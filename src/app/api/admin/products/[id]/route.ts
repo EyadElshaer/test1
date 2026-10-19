@@ -80,7 +80,7 @@ export async function PUT(
 
     const discountPercent = orig > 0 && sale < orig ? Math.round(((orig - sale) / orig) * 100) : 0;
 
-    const updated = await prisma.$transaction(async (tx) => {
+    const updated = await prisma.$transaction(async (tx: any) => {
       const prod = await tx.product.update({
         where: { id },
         data: {

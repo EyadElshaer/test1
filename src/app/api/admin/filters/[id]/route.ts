@@ -15,7 +15,7 @@ export async function PUT(
     const { id } = await params;
     const { label, filterType, displayOrder, isActive, categoryId, options } = await req.json();
 
-    const updated = await prisma.$transaction(async (tx) => {
+    const updated = await prisma.$transaction(async (tx: any) => {
       const group = await tx.filterGroup.update({
         where: { id },
         data: {

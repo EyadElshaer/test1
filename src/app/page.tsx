@@ -215,7 +215,7 @@ export default async function HomePage() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {categories.map((cat) => (
+          {(categories as any[]).map((cat: any) => (
             <Link
               key={cat.id}
               href={`/products?category=${cat.slug}`}
@@ -277,7 +277,7 @@ export default async function HomePage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {featuredProducts.map((product) => (
+            {(featuredProducts as any[]).map((product: any) => (
               <ProductCard
                 key={product.id}
                 id={product.id}
@@ -383,7 +383,7 @@ export default async function HomePage() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {recentProducts.map((product) => (
+          {(recentProducts as any[]).map((product: any) => (
             <ProductCard
               key={product.id}
               id={product.id}

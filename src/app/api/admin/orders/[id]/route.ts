@@ -61,7 +61,7 @@ export async function PATCH(
     const newStatus = status || fromStatus;
     const isStatusChanged = newStatus !== fromStatus;
 
-    const updatedOrder = await prisma.$transaction(async (tx) => {
+    const updatedOrder = await prisma.$transaction(async (tx: any) => {
       const order = await tx.order.update({
         where: { id },
         data: {

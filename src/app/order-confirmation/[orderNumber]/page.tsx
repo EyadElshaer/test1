@@ -104,7 +104,7 @@ export default async function OrderConfirmationPage({
         <div className="space-y-4">
           <h3 className="font-bold text-white text-base">Purchased Digital Items</h3>
           <div className="divide-y divide-white/5 border-t border-b border-white/10">
-            {order.items.map((item) => (
+            {(order.items as any[]).map((item: any) => (
               <div key={item.id} className="py-4 flex items-center justify-between text-xs sm:text-sm">
                 <div className="flex items-center gap-3">
                   <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-slate-900 border border-white/10 shrink-0">

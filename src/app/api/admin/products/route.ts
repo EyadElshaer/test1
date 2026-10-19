@@ -111,7 +111,7 @@ export async function POST(req: Request) {
       counter++;
     }
 
-    const newProduct = await prisma.$transaction(async (tx) => {
+    const newProduct = await prisma.$transaction(async (tx: any) => {
       const product = await tx.product.create({
         data: {
           title: title.trim(),

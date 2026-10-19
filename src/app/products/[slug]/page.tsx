@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import prisma from "@/lib/prisma";
-import ProductDetailClient from "./ProductDetailClient";
+import ProductDetailClient from "@/app/products/[slug]/ProductDetailClient";
 import ProductCard from "@/components/ProductCard";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
@@ -95,7 +95,7 @@ export default async function ProductDetailPage({
             <h2 className="text-2xl font-bold text-white mt-1">Related Products</h2>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {related.map((item) => (
+            {(related as any[]).map((item: any) => (
               <ProductCard
                 key={item.id}
                 id={item.id}

@@ -20,8 +20,8 @@ export async function POST(req: Request) {
     }
 
     // Check if there is already a pending or approved refund request
-    const existingActive = order.refundRequests.find(
-      (r) => r.status === "PENDING" || r.status === "APPROVED" || r.status === "DONE"
+    const existingActive = (order.refundRequests as any[]).find(
+      (r: any) => r.status === "PENDING" || r.status === "APPROVED" || r.status === "DONE"
     );
 
     if (existingActive) {
@@ -41,7 +41,7 @@ export async function POST(req: Request) {
 
     const refundNumber = await generateUniqueRefundNumber();
 
-    const newRefund = await prisma.$transaction(async (tx) => {
+    const newRefund = await prisma.$transaction(async (tx: any) => {
       const refund = await tx.refundRequest.create({
         data: {
           refundNumber,

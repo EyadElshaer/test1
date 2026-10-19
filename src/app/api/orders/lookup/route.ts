@@ -62,7 +62,7 @@ export async function POST(req: Request) {
         totalAmount: order.totalAmount,
         currency: order.currency,
         adminCustomerNote: order.adminCustomerNote,
-        items: order.items.map((i) => ({
+        items: order.items.map((i: any) => ({
           id: i.id,
           productTitle: i.productTitle,
           productSlug: i.productSlug,
@@ -73,12 +73,12 @@ export async function POST(req: Request) {
           discountPercent: i.discountPercent,
           lineTotal: i.lineTotal,
         })),
-        statusTimeline: order.statusHistory.map((h) => ({
+        statusTimeline: order.statusHistory.map((h: any) => ({
           toStatus: h.toStatus,
           notes: h.notes,
           createdAt: h.createdAt,
         })),
-        refundRequests: order.refundRequests.map((r) => ({
+        refundRequests: order.refundRequests.map((r: any) => ({
           id: r.id,
           refundNumber: r.refundNumber,
           reason: r.reason,
@@ -87,7 +87,7 @@ export async function POST(req: Request) {
           status: r.status,
           adminCustomerNote: r.adminCustomerNote,
           createdAt: r.createdAt,
-          statusTimeline: r.statusHistory.map((sh) => ({
+          statusTimeline: r.statusHistory.map((sh: any) => ({
             toStatus: sh.toStatus,
             notes: sh.notes,
             createdAt: sh.createdAt,

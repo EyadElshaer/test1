@@ -28,7 +28,7 @@ export async function PATCH(
     const newStatus = status || fromStatus;
     const isStatusChanged = newStatus !== fromStatus;
 
-    const updated = await prisma.$transaction(async (tx) => {
+    const updated = await prisma.$transaction(async (tx: any) => {
       const refund = await tx.refundRequest.update({
         where: { id },
         data: {

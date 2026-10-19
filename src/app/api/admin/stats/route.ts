@@ -48,12 +48,12 @@ export async function GET() {
     ]);
 
     // Calculate total submitted order value
-    const totalSubmittedValue = allOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+    const totalSubmittedValue = (allOrders as any[]).reduce((sum: number, o: any) => sum + (o.totalAmount || 0), 0);
 
     // Calculate confirmed revenue (ONLY Approved and Done orders!)
-    const confirmedRevenue = allOrders
-      .filter((o) => o.status === "APPROVED" || o.status === "DONE")
-      .reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+    const confirmedRevenue = (allOrders as any[])
+      .filter((o: any) => o.status === "APPROVED" || o.status === "DONE")
+      .reduce((sum: number, o: any) => sum + (o.totalAmount || 0), 0);
 
     return NextResponse.json({
       success: true,

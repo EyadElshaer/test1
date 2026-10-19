@@ -79,7 +79,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const dbProductMap = new Map(dbProducts.map((p) => [p.id, p]));
+    const dbProductMap = new Map((dbProducts as any[]).map((p: any) => [p.id, p]));
 
     let serverSubtotal = 0;
     const orderItemsSnapshot: {
@@ -95,7 +95,7 @@ export async function POST(req: Request) {
     }[] = [];
 
     for (const item of items) {
-      const dbProd = dbProductMap.get(item.productId);
+      const dbProd: any = dbProductMap.get(item.productId);
       if (!dbProd) {
         return NextResponse.json({ error: `Product not found: ${item.productId}` }, { status: 400 });
       }
@@ -179,7 +179,7 @@ export async function POST(req: Request) {
     const orderNumber = await generateUniqueOrderNumber();
 
     // 7. Atomic Database Transaction
-    const newOrder = await prisma.$transaction(async (tx) => {
+    const newOrder = await prisma.$transaction(async (tx: any) => {
       // Create order
       const order = await tx.order.create({
         data: {

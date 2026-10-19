@@ -50,7 +50,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const group = await prisma.$transaction(async (tx) => {
+    const group = await prisma.$transaction(async (tx: any) => {
       const created = await tx.filterGroup.create({
         data: {
           label: label.trim(),

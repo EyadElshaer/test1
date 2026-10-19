@@ -80,7 +80,7 @@ export async function POST(req: Request) {
         },
       });
 
-      const formattedOrders = orders.map((order) => ({
+      const formattedOrders = (orders as any[]).map((order: any) => ({
         id: order.id,
         orderNumber: order.orderNumber,
         createdAt: order.createdAt,
@@ -96,7 +96,7 @@ export async function POST(req: Request) {
         currency: order.currency,
         adminCustomerNote: order.adminCustomerNote,
         items: order.items,
-        statusTimeline: order.statusHistory.map((h) => ({
+        statusTimeline: (order.statusHistory || []).map((h: any) => ({
           toStatus: h.toStatus,
           notes: h.notes,
           createdAt: h.createdAt,
