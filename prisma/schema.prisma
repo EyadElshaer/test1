@@ -1,0 +1,330 @@
+// Prisma schema for PremiKeys E-Commerce Platform
+// Digital products, game keys, PC activations, and software licenses
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Admin {
+  id                 String         @id @default(cuid())
+  username           String         @unique
+  email              String         @unique
+  passwordHash       String
+  role               String         @default("ADMIN") // SUPER_ADMIN, ADMIN
+  mustChangePassword Boolean        @default(true)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  sessions           AdminSession[]
+}
+
+model AdminSession {
+  id        String   @id @default(cuid())
+  adminId   String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  admin     Admin    @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId])
+}
+
+model AdminAuditLog {
+  id        String   @id @default(cuid())
+  adminId   String?
+  action    String
+  details   String?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@index([adminId])
+  @@index([action])
+}
+
+model Category {
+  id           String        @id @default(cuid())
+  name         String
+  slug         String        @unique
+  description  String?
+  image        String?
+  displayOrder Int           @default(0)
+  isActive     Boolean       @default(true)
+  isFeatured   Boolean       @default(false)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  products     Product[]
+  filterGroups FilterGroup[]
+}
+
+model Product {
+  id                   String                  @id @default(cuid())
+  title                String
+  slug                 String                  @unique
+  shortDescription     String?
+  description          String
+  originalPrice        Float                   // Regular price
+  salePrice            Float                   // Discounted price
+  discountPercent      Float                   @default(0) // ((original - sale) / original) * 100
+  categoryId           String
+  platform             String?                 // e.g. Steam, Epic, Xbox, Windows, Office
+  productType          String?                 // Key, Activation, Account, License
+  compatibility        String?                 // e.g. Windows 10/11, Global
+  deliveryInstructions String?                 // Guide for activation
+  availability         String                  @default("IN_STOCK") // IN_STOCK, OUT_OF_STOCK, PREORDER
+  stockQuantity        Int                     @default(999)
+  isFeatured           Boolean                 @default(false)
+  isPublished          Boolean                 @default(true)
+  isArchived           Boolean                 @default(false)
+  displayOrder         Int                     @default(0)
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  category             Category                @relation(fields: [categoryId], references: [id])
+  images               ProductImage[]
+  attributeValues      ProductAttributeValue[]
+  orderItems           OrderItem[]
+
+  @@index([categoryId])
+  @@index([slug])
+  @@index([isPublished, isArchived])
+}
+
+model ProductImage {
+  id           String   @id @default(cuid())
+  productId    String
+  url          String
+  altText      String?
+  isPrimary    Boolean  @default(false)
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+model FilterGroup {
+  id           String         @id @default(cuid())
+  label        String         // Display label (e.g. "Platform", "Region", "License Type")
+  attributeKey String         @unique // Unique key (e.g. "platform", "region")
+  filterType   String         @default("CHECKBOX") // CHECKBOX, DROPDOWN, BOOLEAN, RANGE
+  displayOrder Int            @default(0)
+  isActive     Boolean        @default(true)
+  categoryId   String?        // Null if applies across the entire catalog
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  category     Category?      @relation(fields: [categoryId], references: [id])
+  options      FilterOption[]
+
+  @@index([categoryId])
+}
+
+model FilterOption {
+  id            String      @id @default(cuid())
+  filterGroupId String
+  label         String
+  value         String
+  displayOrder  Int         @default(0)
+  createdAt     DateTime    @default(now())
+  filterGroup   FilterGroup @relation(fields: [filterGroupId], references: [id], onDelete: Cascade)
+
+  @@index([filterGroupId])
+}
+
+model ProductAttributeValue {
+  id           String   @id @default(cuid())
+  productId    String
+  attributeKey String
+  value        String
+  createdAt    DateTime @default(now())
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([attributeKey])
+}
+
+model PaymentMethod {
+  id                     String   @id @default(cuid())
+  name                   String   // e.g. InstaPay, Vodafone Cash, Bank Transfer, Crypto
+  code                   String   @unique
+  description            String?
+  icon                   String?
+  instructions           String   // Transfer steps & details
+  recipientName          String?
+  accountDetails         String?  // Phone / Wallet / Account / IBAN
+  currency               String   @default("EGP")
+  transferReferenceHint  String?
+  deepLink               String?  // App URL / scheme
+  publicPaymentUrl       String?
+  minAmount              Float?
+  maxAmount              Float?
+  requireScreenshot      Boolean  @default(true)
+  displayOrder           Int      @default(0)
+  isActive               Boolean  @default(true)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+}
+
+model PromoCode {
+  id                   String           @id @default(cuid())
+  code                 String           @unique
+  description          String?
+  discountType         String           @default("PERCENTAGE") // PERCENTAGE, FIXED
+  discountValue        Float
+  startDate            DateTime?
+  endDate              DateTime?
+  isActive             Boolean          @default(true)
+  maxUses              Int?
+  currentUses          Int              @default(0)
+  maxUsesPerCustomer   Int?             @default(1)
+  minSubtotal          Float?
+  maxDiscountAmount    Float?
+  eligibleCategoryIds  String?          // JSON array string of category IDs
+  eligibleProductIds   String?          // JSON array string of product IDs
+  minProductPrice      Float?           // Only applies to items with price >= minProductPrice
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  orders               Order[]
+  usages               PromoCodeUsage[]
+}
+
+model PromoCodeUsage {
+  id             String    @id @default(cuid())
+  promoCodeId    String
+  orderId        String
+  customerPhone  String
+  customerEmail  String
+  discountAmount Float
+  createdAt      DateTime  @default(now())
+  promoCode      PromoCode @relation(fields: [promoCodeId], references: [id], onDelete: Cascade)
+
+  @@index([promoCodeId])
+  @@index([customerPhone])
+}
+
+model Order {
+  id                 String               @id @default(cuid())
+  orderNumber        String               @unique // #DN... format
+  customerName       String
+  customerPhone      String               // Normalized international format
+  countryCode        String
+  customerEmail      String
+  status             String               @default("PENDING") // PENDING, APPROVED, REJECTED, DONE
+  paymentStatus      String               @default("AWAITING_VERIFICATION") // AWAITING_VERIFICATION, VERIFIED, REJECTED
+  paymentMethodId    String?
+  paymentMethodName  String
+  paymentReference   String?
+  paymentScreenshotUrl String?
+  subtotal           Float
+  discountAmount     Float                @default(0)
+  promoCodeId        String?
+  promoCodeCode      String?
+  totalAmount        Float
+  currency           String               @default("EGP")
+  customerNotes      String?
+  adminCustomerNote  String?
+  adminInternalNote  String?
+  rejectionReason    String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  items              OrderItem[]
+  statusHistory      OrderStatusHistory[]
+  refundRequests     RefundRequest[]
+  promoCode          PromoCode?           @relation(fields: [promoCodeId], references: [id])
+
+  @@index([orderNumber])
+  @@index([customerPhone])
+  @@index([customerEmail])
+  @@index([status])
+}
+
+model OrderItem {
+  id              String   @id @default(cuid())
+  orderId         String
+  productId       String?
+  productTitle    String   // Historical snapshot
+  productSlug     String   // Historical snapshot
+  productImage    String?  // Historical snapshot
+  quantity        Int
+  originalPrice   Float    // Historical snapshot
+  salePrice       Float    // Historical snapshot
+  discountPercent Float    @default(0)
+  lineTotal       Float
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product         Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model OrderStatusHistory {
+  id         String   @id @default(cuid())
+  orderId    String
+  fromStatus String
+  toStatus   String
+  changedBy  String   // Admin username or SYSTEM
+  notes      String?
+  createdAt  DateTime @default(now())
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}
+
+model RefundRequest {
+  id                 String                @id @default(cuid())
+  refundNumber       String                @unique // #RF... format
+  orderId            String
+  customerName       String
+  customerPhone      String
+  customerEmail      String
+  reason             String
+  explanation        String
+  requestedAmount    Float
+  status             String                @default("PENDING") // PENDING, APPROVED, REJECTED, DONE
+  adminCustomerNote  String?
+  adminInternalNote  String?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  order              Order                 @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  statusHistory      RefundStatusHistory[]
+
+  @@index([orderId])
+  @@index([refundNumber])
+  @@index([status])
+}
+
+model RefundStatusHistory {
+  id              String        @id @default(cuid())
+  refundRequestId String
+  fromStatus      String
+  toStatus        String
+  changedBy       String
+  notes           String?
+  createdAt       DateTime      @default(now())
+  refundRequest   RefundRequest @relation(fields: [refundRequestId], references: [id], onDelete: Cascade)
+
+  @@index([refundRequestId])
+}
+
+model FaqItem {
+  id           String   @id @default(cuid())
+  category     String   @default("General") // Ordering, Payments, Delivery, Refunds, General
+  question     String
+  answer       String
+  displayOrder Int      @default(0)
+  isPublished  Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([category])
+  @@index([isPublished])
+}
+
+model StoreSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+}
