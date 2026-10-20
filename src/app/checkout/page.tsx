@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { COUNTRY_CODES, CountryCode } from "@/lib/countryCodes";
+import { compressImageForUpload } from "@/lib/imageCompression";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -112,13 +113,14 @@ export default function CheckoutPage() {
 
     setErrorMessage("");
 
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+    const allowed = ["image/jpeg", "image/png", "image/webp", "image/jpg", "image/gif"];
+    if (!allowed.includes(file.type)) {
       setErrorMessage("Only JPEG, PNG, and WebP images are allowed.");
       return;
     }
 
-    if (file.size > 8 * 1024 * 1024) {
-      setErrorMessage("File exceeds 8MB. Please choose a smaller payment screenshot.");
+    if (file.size > 20 * 1024 * 1024) {
+      setErrorMessage("File exceeds 20MB limit. Please select a smaller screenshot.");
       return;
     }
 
@@ -126,12 +128,14 @@ export default function CheckoutPage() {
     const objectUrl = URL.createObjectURL(file);
     setScreenshotPreview(objectUrl);
 
-    // Upload to private server storage
+    // Compress client-side for ultra-fast, smooth upload that won't fail on any network or Vercel limit
     setIsUploadingScreenshot(true);
-    const formData = new FormData();
-    formData.append("screenshot", file);
 
     try {
+      const optimizedFile = await compressImageForUpload(file, 1600, 1600, 0.85);
+      const formData = new FormData();
+      formData.append("screenshot", optimizedFile);
+
       const res = await fetch("/api/checkout/upload-screenshot", {
         method: "POST",
         body: formData,

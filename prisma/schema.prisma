@@ -329,3 +329,16 @@ model StoreSetting {
   value     String
   updatedAt DateTime @updatedAt
 }
+
+model UploadedFile {
+  id        String   @id @default(cuid())
+  filename  String   @unique
+  mimeType  String
+  data      Bytes
+  size      Int
+  category  String   @default("general")
+  createdAt DateTime @default(now())
+
+  @@index([filename])
+}
+

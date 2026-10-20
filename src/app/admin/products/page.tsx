@@ -19,6 +19,8 @@ import {
   Sparkles,
   Tag,
 } from "lucide-react";
+import { compressImageForUpload } from "@/lib/imageCompression";
+
 
 export default function AdminProductsPage() {
   const [products, setProducts] = useState<any[]>([]);
@@ -186,10 +188,13 @@ export default function AdminProductsPage() {
     if (!file) return;
 
     setIsUploadingImage(true);
-    const formData = new FormData();
-    formData.append("image", file);
 
     try {
+      // Compress image client-side for fast, seamless upload and reduced payload
+      const optimizedFile = await compressImageForUpload(file, 1600, 1600, 0.85);
+      const formData = new FormData();
+      formData.append("image", optimizedFile);
+
       const res = await fetch("/api/admin/upload-product-image", {
         method: "POST",
         body: formData,
@@ -203,6 +208,8 @@ export default function AdminProductsPage() {
       alert(err.message || "Upload failed.");
     } finally {
       setIsUploadingImage(false);
+      // Reset input value so same file can be selected again if needed
+      e.target.value = "";
     }
   };
 

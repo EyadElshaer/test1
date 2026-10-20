@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import { getAdminSession } from "@/lib/auth";
+import prisma from "@/lib/prisma";
 
 export async function GET(
   req: Request,
@@ -14,26 +15,45 @@ export async function GET(
     }
 
     const { filename } = await params;
-    // Prevent directory traversal
     const safeFilename = path.basename(filename);
-    const filePath = path.join(process.cwd(), "storage", "screenshots", safeFilename);
 
-    if (!fs.existsSync(filePath)) {
-      return new NextResponse("Screenshot not found.", { status: 404 });
+    // 1. Try PostgreSQL database first
+    try {
+      const dbFile = await prisma.uploadedFile.findUnique({
+        where: { filename: safeFilename },
+      });
+
+      if (dbFile && dbFile.data) {
+        return new NextResponse(dbFile.data, {
+          headers: {
+            "Content-Type": dbFile.mimeType || "image/jpeg",
+            "Cache-Control": "private, no-cache, no-store, must-revalidate",
+            "X-Content-Type-Options": "nosniff",
+          },
+        });
+      }
+    } catch (dbErr) {
+      console.warn("Database lookup error for screenshot:", dbErr);
     }
 
-    const fileBuffer = fs.readFileSync(filePath);
-    const ext = path.extname(safeFilename).toLowerCase();
-    const contentType =
-      ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg";
+    // 2. Fallback to local storage on disk
+    const filePath = path.join(process.cwd(), "storage", "screenshots", safeFilename);
+    if (fs.existsSync(filePath)) {
+      const fileBuffer = fs.readFileSync(filePath);
+      const ext = path.extname(safeFilename).toLowerCase();
+      const contentType =
+        ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg";
 
-    return new NextResponse(fileBuffer, {
-      headers: {
-        "Content-Type": contentType,
-        "Cache-Control": "private, no-cache, no-store, must-revalidate",
-        "X-Content-Type-Options": "nosniff",
-      },
-    });
+      return new NextResponse(fileBuffer, {
+        headers: {
+          "Content-Type": contentType,
+          "Cache-Control": "private, no-cache, no-store, must-revalidate",
+          "X-Content-Type-Options": "nosniff",
+        },
+      });
+    }
+
+    return new NextResponse("Screenshot not found.", { status: 404 });
   } catch (error) {
     console.error("Error reading screenshot:", error);
     return new NextResponse("Internal server error", { status: 500 });

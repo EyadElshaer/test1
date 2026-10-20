@@ -1,11 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { ShoppingCart, Zap, Eye, CheckCircle2, AlertCircle, Check } from "lucide-react";
-import { useCart } from "@/context/CartContext";
+import { ShoppingCart, ArrowRight, Eye, CheckCircle2, AlertCircle } from "lucide-react";
 
 export interface ProductCardProps {
   id: string;
@@ -37,55 +36,25 @@ export default function ProductCard({
   images,
 }: ProductCardProps) {
   const router = useRouter();
-  const { addItem, setIsCartOpen } = useCart();
-  const [justAdded, setJustAdded] = useState(false);
-  const primaryImage = images[0]?.url || "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80";
+  const primaryImage =
+    images && images.length > 0 && images[0]?.url
+      ? images[0].url
+      : "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80";
 
   const isOutOfStock = availability === "OUT_OF_STOCK";
 
-  const handleAddToCart = (e: React.MouseEvent) => {
+  const handleNavigateToProduct = (e: React.MouseEvent) => {
     e.preventDefault();
-    e.stopPropagation();
-    if (isOutOfStock) return;
-    
-    addItem({
-      productId: id,
-      title,
-      slug,
-      image: primaryImage,
-      originalPrice,
-      salePrice,
-      discountPercent,
-      platform: platform || undefined,
-      productType: productType || undefined,
-    });
-
-    setJustAdded(true);
-    setTimeout(() => setJustAdded(false), 1400);
-  };
-
-  const handleBuyNow = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (isOutOfStock) return;
-    addItem({
-      productId: id,
-      title,
-      slug,
-      image: primaryImage,
-      originalPrice,
-      salePrice,
-      discountPercent,
-      platform: platform || undefined,
-      productType: productType || undefined,
-    });
-    router.push("/checkout");
+    router.push(`/products/${slug}`);
   };
 
   return (
     <div className="glass-card rounded-2xl overflow-hidden flex flex-col group relative border border-white/10 hover:border-cyan-400/50 transition-all duration-300 gpu-layer will-change-transform">
-      {/* Image Banner */}
-      <Link href={`/products/${slug}`} className="relative h-48 w-full overflow-hidden bg-slate-900 block">
+      {/* Image Banner - Clicking navigates to product details */}
+      <Link
+        href={`/products/${slug}`}
+        className="relative h-48 w-full overflow-hidden bg-slate-900 block cursor-pointer"
+      >
         <Image
           src={primaryImage}
           alt={title}
@@ -97,7 +66,7 @@ export default function ProductCard({
         <div className="absolute inset-0 bg-gradient-to-t from-[#0a0f24] via-transparent to-transparent opacity-90 pointer-events-none" />
 
         {/* Badges on image */}
-        <div className="absolute top-3 left-3 flex flex-wrap gap-1.5 z-10">
+        <div className="absolute top-3 left-3 flex flex-wrap gap-1.5 z-10 pointer-events-none">
           {discountPercent > 0 && (
             <span className="badge-discount text-[11px] px-2 py-0.5 rounded-md uppercase font-extrabold shadow-md shadow-red-900/40">
               -{discountPercent}% OFF
@@ -126,6 +95,7 @@ export default function ProductCard({
               {category.name}
             </span>
           )}
+          {/* Product Name / Title - Clicking navigates to product details */}
           <Link href={`/products/${slug}`} className="block mt-1">
             <h3 className="font-bold text-sm sm:text-base text-white group-hover:text-cyan-300 transition-colors line-clamp-1">
               {title}
@@ -167,42 +137,27 @@ export default function ProductCard({
             </div>
           </div>
 
-          {/* Buttons: Add to Cart & Buy Now */}
-          <div className="grid grid-cols-2 gap-2 pt-1">
-            <button
-              type="button"
-              onClick={handleAddToCart}
-              disabled={isOutOfStock}
-              className={`w-full flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-semibold transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed ${
-                justAdded
-                  ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/30 border border-emerald-400"
-                  : "btn-secondary"
-              }`}
-              title="Add to Cart"
-            >
-              {justAdded ? (
-                <>
-                  <Check className="w-3.5 h-3.5 stroke-[3]" />
-                  <span>Added!</span>
-                </>
-              ) : (
-                <>
-                  <ShoppingCart className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>Add to Cart</span>
-                </>
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={handleBuyNow}
-              disabled={isOutOfStock}
-              className="w-full flex items-center justify-center gap-1 py-2.5 px-3 rounded-xl text-xs font-bold btn-primary disabled:opacity-40 disabled:cursor-not-allowed"
-              title="Buy Now"
-            >
-              <Zap className="w-3.5 h-3.5 fill-current" />
-              <span>Buy Now</span>
-            </button>
+          {/* Action Button: Pressing Add to Cart takes customer to actual product details */}
+          <div className="pt-1">
+            {isOutOfStock ? (
+              <button
+                type="button"
+                disabled
+                className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-semibold bg-white/5 text-slate-500 border border-white/5 cursor-not-allowed"
+              >
+                Out of Stock
+              </button>
+            ) : (
+              <Link
+                href={`/products/${slug}`}
+                className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold btn-primary transition-all duration-200 group/btn"
+                title="View Product Details and Add to Cart"
+              >
+                <ShoppingCart className="w-3.5 h-3.5 text-cyan-200" />
+                <span>Add to Cart • View Details</span>
+                <ArrowRight className="w-3.5 h-3.5 ml-0.5 group-hover/btn:translate-x-1 transition-transform" />
+              </Link>
+            )}
           </div>
         </div>
       </div>
