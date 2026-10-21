@@ -23,6 +23,7 @@ import {
   X,
   AlertTriangle,
   CheckCircle2,
+  Users,
 } from "lucide-react";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -127,6 +128,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const navItems = [
     { name: "Overview", href: "/admin/dashboard", icon: LayoutDashboard },
     { name: "Orders", href: "/admin/orders", icon: ShoppingBag },
+    { name: "Customers", href: "/admin/customers", icon: Users },
     { name: "Refunds", href: "/admin/refunds", icon: RotateCcw },
     { name: "Products", href: "/admin/products", icon: Package },
     { name: "Categories", href: "/admin/categories", icon: Layers },

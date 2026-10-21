@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
 import { generateUniqueOrderNumber } from "@/lib/orderNumber";
 import { normalizePhoneNumber } from "@/lib/countryCodes";
+import { getUserSession, createUserSession } from "@/lib/userAuth";
 
 export async function POST(req: Request) {
   try {
@@ -18,6 +20,8 @@ export async function POST(req: Request) {
       promoCode,
       customerNotes,
       items,
+      autoSignup,
+      password,
     } = body;
 
     // 1. Validate Customer Information
@@ -178,12 +182,51 @@ export async function POST(req: Request) {
     // 6. Generate Unique Order Number (#DN...)
     const orderNumber = await generateUniqueOrderNumber();
 
+    // Check if user is currently logged in or opted into auto-signup
+    let orderUserId: string | null = null;
+    const activeSessionUser = await getUserSession();
+    if (activeSessionUser) {
+      orderUserId = activeSessionUser.id;
+    } else if (autoSignup && password && password.length >= 6) {
+      const cleanEmail = customerEmail.trim().toLowerCase();
+      try {
+        let user = await prisma.user.findFirst({
+          where: {
+            OR: [{ email: cleanEmail }, { phone: normalizedPhone }],
+          },
+        });
+
+        if (user) {
+          orderUserId = user.id;
+          const isMatch = await bcrypt.compare(password, user.passwordHash);
+          if (isMatch) {
+            await createUserSession(user.id);
+          }
+        } else {
+          const passwordHash = await bcrypt.hash(password, 10);
+          user = await prisma.user.create({
+            data: {
+              name: customerName.trim(),
+              email: cleanEmail,
+              phone: normalizedPhone,
+              passwordHash,
+            },
+          });
+          orderUserId = user.id;
+          await createUserSession(user.id);
+        }
+      } catch (authErr) {
+        console.warn("Auto-signup note:", authErr);
+      }
+    }
+
     // 7. Atomic Database Transaction
     const newOrder = await prisma.$transaction(async (tx: any) => {
       // Create order
       const order = await tx.order.create({
         data: {
           orderNumber,
+          userId: orderUserId,
           customerName: customerName.trim(),
           customerPhone: normalizedPhone,
           countryCode: countryCode || "EG",

@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { CartProvider } from "@/context/CartContext";
+import { AuthProvider } from "@/context/AuthContext";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import AnnouncementBanner from "@/components/AnnouncementBanner";
 import CartDrawer from "@/components/CartDrawer";
+import CookieNotice from "@/components/CookieNotice";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://premikeys.com"),
@@ -44,13 +46,16 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className="min-h-screen bg-[#030712] text-slate-100 flex flex-col antialiased selection:bg-cyan-500 selection:text-black">
-        <CartProvider>
-          <AnnouncementBanner />
-          <Header />
-          <main className="flex-1 w-full">{children}</main>
-          <CartDrawer />
-          <Footer />
-        </CartProvider>
+        <AuthProvider>
+          <CartProvider>
+            <AnnouncementBanner />
+            <Header />
+            <main className="flex-1 w-full">{children}</main>
+            <CartDrawer />
+            <CookieNotice />
+            <Footer />
+          </CartProvider>
+        </AuthProvider>
       </body>
     </html>
   );

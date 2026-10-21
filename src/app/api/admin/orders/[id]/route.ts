@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import fs from "fs";
+import path from "path";
 import prisma from "@/lib/prisma";
 import { getAdminSession, logAdminAudit } from "@/lib/auth";
 
@@ -46,8 +48,14 @@ export async function PATCH(
     }
 
     const { id } = await params;
-    const { status, paymentStatus, adminCustomerNote, adminInternalNote, rejectionReason } =
-      await req.json();
+    const {
+      status,
+      paymentStatus,
+      adminCustomerNote,
+      adminInternalNote,
+      rejectionReason,
+      purgeScreenshot,
+    } = await req.json();
 
     const existingOrder = await prisma.order.findUnique({
       where: { id },
@@ -61,16 +69,65 @@ export async function PATCH(
     const newStatus = status || fromStatus;
     const isStatusChanged = newStatus !== fromStatus;
 
+    // Auto-delete payment screenshot if order moves away from PENDING, or if explicitly requested
+    const shouldDeleteScreenshot =
+      Boolean(existingOrder.paymentScreenshotUrl) &&
+      ((fromStatus === "PENDING" && newStatus !== "PENDING") || purgeScreenshot === true);
+
+    if (shouldDeleteScreenshot && existingOrder.paymentScreenshotUrl) {
+      const filename = path.basename(existingOrder.paymentScreenshotUrl.split("?")[0]);
+
+      // 1. Delete from PostgreSQL database storage (UploadedFile) to immediately reclaim storage space
+      try {
+        await prisma.uploadedFile.deleteMany({
+          where: { filename },
+        });
+      } catch (fileErr) {
+        console.warn("Failed to delete screenshot from database storage:", fileErr);
+      }
+
+      // 2. Delete from local disk storage if present
+      try {
+        const diskPath = path.join(process.cwd(), "storage", "screenshots", filename);
+        if (fs.existsSync(diskPath)) {
+          fs.unlinkSync(diskPath);
+        }
+      } catch (diskErr) {
+        console.warn("Failed to delete screenshot from disk storage:", diskErr);
+      }
+    }
+
     const updatedOrder = await prisma.$transaction(async (tx: any) => {
+      const updateData: any = {
+        status: newStatus,
+        paymentStatus:
+          paymentStatus ||
+          (newStatus === "APPROVED" || newStatus === "DONE"
+            ? "VERIFIED"
+            : newStatus === "REJECTED"
+            ? "REJECTED"
+            : existingOrder.paymentStatus),
+        adminCustomerNote:
+          adminCustomerNote !== undefined
+            ? adminCustomerNote
+            : existingOrder.adminCustomerNote,
+        adminInternalNote:
+          adminInternalNote !== undefined
+            ? adminInternalNote
+            : existingOrder.adminInternalNote,
+        rejectionReason:
+          rejectionReason !== undefined
+            ? rejectionReason
+            : existingOrder.rejectionReason,
+      };
+
+      if (shouldDeleteScreenshot) {
+        updateData.paymentScreenshotUrl = null;
+      }
+
       const order = await tx.order.update({
         where: { id },
-        data: {
-          status: newStatus,
-          paymentStatus: paymentStatus || (newStatus === "APPROVED" || newStatus === "DONE" ? "VERIFIED" : newStatus === "REJECTED" ? "REJECTED" : existingOrder.paymentStatus),
-          adminCustomerNote: adminCustomerNote !== undefined ? adminCustomerNote : existingOrder.adminCustomerNote,
-          adminInternalNote: adminInternalNote !== undefined ? adminInternalNote : existingOrder.adminInternalNote,
-          rejectionReason: rejectionReason !== undefined ? rejectionReason : existingOrder.rejectionReason,
-        },
+        data: updateData,
         include: {
           items: true,
           statusHistory: { orderBy: { createdAt: "asc" } },
@@ -85,7 +142,13 @@ export async function PATCH(
             fromStatus,
             toStatus: newStatus,
             changedBy: admin.username,
-            notes: adminCustomerNote || `Status updated from ${fromStatus} to ${newStatus}`,
+            notes:
+              adminCustomerNote ||
+              `Status updated from ${fromStatus} to ${newStatus}${
+                shouldDeleteScreenshot
+                  ? " (Payment receipt proof purged from DB storage to free space)"
+                  : ""
+              }`,
           },
         });
       }
@@ -96,7 +159,9 @@ export async function PATCH(
     await logAdminAudit(
       admin.id,
       "ORDER_UPDATED",
-      `Order ${existingOrder.orderNumber} updated. Status: ${fromStatus} -> ${newStatus}`
+      `Order ${existingOrder.orderNumber} updated. Status: ${fromStatus} -> ${newStatus}${
+        shouldDeleteScreenshot ? " (Receipt screenshot purged to free database storage)" : ""
+      }`
     );
 
     return NextResponse.json({ success: true, order: updatedOrder });

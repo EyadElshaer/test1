@@ -100,7 +100,7 @@ export default function Footer() {
 
           {/* Quick Links */}
           <div>
-            <h5 className="text-xs font-bold uppercase tracking-wider text-slate-200 mb-4">Catalog & Orders</h5>
+            <h5 className="text-xs font-bold uppercase tracking-wider text-slate-200 mb-4">Catalog & Account</h5>
             <ul className="space-y-2.5 text-xs">
               <li>
                 <Link href="/products" className="hover:text-cyan-300 transition-colors">
@@ -108,13 +108,18 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/cart" className="hover:text-cyan-300 transition-colors">
-                  Shopping Cart
+                <Link href="/account/orders" className="hover:text-cyan-300 transition-colors">
+                  My Orders &amp; Purchased Keys
+                </Link>
+              </li>
+              <li>
+                <Link href="/login" className="hover:text-cyan-300 transition-colors">
+                  Customer Sign In / Register
                 </Link>
               </li>
               <li>
                 <Link href="/my-orders" className="hover:text-cyan-300 transition-colors">
-                  Track Order / Refund Status
+                  Track Order with Code (#DN...)
                 </Link>
               </li>
               <li>
@@ -129,6 +134,11 @@ export default function Footer() {
           <div>
             <h5 className="text-xs font-bold uppercase tracking-wider text-slate-200 mb-4">Policies & Terms</h5>
             <ul className="space-y-2.5 text-xs">
+              <li>
+                <Link href="/cookie-policy" className="hover:text-cyan-300 transition-colors">
+                  Cookie Policy
+                </Link>
+              </li>
               <li>
                 <Link href="/refund-policy" className="hover:text-cyan-300 transition-colors">
                   Refund & Return Policy

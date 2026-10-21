@@ -1,0 +1,121 @@
+"use client";
+
+import React, { createContext, useContext, useState, useEffect } from "react";
+
+export interface CustomerUser {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  createdAt?: string;
+}
+
+interface AuthContextType {
+  user: CustomerUser | null;
+  loading: boolean;
+  login: (identifier: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  register: (data: {
+    name: string;
+    identifier?: string;
+    email?: string;
+    phone?: string;
+    password: string;
+  }) => Promise<{ success: boolean; error?: string }>;
+  logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<CustomerUser | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const refreshUser = async () => {
+    try {
+      const res = await fetch("/api/auth/me");
+      const data = await res.json();
+      if (data.authenticated && data.user) {
+        setUser(data.user);
+      } else {
+        setUser(null);
+      }
+    } catch (err) {
+      console.error("Failed to check auth state:", err);
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    refreshUser();
+  }, []);
+
+  const login = async (identifier: string, password: string) => {
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identifier, password }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        return { success: false, error: data.error || "Login failed" };
+      }
+      setUser(data.user);
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || "Network error. Please try again." };
+    }
+  };
+
+  const register = async (formData: {
+    name: string;
+    identifier?: string;
+    email?: string;
+    phone?: string;
+    password: string;
+  }) => {
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        return { success: false, error: data.error || "Registration failed" };
+      }
+      setUser(data.user);
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || "Network error. Please try again." };
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+      setUser(null);
+      window.location.href = "/";
+    } catch (err) {
+      console.error("Failed to log out:", err);
+      setUser(null);
+    }
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return context;
+}

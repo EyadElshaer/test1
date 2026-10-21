@@ -46,6 +46,32 @@ model AdminAuditLog {
   @@index([action])
 }
 
+model User {
+  id           String        @id @default(cuid())
+  name         String
+  email        String?       @unique
+  phone        String?       @unique
+  passwordHash String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  orders       Order[]
+  sessions     UserSession[]
+
+  @@index([email])
+  @@index([phone])
+}
+
+model UserSession {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
 model Category {
   id           String        @id @default(cuid())
   name         String
@@ -234,11 +260,14 @@ model Order {
   statusHistory      OrderStatusHistory[]
   refundRequests     RefundRequest[]
   promoCode          PromoCode?           @relation(fields: [promoCodeId], references: [id])
+  userId             String?
+  user               User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([orderNumber])
   @@index([customerPhone])
   @@index([customerEmail])
   @@index([status])
+  @@index([userId])
 }
 
 model OrderItem {

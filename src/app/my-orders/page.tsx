@@ -21,8 +21,10 @@ import {
   Copy,
   Check,
 } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 function MyOrdersContent() {
+  const { user } = useAuth();
   const searchParams = useSearchParams();
   const initialOrderNumber = searchParams.get("orderNumber") || "";
 
@@ -203,6 +205,31 @@ function MyOrdersContent() {
           Lookup your digital keys, view real-time administrative verification progress, and manage refund requests without creating an account.
         </p>
       </div>
+
+      {/* Logged in User Callout */}
+      {user && (
+        <div className="max-w-2xl mx-auto p-4 rounded-2xl bg-gradient-to-r from-blue-950/70 to-cyan-950/50 border border-cyan-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xl">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-cyan-500/20 text-cyan-300 flex items-center justify-center shrink-0">
+              <KeyRound className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-white">
+                You are signed in as {user.name}
+              </p>
+              <p className="text-[11px] text-slate-300">
+                All your past orders and digital licenses are ready in your account.
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/account/orders"
+            className="px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-blue-600 to-cyan-500 text-white hover:from-blue-500 hover:to-cyan-400 shrink-0 text-center shadow-md shadow-blue-500/20"
+          >
+            Go to My Account Orders
+          </Link>
+        </div>
+      )}
 
       {/* Lookup Card */}
       <div className="glass-card rounded-3xl p-6 sm:p-8 border border-white/10 max-w-2xl mx-auto space-y-6">

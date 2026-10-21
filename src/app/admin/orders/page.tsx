@@ -24,6 +24,7 @@ import {
   AlertCircle,
   RotateCcw,
   X,
+  Trash2,
 } from "lucide-react";
 
 export default function AdminOrdersPage() {
@@ -126,6 +127,35 @@ export default function AdminOrdersPage() {
       fetchOrders();
     } catch (err: any) {
       setUpdateError(err.message || "Failed to update order.");
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  const handlePurgeScreenshot = async (orderId: string) => {
+    if (!confirm("Are you sure you want to permanently delete this receipt image to free database storage?")) {
+      return;
+    }
+    setIsUpdatingStatus(true);
+    setUpdateSuccess("");
+    setUpdateError("");
+    try {
+      const res = await fetch(`/api/admin/orders/${orderId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          purgeScreenshot: true,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to purge receipt image.");
+      }
+      setSelectedOrder(data.order);
+      setUpdateSuccess("Receipt screenshot permanently deleted from database storage!");
+      fetchOrders();
+    } catch (err: any) {
+      setUpdateError(err.message || "Failed to delete screenshot.");
     } finally {
       setIsUpdatingStatus(false);
     }
@@ -483,14 +513,31 @@ export default function AdminOrdersPage() {
                 <div>
                   <span className="text-slate-400 block text-[10px]">Proof Screenshot:</span>
                   {selectedOrder.paymentScreenshotUrl ? (
-                    <button
-                      type="button"
-                      onClick={() => setScreenshotModalUrl(selectedOrder.paymentScreenshotUrl)}
-                      className="mt-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-600/30 text-cyan-300 border border-blue-500/40 hover:bg-blue-600/50 flex items-center gap-1.5"
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                      <span>Inspect Uploaded Transfer Receipt</span>
-                    </button>
+                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                      <button
+                        type="button"
+                        onClick={() => setScreenshotModalUrl(selectedOrder.paymentScreenshotUrl)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-600/30 text-cyan-300 border border-blue-500/40 hover:bg-blue-600/50 flex items-center gap-1.5 transition-colors"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>Inspect Receipt</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handlePurgeScreenshot(selectedOrder.id)}
+                        disabled={isUpdatingStatus}
+                        className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30 hover:bg-rose-500/40 flex items-center gap-1 transition-colors disabled:opacity-50"
+                        title="Delete receipt image to free database storage"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Purge</span>
+                      </button>
+                    </div>
+                  ) : selectedOrder.status !== "PENDING" ? (
+                    <span className="text-emerald-400 text-xs flex items-center gap-1 mt-1 font-medium">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Receipt verified &amp; auto-deleted to free DB storage
+                    </span>
                   ) : (
                     <span className="text-slate-500 italic">No screenshot uploaded</span>
                   )}
@@ -562,6 +609,14 @@ export default function AdminOrdersPage() {
                     <option value="DONE" className="bg-slate-900">DONE (Key Delivered / Complete)</option>
                     <option value="REJECTED" className="bg-slate-900">REJECTED (Payment Declined)</option>
                   </select>
+                  {selectedOrder.status === "PENDING" && selectedOrder.paymentScreenshotUrl && (
+                    <p className="text-[11px] text-cyan-300 mt-2 bg-blue-950/40 border border-blue-500/20 rounded-lg p-2 flex items-start gap-1.5 leading-relaxed">
+                      <span className="text-cyan-400">💡</span>
+                      <span>
+                        Moving away from <strong>PENDING</strong> will automatically delete the receipt image from database storage to save space.
+                      </span>
+                    </p>
+                  )}
                 </div>
 
                 <div>

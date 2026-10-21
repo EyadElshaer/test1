@@ -18,14 +18,20 @@ import {
   Smartphone,
   Copy,
   Check,
+  Eye,
+  EyeOff,
+  User,
+  Package,
 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
+import { useAuth } from "@/context/AuthContext";
 import { COUNTRY_CODES, CountryCode } from "@/lib/countryCodes";
 import { compressImageForUpload } from "@/lib/imageCompression";
 
 export default function CheckoutPage() {
   const router = useRouter();
   const { items, subtotal, promoDiscount, total, appliedPromo, clearCart } = useCart();
+  const { user, refreshUser } = useAuth();
 
   // Customer Form State
   const [customerName, setCustomerName] = useState("");
@@ -35,6 +41,23 @@ export default function CheckoutPage() {
   const [customerNotes, setCustomerNotes] = useState("");
   const [countrySearch, setCountrySearch] = useState("");
   const [isCountryDropdownOpen, setIsCountryDropdownOpen] = useState(false);
+
+  // Auto Signup State
+  const [autoSignup, setAutoSignup] = useState(false);
+  const [autoSignupPassword, setAutoSignupPassword] = useState("");
+  const [showAutoSignupPassword, setShowAutoSignupPassword] = useState(false);
+
+  // Pre-fill user details if logged in
+  useEffect(() => {
+    if (user) {
+      if (user.name && !customerName) setCustomerName(user.name);
+      if (user.email && !customerEmail) setCustomerEmail(user.email);
+      if (user.phone && !customerPhone) {
+        const cleaned = user.phone.replace(/^\+2/, "");
+        setCustomerPhone(cleaned);
+      }
+    }
+  }, [user]);
 
   // Payment Methods
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
@@ -186,6 +209,13 @@ export default function CheckoutPage() {
       return;
     }
 
+    if (!user && autoSignup) {
+      if (!autoSignupPassword || autoSignupPassword.length < 6) {
+        setErrorMessage("Please enter an account password of at least 6 characters.");
+        return;
+      }
+    }
+
     if (selectedPaymentMethod.requireScreenshot && !screenshotUrl) {
       setErrorMessage(`Please upload proof of transfer for ${selectedPaymentMethod.name}.`);
       return;
@@ -205,6 +235,8 @@ export default function CheckoutPage() {
         paymentReference: paymentReference.trim(),
         paymentScreenshotUrl: screenshotUrl,
         promoCode: appliedPromo?.code || null,
+        autoSignup: !user && autoSignup,
+        password: autoSignupPassword,
         items: items.map((i) => ({
           productId: i.productId,
           quantity: i.quantity,
@@ -221,6 +253,10 @@ export default function CheckoutPage() {
 
       if (!res.ok || !data.success) {
         throw new Error(data.error || "Failed to process order.");
+      }
+
+      if (!user && autoSignup) {
+        await refreshUser();
       }
 
       // Display Confirmation Popup Modal on Screen
@@ -273,6 +309,21 @@ export default function CheckoutPage() {
                 </span>
                 <span>Customer Information</span>
               </div>
+
+              {/* Logged in indicator */}
+              {user && (
+                <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-xs flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-cyan-200">
+                      Signed in as <strong>{user.name}</strong> ({user.email || user.phone})
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider bg-emerald-500/10 px-2 py-0.5 rounded">
+                    Linked to Account
+                  </span>
+                </div>
+              )}
 
               <div className="space-y-4">
                 {/* Full Name */}
@@ -380,6 +431,58 @@ export default function CheckoutPage() {
                     className="w-full glass-input px-3.5 py-2 rounded-xl text-xs"
                   />
                 </div>
+
+                {/* Auto-Signup Checkbox & Password Field (if guest) */}
+                {!user && (
+                  <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-950/40 via-cyan-950/30 to-black/40 border border-blue-500/30 space-y-3">
+                    <label className="flex items-start gap-3 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={autoSignup}
+                        onChange={(e) => setAutoSignup(e.target.checked)}
+                        className="mt-0.5 w-4 h-4 rounded text-cyan-500 focus:ring-cyan-400 bg-slate-900 border-white/20 cursor-pointer"
+                      />
+                      <div className="space-y-0.5">
+                        <span className="text-xs font-bold text-white block">
+                          Create an account for me with these details
+                        </span>
+                        <span className="text-[11px] text-slate-300 block">
+                          Access your digital keys anytime, track past orders, and stay signed in automatically.
+                        </span>
+                      </div>
+                    </label>
+
+                    {autoSignup && (
+                      <div className="pt-3 border-t border-white/10 space-y-2 animate-in fade-in duration-200">
+                        <label className="text-xs font-semibold text-slate-200 block">
+                          Create Account Password <span className="text-cyan-400">*</span>
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={showAutoSignupPassword ? "text" : "password"}
+                            required={autoSignup}
+                            placeholder="Choose a password (minimum 6 characters)"
+                            value={autoSignupPassword}
+                            onChange={(e) => setAutoSignupPassword(e.target.value)}
+                            className="w-full glass-input pr-10 px-3.5 py-2.5 rounded-xl text-xs font-mono"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowAutoSignupPassword(!showAutoSignupPassword)}
+                            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                            aria-label="Toggle password visibility"
+                          >
+                            {showAutoSignupPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                        <p className="text-[10px] text-cyan-300 flex items-center gap-1 font-mono">
+                          <span>🔒</span>
+                          <span>You will be kept securely signed in for 90 days with persistent cookies.</span>
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -717,6 +820,17 @@ export default function CheckoutPage() {
                 <span>Track Order & View Confirmation</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
+
+              {(user || autoSignup) && (
+                <button
+                  type="button"
+                  onClick={() => router.push("/account/orders")}
+                  className="w-full py-3 rounded-xl font-bold text-xs bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/30 transition-all flex items-center justify-center gap-2"
+                >
+                  <Package className="w-4 h-4" />
+                  <span>View in My Account (Purchased Keys)</span>
+                </button>
+              )}
 
               <button
                 type="button"
