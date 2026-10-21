@@ -52,6 +52,29 @@ export async function PATCH(
             notes: adminCustomerNote || `Status changed from ${fromStatus} to ${newStatus}`,
           },
         });
+
+        // Sync with linked order status
+        let targetOrderStatus: string | null = null;
+        if (newStatus === "DONE") targetOrderStatus = "REFUNDED";
+        else if (newStatus === "APPROVED") targetOrderStatus = "REFUND_APPROVED";
+        else if (newStatus === "REJECTED") targetOrderStatus = "DONE";
+
+        if (targetOrderStatus && existing.order) {
+          await tx.order.update({
+            where: { id: existing.order.id },
+            data: {
+              status: targetOrderStatus,
+              statusHistory: {
+                create: {
+                  fromStatus: existing.order.status,
+                  toStatus: targetOrderStatus,
+                  changedBy: admin.username,
+                  notes: `Refund ${existing.refundNumber} updated to ${newStatus}: ${adminCustomerNote || "Admin processed refund request."}`,
+                },
+              },
+            },
+          });
+        }
       }
 
       return refund;

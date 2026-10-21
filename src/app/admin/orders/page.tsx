@@ -22,6 +22,7 @@ import {
   ChevronRight,
   ShieldAlert,
   AlertCircle,
+  RotateCcw,
   X,
 } from "lucide-react";
 
@@ -151,7 +152,7 @@ export default function AdminOrdersPage() {
       <div className="glass-card rounded-2xl p-4 border border-white/10 flex flex-col md:flex-row gap-4 justify-between items-center">
         {/* Status Filter Tabs */}
         <div className="flex flex-wrap gap-1.5 w-full md:w-auto">
-          {["ALL", "PENDING", "APPROVED", "DONE", "REJECTED"].map((st) => (
+          {["ALL", "PENDING", "APPROVED", "REFUND_REQUESTED", "DONE", "REJECTED"].map((st) => (
             <button
               key={st}
               onClick={() => {
@@ -160,11 +161,13 @@ export default function AdminOrdersPage() {
               }}
               className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
                 statusFilter === st
-                  ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                  ? st === "REFUND_REQUESTED"
+                    ? "bg-amber-600 text-white shadow-md shadow-amber-500/20"
+                    : "bg-blue-600 text-white shadow-md shadow-blue-500/20"
                   : "bg-white/5 text-slate-400 hover:text-white"
               }`}
             >
-              {st === "ALL" ? "All Statuses" : st}
+              {st === "ALL" ? "All Statuses" : st === "REFUND_REQUESTED" ? "Refund Requested" : st}
             </button>
           ))}
         </div>
@@ -280,12 +283,16 @@ export default function AdminOrdersPage() {
                             ? "status-badge-pending"
                             : ord.status === "APPROVED"
                             ? "status-badge-approved"
+                            : ord.status === "REFUND_REQUESTED"
+                            ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                            : ord.status === "REFUNDED"
+                            ? "bg-rose-500/20 text-rose-300 border border-rose-500/40"
                             : ord.status === "DONE"
                             ? "status-badge-done"
                             : "status-badge-rejected"
                         }`}
                       >
-                        {ord.status}
+                        {ord.status === "REFUND_REQUESTED" ? "REFUND REQUESTED" : ord.status}
                       </span>
                     </td>
 
@@ -363,6 +370,71 @@ export default function AdminOrdersPage() {
               <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 <span>{updateError}</span>
+              </div>
+            )}
+
+            {/* REFUND REQUEST ACTIVE BANNER & DETAILS - MAIN LINE AT THE TOP */}
+            {((selectedOrder.status === "REFUND_REQUESTED" || selectedOrder.status === "REFUNDED") || (selectedOrder.refundRequests && selectedOrder.refundRequests.length > 0)) && (
+              <div className="relative overflow-hidden rounded-2xl border border-amber-500/40 bg-gradient-to-b from-amber-500/15 to-amber-950/20 p-5 space-y-3 shadow-xl">
+                {/* Main line across top */}
+                <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-400 via-rose-500 to-amber-400" />
+                
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-amber-500/20">
+                  <div className="flex items-center gap-2">
+                    <RotateCcw className="w-5 h-5 text-amber-400 animate-spin-slow" />
+                    <div>
+                      <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider block">
+                        Customer Refund Request Notice
+                      </span>
+                      <h4 className="font-mono font-black text-white text-base">
+                        {selectedOrder.refundRequests?.[0]?.refundNumber || "Refund Request Active"}
+                      </h4>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-300">Refund Status:</span>
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                      {selectedOrder.refundRequests?.[0]?.status || "PENDING"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                  <div className="p-3 rounded-xl bg-black/40 border border-white/5">
+                    <span className="text-slate-400 block text-[10px] uppercase">Requested Amount</span>
+                    <span className="font-mono font-bold text-amber-300 text-sm">
+                      {selectedOrder.refundRequests?.[0]?.requestedAmount?.toLocaleString() || selectedOrder.totalAmount?.toLocaleString()} {selectedOrder.currency}
+                    </span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-black/40 border border-white/5">
+                    <span className="text-slate-400 block text-[10px] uppercase">Reason Stated</span>
+                    <span className="font-semibold text-white">
+                      {selectedOrder.refundRequests?.[0]?.reason || "Customer requested refund"}
+                    </span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-black/40 border border-white/5">
+                    <span className="text-slate-400 block text-[10px] uppercase">Request Date</span>
+                    <span className="text-slate-300">
+                      {selectedOrder.refundRequests?.[0]?.createdAt
+                        ? new Date(selectedOrder.refundRequests[0].createdAt).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
+                        : "Recent"}
+                    </span>
+                  </div>
+                </div>
+
+                {selectedOrder.refundRequests?.[0]?.explanation && (
+                  <div className="p-3 rounded-xl bg-black/40 border border-white/5 text-xs">
+                    <span className="text-slate-400 block text-[10px] uppercase mb-1">Customer Explanation:</span>
+                    <p className="text-slate-200 italic">
+                      &ldquo;{selectedOrder.refundRequests[0].explanation}&rdquo;
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
@@ -485,6 +557,8 @@ export default function AdminOrdersPage() {
                   >
                     <option value="PENDING" className="bg-slate-900">PENDING (Awaiting Review)</option>
                     <option value="APPROVED" className="bg-slate-900">APPROVED (Payment Verified)</option>
+                    <option value="REFUND_REQUESTED" className="bg-slate-900 text-amber-400 font-bold">REFUND_REQUESTED (Refund In Review)</option>
+                    <option value="REFUNDED" className="bg-slate-900 text-rose-400 font-bold">REFUNDED (Refund Completed)</option>
                     <option value="DONE" className="bg-slate-900">DONE (Key Delivered / Complete)</option>
                     <option value="REJECTED" className="bg-slate-900">REJECTED (Payment Declined)</option>
                   </select>
@@ -565,24 +639,50 @@ export default function AdminOrdersPage() {
       {screenshotModalUrl && (
         <div
           onClick={() => setScreenshotModalUrl(null)}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md cursor-zoom-out"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md"
         >
-          <div className="relative max-w-4xl max-h-[85vh] w-full h-[80vh] rounded-3xl overflow-hidden border border-white/20 shadow-2xl bg-black">
-            <Image
-              src={screenshotModalUrl}
-              alt="Payment Evidence Proof"
-              fill
-              className="object-contain"
-            />
-            <div className="absolute top-4 right-4 bg-black/70 px-3 py-1.5 rounded-xl text-xs text-white border border-white/10 flex items-center gap-2">
-              <span>Payment Proof Verified Storage</span>
-              <button
-                type="button"
-                onClick={() => setScreenshotModalUrl(null)}
-                className="p-1 hover:text-rose-400"
-              >
-                ✕
-              </button>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative max-w-5xl max-h-[90vh] w-full flex flex-col rounded-3xl overflow-hidden border border-white/20 shadow-2xl bg-slate-950 p-4 space-y-3"
+          >
+            {/* Top Toolbar */}
+            <div className="flex items-center justify-between pb-3 border-b border-white/10 px-2">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <span className="text-xs font-bold text-white tracking-wide">
+                  Customer Transfer Receipt Proof
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={screenshotModalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/10 hover:bg-white/20 text-cyan-300 border border-white/10 flex items-center gap-1.5 transition-colors"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Open Full Size</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setScreenshotModalUrl(null)}
+                  className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-colors"
+                  aria-label="Close Preview"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Direct Image Container */}
+            <div className="relative flex-1 min-h-[50vh] max-h-[75vh] flex items-center justify-center bg-black/60 rounded-2xl p-2 overflow-auto">
+              {/* Native img tag directly sends browser cookies and avoids Next.js serverless optimizer issues */}
+              <img
+                src={screenshotModalUrl}
+                alt="Payment Evidence Proof"
+                className="max-w-full max-h-[72vh] object-contain rounded-xl select-none shadow-2xl"
+                loading="eager"
+              />
             </div>
           </div>
         </div>

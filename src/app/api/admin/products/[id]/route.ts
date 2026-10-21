@@ -68,10 +68,17 @@ export async function PUT(
     } = body;
 
     const orig = Number(originalPrice);
-    const sale = Number(salePrice);
+    let sale =
+      salePrice !== undefined && salePrice !== null && salePrice !== ""
+        ? Number(salePrice)
+        : orig;
 
-    if (isNaN(orig) || isNaN(sale) || orig < 0 || sale < 0) {
-      return NextResponse.json({ error: "Prices must be non-negative numbers." }, { status: 400 });
+    if (isNaN(orig) || orig < 0) {
+      return NextResponse.json({ error: "Regular price must be a non-negative number." }, { status: 400 });
+    }
+
+    if (isNaN(sale) || sale < 0) {
+      sale = orig;
     }
 
     if (sale > orig) {

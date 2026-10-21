@@ -31,9 +31,28 @@ export async function GET(
       return new NextResponse("Unauthorized: Verification failed.", { status: 403 });
     }
 
+    // 1. Check database storage
+    try {
+      const dbFile = await prisma.uploadedFile.findUnique({
+        where: { filename: safeFilename },
+      });
+      if (dbFile && dbFile.data) {
+        return new NextResponse(new Uint8Array(dbFile.data), {
+          headers: {
+            "Content-Type": dbFile.mimeType || "image/jpeg",
+            "Cache-Control": "private, max-age=3600",
+            "X-Content-Type-Options": "nosniff",
+          },
+        });
+      }
+    } catch (e) {
+      console.warn("DB lookup error:", e);
+    }
+
+    // 2. Fallback to local storage on disk
     const filePath = path.join(process.cwd(), "storage", "screenshots", safeFilename);
     if (!fs.existsSync(filePath)) {
-      return new NextResponse("Screenshot file not found on disk.", { status: 404 });
+      return new NextResponse("Screenshot file not found.", { status: 404 });
     }
 
     const fileBuffer = fs.readFileSync(filePath);
@@ -41,7 +60,7 @@ export async function GET(
     const contentType =
       ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg";
 
-    return new NextResponse(fileBuffer, {
+    return new NextResponse(new Uint8Array(fileBuffer), {
       headers: {
         "Content-Type": contentType,
         "Cache-Control": "private, max-age=3600",

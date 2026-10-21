@@ -438,6 +438,24 @@ function MyOrdersContent() {
                   <span>Payment Approved & Processing</span>
                 </span>
               )}
+              {activeOrder.status === "REFUND_REQUESTED" && (
+                <span className="px-4 py-1.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1.5 shadow-md shadow-amber-500/10">
+                  <RotateCcw className="w-4 h-4 text-amber-400 animate-spin-slow" />
+                  <span>Refund Requested (Under Review)</span>
+                </span>
+              )}
+              {activeOrder.status === "REFUND_APPROVED" && (
+                <span className="px-4 py-1.5 rounded-full text-xs font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-purple-400" />
+                  <span>Refund Approved (Processing Transfer)</span>
+                </span>
+              )}
+              {activeOrder.status === "REFUNDED" && (
+                <span className="px-4 py-1.5 rounded-full text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40 flex items-center gap-1.5">
+                  <RotateCcw className="w-4 h-4 text-rose-400" />
+                  <span>Refund Completed</span>
+                </span>
+              )}
               {activeOrder.status === "DONE" && (
                 <span className="px-4 py-1.5 rounded-full text-xs font-bold status-badge-done flex items-center gap-1.5">
                   <CheckCircle2 className="w-4 h-4" />
@@ -452,6 +470,91 @@ function MyOrdersContent() {
               )}
             </div>
           </div>
+
+          {/* REFUND REQUEST DETAILS BANNER - WITH MAIN LINE AT THE TOP */}
+          {(activeOrder.status === "REFUND_REQUESTED" || (activeOrder.refundRequests && activeOrder.refundRequests.length > 0)) && (
+            <div className="relative overflow-hidden rounded-2xl border border-amber-500/40 bg-gradient-to-b from-amber-500/15 to-amber-950/20 p-5 sm:p-6 space-y-4 shadow-xl shadow-amber-950/30">
+              {/* Highlight accent main line across the top */}
+              <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-400 via-rose-500 to-amber-400" />
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-amber-500/20">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    <RotateCcw className="w-5 h-5 animate-spin-slow" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-amber-400 block">
+                      Active Refund Request
+                    </span>
+                    <h3 className="text-base sm:text-lg font-black font-mono text-white">
+                      {activeOrder.refundRequests?.[0]?.refundNumber || "Refund Under Review"}
+                    </h3>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-300">Status:</span>
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                    {activeOrder.refundRequests?.[0]?.status === "PENDING"
+                      ? "Under Customer Support Review"
+                      : activeOrder.refundRequests?.[0]?.status || "In Review"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Grid of refund details - just like order details */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 text-xs">
+                <div className="p-3.5 rounded-xl bg-black/40 border border-white/5 space-y-1">
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Requested Amount</span>
+                  <span className="text-base font-black font-mono text-amber-300">
+                    {activeOrder.refundRequests?.[0]?.requestedAmount?.toLocaleString() || activeOrder.totalAmount?.toLocaleString()} {activeOrder.currency}
+                  </span>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-black/40 border border-white/5 space-y-1">
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Reason For Request</span>
+                  <span className="text-xs font-semibold text-white">
+                    {activeOrder.refundRequests?.[0]?.reason || "Defective / unredeemed key"}
+                  </span>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-black/40 border border-white/5 space-y-1">
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Submitted Date</span>
+                  <span className="text-xs text-slate-300">
+                    {activeOrder.refundRequests?.[0]?.createdAt
+                      ? new Date(activeOrder.refundRequests[0].createdAt).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
+                      : "Recently submitted"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Customer explanation */}
+              {activeOrder.refundRequests?.[0]?.explanation && (
+                <div className="p-3.5 rounded-xl bg-black/40 border border-white/5 space-y-1 text-xs">
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Your Explanation:</span>
+                  <p className="text-slate-200 leading-relaxed italic">
+                    &ldquo;{activeOrder.refundRequests[0].explanation}&rdquo;
+                  </p>
+                </div>
+              )}
+
+              {/* Staff Response Note */}
+              {activeOrder.refundRequests?.[0]?.adminCustomerNote && (
+                <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs space-y-1">
+                  <span className="text-[10px] text-amber-300 font-bold uppercase tracking-wider block">Staff Response Note:</span>
+                  <p className="text-white font-medium">
+                    {activeOrder.refundRequests[0].adminCustomerNote}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Customer Facing Note from Staff (Key delivery or notes!) */}
           {activeOrder.adminCustomerNote && (

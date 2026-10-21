@@ -176,32 +176,34 @@ export default function Footer() {
       </div>
 
       {/* Copyright & Disclaimer Bar */}
-      <div className="border-t border-white/5 bg-black/60 py-6 px-4">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-400">
-          <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4 text-center sm:text-left">
-            <p className="font-medium text-slate-300">
-              © {new Date().getFullYear()} PremiKeys & Nexifing. All rights reserved.
-            </p>
-            <span className="hidden sm:inline text-white/20">•</span>
-            <div className="flex items-center gap-2">
-              <span className="text-slate-400">Created by</span>
-              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-white/[0.05] border border-white/10 shadow-sm hover:border-cyan-400/30 transition-all">
-                <div className="relative h-4 w-4 shrink-0 rounded overflow-hidden">
-                  <Image
-                    src="/images/nexifing-logo.png"
-                    alt="Nexifing"
-                    fill
-                    sizes="16px"
-                    className="object-contain"
-                  />
-                </div>
-                <span className="font-bold text-white tracking-wide text-xs">Nexifing</span>
-              </div>
+      <div className="border-t border-white/5 bg-black/60 py-8 px-4">
+        <div className="max-w-7xl mx-auto flex flex-col items-center justify-center gap-4 text-center">
+          {/* Top Line: Created by Nexifing in larger font with transparent logo & no background */}
+          <div className="flex items-center justify-center gap-3">
+            <span className="text-base sm:text-lg font-medium text-slate-300 tracking-wide">
+              Created by
+            </span>
+            <div className="relative h-8 sm:h-9 w-28 sm:w-32 transition-transform duration-200 hover:scale-105">
+              <Image
+                src="/images/nexifing-logo.png"
+                alt="Nexifing"
+                fill
+                sizes="144px"
+                className="object-contain"
+              />
             </div>
           </div>
-          <p className="text-[11px] text-slate-500 text-center md:text-right">
-            All product names, trademarks, and registered trademarks are property of their respective owners.
-          </p>
+
+          {/* Copyright & Disclaimer Line Below */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-xs text-slate-400 pt-1">
+            <p className="font-medium text-slate-400">
+              © {new Date().getFullYear()} PremiKeys. All rights reserved.
+            </p>
+            <span className="hidden sm:inline text-white/20">•</span>
+            <p className="text-[11px] text-slate-500">
+              All product names, trademarks, and registered trademarks are property of their respective owners.
+            </p>
+          </div>
         </div>
       </div>
     </footer>

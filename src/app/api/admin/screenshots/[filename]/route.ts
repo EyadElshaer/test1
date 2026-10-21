@@ -9,25 +9,28 @@ export async function GET(
   { params }: { params: Promise<{ filename: string }> }
 ) {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return new NextResponse("Unauthorized: Administrator session required.", { status: 401 });
-    }
-
     const { filename } = await params;
     const safeFilename = path.basename(filename);
 
-    // 1. Try PostgreSQL database first
+    // Verify access: either admin session is active OR the file is a cryptographically random proof file
+    const admin = await getAdminSession();
+    const isProofFile = safeFilename.startsWith("proof_");
+
+    if (!admin && !isProofFile) {
+      return new NextResponse("Unauthorized: Administrator session required.", { status: 401 });
+    }
+
+    // 1. Try PostgreSQL database first (primary storage for persistent serverless environments)
     try {
       const dbFile = await prisma.uploadedFile.findUnique({
         where: { filename: safeFilename },
       });
 
       if (dbFile && dbFile.data) {
-        return new NextResponse(dbFile.data, {
+        return new NextResponse(new Uint8Array(dbFile.data), {
           headers: {
             "Content-Type": dbFile.mimeType || "image/jpeg",
-            "Cache-Control": "private, no-cache, no-store, must-revalidate",
+            "Cache-Control": "public, max-age=86400",
             "X-Content-Type-Options": "nosniff",
           },
         });
@@ -36,7 +39,7 @@ export async function GET(
       console.warn("Database lookup error for screenshot:", dbErr);
     }
 
-    // 2. Fallback to local storage on disk
+    // 2. Fallback to local storage on disk if present
     const filePath = path.join(process.cwd(), "storage", "screenshots", safeFilename);
     if (fs.existsSync(filePath)) {
       const fileBuffer = fs.readFileSync(filePath);
@@ -44,10 +47,10 @@ export async function GET(
       const contentType =
         ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg";
 
-      return new NextResponse(fileBuffer, {
+      return new NextResponse(new Uint8Array(fileBuffer), {
         headers: {
           "Content-Type": contentType,
-          "Cache-Control": "private, no-cache, no-store, must-revalidate",
+          "Cache-Control": "public, max-age=86400",
           "X-Content-Type-Options": "nosniff",
         },
       });
@@ -59,3 +62,4 @@ export async function GET(
     return new NextResponse("Internal server error", { status: 500 });
   }
 }
+

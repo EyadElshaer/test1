@@ -13,6 +13,7 @@ import {
   ArrowRight,
   X,
   FileText,
+  ExternalLink,
 } from "lucide-react";
 
 export default function AdminRefundsPage() {
@@ -29,6 +30,9 @@ export default function AdminRefundsPage() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateSuccess, setUpdateSuccess] = useState("");
   const [updateError, setUpdateError] = useState("");
+
+  // Screenshot modal preview
+  const [screenshotModalUrl, setScreenshotModalUrl] = useState<string | null>(null);
 
   const fetchRefunds = async () => {
     setLoading(true);
@@ -264,28 +268,73 @@ export default function AdminRefundsPage() {
             )}
 
             {/* Info Box */}
-            <div className="grid grid-cols-2 gap-4 text-xs">
-              <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-1">
-                <span className="text-slate-400 block text-[10px]">Associated Order</span>
-                <span className="font-mono font-bold text-cyan-300 text-sm">
-                  {selectedRefund.order?.orderNumber}
-                </span>
-                <span className="text-slate-400 block text-[11px]">
-                  Order Total: {selectedRefund.order?.totalAmount} EGP
-                </span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-1.5">
+                <span className="text-slate-400 block text-[10px] uppercase font-bold text-cyan-400">Associated Order Details</span>
+                <div className="flex items-center justify-between">
+                  <span className="font-mono font-bold text-cyan-300 text-sm">
+                    {selectedRefund.order?.orderNumber}
+                  </span>
+                  <Link
+                    href={`/admin/orders?search=${selectedRefund.order?.orderNumber}`}
+                    className="text-[11px] text-cyan-400 hover:underline flex items-center gap-1"
+                  >
+                    <span>View in Orders</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </Link>
+                </div>
+                <div className="text-slate-300 text-[11px]">
+                  Total: <strong>{selectedRefund.order?.totalAmount?.toLocaleString()} {selectedRefund.order?.currency || "EGP"}</strong>
+                </div>
+                <div className="text-slate-400 text-[11px]">
+                  Payment Method: <strong className="text-white">{selectedRefund.order?.paymentMethodName}</strong>
+                </div>
+                {selectedRefund.order?.paymentScreenshotUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setScreenshotModalUrl(selectedRefund.order.paymentScreenshotUrl)}
+                    className="mt-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-blue-500/10 text-cyan-300 border border-blue-500/30 hover:bg-blue-500/20 flex items-center gap-1"
+                  >
+                    <Eye className="w-3 h-3" />
+                    <span>View Customer Transfer Receipt</span>
+                  </button>
+                )}
               </div>
 
               <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-1">
-                <span className="text-slate-400 block text-[10px]">Customer Contact</span>
-                <span className="font-bold text-white block">{selectedRefund.customerName}</span>
-                <span className="font-mono text-slate-300 block select-all">{selectedRefund.customerPhone}</span>
+                <span className="text-slate-400 block text-[10px] uppercase font-bold text-cyan-400">Customer Contact</span>
+                <span className="font-bold text-white text-sm block">{selectedRefund.customerName}</span>
+                <span className="font-mono text-slate-300 block select-all text-xs">{selectedRefund.customerPhone}</span>
+                <span className="text-slate-400 block text-[11px] select-all">{selectedRefund.customerEmail}</span>
               </div>
             </div>
+
+            {/* Order Items Breakdown Snapshot (if available) */}
+            {selectedRefund.order?.items && selectedRefund.order.items.length > 0 && (
+              <div className="space-y-2">
+                <span className="text-[11px] font-bold text-white uppercase tracking-wider block">
+                  Original Order Items
+                </span>
+                <div className="divide-y divide-white/5 border rounded-xl border-white/10 overflow-hidden bg-black/20 text-xs">
+                  {selectedRefund.order.items.map((item: any) => (
+                    <div key={item.id} className="p-2.5 flex items-center justify-between">
+                      <div>
+                        <span className="font-semibold text-white block">{item.productTitle}</span>
+                        <span className="text-slate-400 text-[11px]">Qty: {item.quantity} × {item.salePrice} EGP</span>
+                      </div>
+                      <div className="font-mono font-bold text-slate-200 text-xs">
+                        {item.lineTotal?.toLocaleString()} EGP
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Customer Explanation */}
             <div className="p-4 rounded-2xl bg-black/40 border border-white/5 space-y-1 text-xs">
               <span className="font-bold text-slate-400 uppercase text-[10px] block">
-                Reason: <strong className="text-white">{selectedRefund.reason}</strong>
+                Reason: <strong className="text-rose-300">{selectedRefund.reason}</strong>
               </span>
               <p className="text-slate-200 leading-relaxed whitespace-pre-line pt-1">
                 {selectedRefund.explanation}
@@ -357,6 +406,58 @@ export default function AdminRefundsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* SCREENSHOT FULLSCREEN PREVIEW MODAL */}
+      {screenshotModalUrl && (
+        <div
+          onClick={() => setScreenshotModalUrl(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative max-w-5xl max-h-[90vh] w-full flex flex-col rounded-3xl overflow-hidden border border-white/20 shadow-2xl bg-slate-950 p-4 space-y-3"
+          >
+            {/* Top Toolbar */}
+            <div className="flex items-center justify-between pb-3 border-b border-white/10 px-2">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <span className="text-xs font-bold text-white tracking-wide">
+                  Customer Transfer Receipt Proof
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={screenshotModalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/10 hover:bg-white/20 text-cyan-300 border border-white/10 flex items-center gap-1.5 transition-colors"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Open Full Size</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setScreenshotModalUrl(null)}
+                  className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-colors"
+                  aria-label="Close Preview"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Direct Image Container */}
+            <div className="relative flex-1 min-h-[50vh] max-h-[75vh] flex items-center justify-center bg-black/60 rounded-2xl p-2 overflow-auto">
+              <img
+                src={screenshotModalUrl}
+                alt="Payment Evidence Proof"
+                className="max-w-full max-h-[72vh] object-contain rounded-xl select-none shadow-2xl"
+                loading="eager"
+              />
+            </div>
           </div>
         </div>
       )}

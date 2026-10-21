@@ -58,11 +58,14 @@ export default function AdminProductsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
 
+  // Sale Price on-demand toggle
+  const [hasSale, setHasSale] = useState(false);
+
   // Live Auto-calculated Discount Percentage
   const origNum = Number(originalPrice) || 0;
-  const saleNum = Number(salePrice) || 0;
+  const saleNum = hasSale ? Number(salePrice) || 0 : origNum;
   const calculatedDiscount =
-    origNum > 0 && saleNum < origNum ? Math.round(((origNum - saleNum) / origNum) * 100) : 0;
+    hasSale && origNum > 0 && saleNum < origNum ? Math.round(((origNum - saleNum) / origNum) * 100) : 0;
 
   const loadData = async () => {
     setLoading(true);
@@ -105,6 +108,7 @@ export default function AdminProductsPage() {
     setDescription("");
     setOriginalPrice("");
     setSalePrice("");
+    setHasSale(false);
     if (categories.length > 0) setCategoryId(categories[0].id);
     setPlatform("Windows");
     setProductType("License");
@@ -127,7 +131,9 @@ export default function AdminProductsPage() {
     setShortDescription(p.shortDescription || "");
     setDescription(p.description);
     setOriginalPrice(p.originalPrice);
-    setSalePrice(p.salePrice);
+    const isDiscounted = Number(p.salePrice) < Number(p.originalPrice);
+    setHasSale(isDiscounted);
+    setSalePrice(isDiscounted ? p.salePrice : "");
     setCategoryId(p.categoryId);
     setPlatform(p.platform || "Windows");
     setProductType(p.productType || "License");
@@ -150,7 +156,9 @@ export default function AdminProductsPage() {
     setShortDescription(p.shortDescription || "");
     setDescription(p.description);
     setOriginalPrice(p.originalPrice);
-    setSalePrice(p.salePrice);
+    const isDiscounted = Number(p.salePrice) < Number(p.originalPrice);
+    setHasSale(isDiscounted);
+    setSalePrice(isDiscounted ? p.salePrice : "");
     setCategoryId(p.categoryId);
     setPlatform(p.platform || "Windows");
     setProductType(p.productType || "License");
@@ -234,14 +242,22 @@ export default function AdminProductsPage() {
       return;
     }
 
-    if (origNum < 0 || saleNum < 0) {
-      setFormError("Prices cannot be negative.");
+    if (origNum <= 0) {
+      setFormError("Regular price must be greater than 0.");
       return;
     }
 
-    if (saleNum > origNum) {
-      setFormError("Sale price cannot exceed the original regular price.");
-      return;
+    let finalSalePrice = origNum;
+    if (hasSale) {
+      if (saleNum <= 0) {
+        setFormError("Please enter a valid sale price greater than 0.");
+        return;
+      }
+      if (saleNum >= origNum) {
+        setFormError("Sale price must be strictly less than the regular price.");
+        return;
+      }
+      finalSalePrice = saleNum;
     }
 
     setIsSaving(true);
@@ -251,7 +267,7 @@ export default function AdminProductsPage() {
       shortDescription: shortDescription.trim(),
       description: description.trim(),
       originalPrice: origNum,
-      salePrice: saleNum,
+      salePrice: finalSalePrice,
       categoryId,
       platform,
       productType,
@@ -613,47 +629,83 @@ export default function AdminProductsPage() {
                 </div>
               </div>
 
-              {/* Pricing & Automatic Discount Calculation */}
-              <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/10 space-y-3">
-                <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider block">
-                  Pricing & Automatic Discount Engine
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+              {/* Pricing & Automatic Discount Engine with On-Demand Sale Box */}
+              <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/10 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-white/5">
+                  <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider block">
+                    Product Pricing & Sale Options
+                  </span>
+
+                  {/* On-Demand Sale Checkbox */}
+                  <label className="flex items-center gap-2 cursor-pointer select-none bg-white/[0.03] hover:bg-white/[0.06] border border-white/10 px-3 py-1.5 rounded-xl transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={hasSale}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setHasSale(checked);
+                        if (!checked) {
+                          setSalePrice("");
+                        }
+                      }}
+                      className="w-4 h-4 rounded text-blue-600 focus:ring-0 bg-slate-900 border-white/20 cursor-pointer"
+                    />
+                    <span className="text-xs font-semibold text-white">
+                      Put on Sale / Add Discount Price
+                    </span>
+                  </label>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
                   <div>
                     <label className="text-xs font-semibold text-slate-300 block mb-1">
-                      Original Regular Price (EGP) <span className="text-rose-400">*</span>
+                      Regular / Original Price (EGP) <span className="text-rose-400">*</span>
                     </label>
                     <input
                       type="number"
                       required
-                      placeholder="650"
+                      placeholder="e.g. 650"
                       value={originalPrice}
                       onChange={(e) => setOriginalPrice(e.target.value ? Number(e.target.value) : "")}
-                      className="w-full glass-input px-3.5 py-2 rounded-xl text-xs font-mono"
+                      className="w-full glass-input px-3.5 py-2.5 rounded-xl text-xs font-mono"
                     />
                   </div>
 
-                  <div>
-                    <label className="text-xs font-semibold text-slate-300 block mb-1">
-                      Sale Discounted Price (EGP) <span className="text-rose-400">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      required
-                      placeholder="380"
-                      value={salePrice}
-                      onChange={(e) => setSalePrice(e.target.value ? Number(e.target.value) : "")}
-                      className="w-full glass-input px-3.5 py-2 rounded-xl text-xs font-mono"
-                    />
-                  </div>
-
-                  <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs">
-                    <span className="text-[10px] text-slate-400 block">Auto-Calculated Discount:</span>
-                    <strong className="text-emerald-400 text-sm font-bold">
-                      {calculatedDiscount > 0 ? `-${calculatedDiscount}% OFF` : "No Discount"}
-                    </strong>
-                  </div>
+                  {hasSale ? (
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-xs font-semibold text-cyan-300 block">
+                          Discounted Sale Price (EGP) <span className="text-rose-400">*</span>
+                        </label>
+                        {calculatedDiscount > 0 && (
+                          <span className="text-[10px] font-bold text-emerald-400">
+                            -{calculatedDiscount}% OFF
+                          </span>
+                        )}
+                      </div>
+                      <input
+                        type="number"
+                        required={hasSale}
+                        placeholder="e.g. 380"
+                        value={salePrice}
+                        onChange={(e) => setSalePrice(e.target.value ? Number(e.target.value) : "")}
+                        className="w-full glass-input px-3.5 py-2.5 rounded-xl text-xs font-mono border-cyan-500/40 focus:border-cyan-400"
+                      />
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-xl bg-white/[0.02] border border-dashed border-white/10 text-xs text-slate-400 flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-slate-500 shrink-0" />
+                      <span>Regular price only. No sale discount will be applied.</span>
+                    </div>
+                  )}
                 </div>
+
+                {hasSale && calculatedDiscount > 0 && (
+                  <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300 flex items-center justify-between">
+                    <span>Active Discount: Customer saves <strong>{(origNum - (Number(salePrice) || 0)).toLocaleString()} EGP</strong></span>
+                    <span className="font-bold font-mono">-{calculatedDiscount}%</span>
+                  </div>
+                )}
               </div>
 
               {/* Stock & Availability */}

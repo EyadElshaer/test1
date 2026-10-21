@@ -34,12 +34,15 @@ export async function GET(req: Request) {
       include: {
         order: {
           select: {
+            id: true,
             orderNumber: true,
             totalAmount: true,
+            currency: true,
             paymentMethodName: true,
             paymentScreenshotUrl: true,
             status: true,
             createdAt: true,
+            items: true,
           },
         },
         statusHistory: { orderBy: { createdAt: "asc" } },

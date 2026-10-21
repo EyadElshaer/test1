@@ -63,6 +63,23 @@ export async function POST(req: Request) {
           },
         },
       });
+
+      // Update Order status to REFUND_REQUESTED and record audit history
+      await tx.order.update({
+        where: { id: order.id },
+        data: {
+          status: "REFUND_REQUESTED",
+          statusHistory: {
+            create: {
+              fromStatus: order.status,
+              toStatus: "REFUND_REQUESTED",
+              changedBy: "CUSTOMER",
+              notes: `Refund requested (${refundNumber}): ${reason.trim()} - ${explanation.trim()}`,
+            },
+          },
+        },
+      });
+
       return refund;
     });
 
