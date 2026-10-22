@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -19,7 +19,48 @@ import { useAuth } from "@/context/AuthContext";
 
 export default function AccountProfilePage() {
   const router = useRouter();
-  const { user, loading: authLoading, logout } = useAuth();
+  const { user, loading: authLoading, logout, refreshUser } = useAuth();
+
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editError, setEditError] = useState("");
+  const [editSuccess, setEditSuccess] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEditError("");
+    setEditSuccess("");
+    setIsSaving(true);
+
+    try {
+      const res = await fetch("/api/user/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: editName,
+          email: editEmail.trim() || null,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to update profile.");
+      }
+
+      setEditSuccess("Profile updated successfully!");
+      await refreshUser();
+      setTimeout(() => {
+        setIsEditModalOpen(false);
+        setEditSuccess("");
+      }, 1200);
+    } catch (err: any) {
+      setEditError(err.message || "Failed to update profile.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -87,7 +128,20 @@ export default function AccountProfilePage() {
               <User className="w-3.5 h-3.5 text-cyan-400" />
               <span>Full Name</span>
             </span>
-            <p className="font-semibold text-white text-sm">{user.name}</p>
+            <div className="flex items-center justify-between">
+              <p className="font-semibold text-white text-sm">{user.name}</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditName(user.name);
+                  setEditEmail(user.email || "");
+                  setIsEditModalOpen(true);
+                }}
+                className="text-[11px] text-cyan-400 hover:text-cyan-300 font-semibold"
+              >
+                Edit
+              </button>
+            </div>
           </div>
 
           <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-1">
@@ -95,9 +149,22 @@ export default function AccountProfilePage() {
               <Mail className="w-3.5 h-3.5 text-cyan-400" />
               <span>Email Address</span>
             </span>
-            <p className="font-semibold text-white text-sm font-mono">
-              {user.email || <span className="text-slate-500 italic">Not set</span>}
-            </p>
+            <div className="flex items-center justify-between">
+              <p className="font-semibold text-white text-sm font-mono">
+                {user.email || <span className="text-amber-400/80 italic font-sans">No email linked</span>}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditName(user.name);
+                  setEditEmail(user.email || "");
+                  setIsEditModalOpen(true);
+                }}
+                className="text-[11px] text-cyan-400 hover:text-cyan-300 font-semibold"
+              >
+                {user.email ? "Edit Email" : "+ Add Email"}
+              </button>
+            </div>
           </div>
 
           <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-1">
@@ -144,6 +211,91 @@ export default function AccountProfilePage() {
           </Link>
         </div>
       </div>
+
+      {/* Edit Profile Modal */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-[#0b1026] border border-white/15 rounded-3xl p-6 sm:p-8 max-w-md w-full space-y-6 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <h3 className="font-bold text-lg text-white flex items-center gap-2">
+                <User className="w-5 h-5 text-cyan-400" />
+                <span>Update Account Information</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditModalOpen(false);
+                  setEditError("");
+                  setEditSuccess("");
+                }}
+                className="p-1 text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveProfile} className="space-y-4">
+              {editError && (
+                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs">
+                  {editError}
+                </div>
+              )}
+              {editSuccess && (
+                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs">
+                  {editSuccess}
+                </div>
+              )}
+
+              <div>
+                <label className="text-xs font-semibold text-slate-300 block mb-1">
+                  Full Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full glass-input px-3.5 py-2.5 rounded-xl text-sm"
+                  placeholder="Your Name"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-300 block mb-1">
+                  Account Email Address
+                </label>
+                <input
+                  type="email"
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  className="w-full glass-input px-3.5 py-2.5 rounded-xl text-sm font-mono"
+                  placeholder="yourname@example.com"
+                />
+                <span className="text-[11px] text-slate-400 mt-1 block">
+                  You can use this email to sign in and receive order confirmation keys.
+                </span>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="flex-1 py-2.5 rounded-xl text-xs font-semibold btn-secondary"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="flex-1 py-2.5 rounded-xl font-bold text-xs text-white btn-primary shadow-lg shadow-blue-500/30 disabled:opacity-50"
+                >
+                  {isSaving ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

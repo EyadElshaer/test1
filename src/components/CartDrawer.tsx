@@ -139,23 +139,31 @@ export default function CartDrawer() {
                   className="p-3.5 rounded-2xl bg-slate-900/80 border border-white/5 flex gap-3.5 relative group hover:border-cyan-500/20 transition-all"
                 >
                   {/* Thumbnail */}
-                  <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-slate-950 border border-white/10 shrink-0">
+                  <Link
+                    href={`/products/${item.slug}`}
+                    onClick={() => setIsCartOpen(false)}
+                    className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-slate-950 border border-white/10 shrink-0 hover:border-cyan-400/50 transition-colors block"
+                  >
                     <Image
                       src={item.image}
                       alt={item.title}
                       fill
                       sizes="80px"
-                      className="object-cover"
+                      className="object-cover group-hover:scale-105 transition-transform duration-300"
                     />
-                  </div>
+                  </Link>
 
                   {/* Details */}
                   <div className="flex-1 flex flex-col justify-between min-w-0">
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <h4 className="font-bold text-xs sm:text-sm text-white line-clamp-1">
+                        <Link
+                          href={`/products/${item.slug}`}
+                          onClick={() => setIsCartOpen(false)}
+                          className="font-bold text-xs sm:text-sm text-white hover:text-cyan-300 transition-colors line-clamp-1 block"
+                        >
                           {item.title}
-                        </h4>
+                        </Link>
                         {item.platform && (
                           <span className="text-[10px] text-cyan-400 font-semibold block mt-0.5">
                             {item.platform}

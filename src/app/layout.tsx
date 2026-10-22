@@ -10,7 +10,10 @@ import CookieNotice from "@/components/CookieNotice";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://premikeys.com"),
-  title: "PremiKeys | Genuine Software Licenses, Windows & Office Keys",
+  title: {
+    default: "PremiKeys | Genuine Software and Licences",
+    template: "%s | PremiKeys",
+  },
   description:
     "Official store for genuine Windows 11 activation keys, Microsoft Office suites, cybersecurity tools, and professional software licenses with verified manual payment fulfillment.",
   keywords: [
@@ -25,16 +28,19 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "PremiKeys" }],
   openGraph: {
-    title: "PremiKeys — Genuine Software Licenses & Windows Activations",
+    title: "PremiKeys | Genuine Software and Licences",
     description:
       "Instant digital activations for Windows 11 Pro, Microsoft Office, and verified software licenses with manual InstaPay and wallet payments.",
     siteName: "PremiKeys",
     images: [{ url: "/images/premikeys-logo.png", width: 800, height: 800, alt: "PremiKeys" }],
   },
   icons: {
-    icon: "/images/premikeys-logo.png",
-    shortcut: "/images/premikeys-logo.png",
-    apple: "/images/premikeys-logo.png",
+    icon: [
+      { url: "/icon.png", sizes: "512x512", type: "image/png" },
+      { url: "/favicon.ico", sizes: "any" },
+    ],
+    shortcut: "/icon.png",
+    apple: "/apple-touch-icon.png",
   },
 };
 

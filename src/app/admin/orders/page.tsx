@@ -48,6 +48,33 @@ export default function AdminOrdersPage() {
   // Screenshot modal preview
   const [screenshotModalUrl, setScreenshotModalUrl] = useState<string | null>(null);
 
+  // Order Deletion Confirmation
+  const [orderToDelete, setOrderToDelete] = useState<any | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeleteOrder = async () => {
+    if (!orderToDelete) return;
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/admin/orders/${orderToDelete.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to delete order.");
+      }
+      setOrderToDelete(null);
+      if (selectedOrder?.id === orderToDelete.id) {
+        setSelectedOrder(null);
+      }
+      fetchOrders();
+    } catch (err: any) {
+      alert(err.message || "Failed to delete order.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const fetchOrders = async () => {
     setLoading(true);
     try {
@@ -328,12 +355,22 @@ export default function AdminOrdersPage() {
 
                     {/* Actions */}
                     <td className="py-3.5 px-4 text-right">
-                      <button
-                        onClick={() => openOrderDetail(ord.id)}
-                        className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/10 hover:bg-white/20 text-white transition-colors"
-                      >
-                        Review Order
-                      </button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => openOrderDetail(ord.id)}
+                          className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/10 hover:bg-white/20 text-white transition-colors"
+                        >
+                          Review
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setOrderToDelete(ord)}
+                          className="p-1.5 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                          title="Delete Order Permanently"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -597,18 +634,40 @@ export default function AdminOrdersPage() {
                   <label className="text-xs font-semibold text-slate-300 block mb-1">
                     Order Status
                   </label>
-                  <select
-                    value={newStatus}
-                    onChange={(e) => setNewStatus(e.target.value)}
-                    className="w-full glass-input px-3.5 py-2 rounded-xl text-xs font-semibold cursor-pointer"
-                  >
-                    <option value="PENDING" className="bg-slate-900">PENDING (Awaiting Review)</option>
-                    <option value="APPROVED" className="bg-slate-900">APPROVED (Payment Verified)</option>
-                    <option value="REFUND_REQUESTED" className="bg-slate-900 text-amber-400 font-bold">REFUND_REQUESTED (Refund In Review)</option>
-                    <option value="REFUNDED" className="bg-slate-900 text-rose-400 font-bold">REFUNDED (Refund Completed)</option>
-                    <option value="DONE" className="bg-slate-900">DONE (Key Delivered / Complete)</option>
-                    <option value="REJECTED" className="bg-slate-900">REJECTED (Payment Declined)</option>
-                  </select>
+                  {(() => {
+                    const hasActiveRefund = Boolean(
+                      selectedOrder?.refundRequests &&
+                      selectedOrder.refundRequests.some((r: any) => r.status === "PENDING" || r.status === "APPROVED")
+                    );
+                    const activeRefundCase = selectedOrder?.refundRequests?.find(
+                      (r: any) => r.status === "PENDING" || r.status === "APPROVED"
+                    );
+
+                    return (
+                      <>
+                        <select
+                          value={newStatus}
+                          disabled={hasActiveRefund}
+                          onChange={(e) => setNewStatus(e.target.value)}
+                          className="w-full glass-input px-3.5 py-2 rounded-xl text-xs font-semibold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <option value="PENDING" className="bg-slate-900">PENDING (Awaiting Review)</option>
+                          <option value="APPROVED" className="bg-slate-900">APPROVED (Payment Verified)</option>
+                          <option value="DONE" className="bg-slate-900">DONE (Key Delivered / Complete)</option>
+                          <option value="REJECTED" className="bg-slate-900">REJECTED (Payment Declined)</option>
+                        </select>
+
+                        {hasActiveRefund && (
+                          <div className="p-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-2 mt-2 leading-relaxed">
+                            <AlertCircle className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" />
+                            <span>
+                              Refund request in progress ({activeRefundCase?.refundNumber} - {activeRefundCase?.status}). Order status changes are locked until this refund request is resolved or declined in the Refund Requests tab.
+                            </span>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                   {selectedOrder.status === "PENDING" && selectedOrder.paymentScreenshotUrl && (
                     <p className="text-[11px] text-cyan-300 mt-2 bg-blue-950/40 border border-blue-500/20 rounded-lg p-2 flex items-start gap-1.5 leading-relaxed">
                       <span className="text-cyan-400">💡</span>
@@ -647,21 +706,38 @@ export default function AdminOrdersPage() {
                 />
               </div>
 
-              <div className="flex justify-end gap-3 pt-2">
+              <div className="flex items-center justify-between gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setSelectedOrder(null)}
-                  className="px-5 py-2.5 rounded-xl text-xs font-semibold btn-secondary"
+                  onClick={() => setOrderToDelete(selectedOrder)}
+                  className="px-4 py-2.5 rounded-xl text-xs font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30 hover:bg-rose-500/25 flex items-center gap-1.5 transition-colors"
                 >
-                  Cancel
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Delete Order</span>
                 </button>
-                <button
-                  type="submit"
-                  disabled={isUpdatingStatus}
-                  className="px-7 py-2.5 rounded-xl text-xs font-bold btn-primary shadow-lg shadow-blue-500/25 disabled:opacity-50"
-                >
-                  {isUpdatingStatus ? "Updating..." : "Save Order Status & Notes"}
-                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedOrder(null)}
+                    className="px-5 py-2.5 rounded-xl text-xs font-semibold btn-secondary"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={
+                      isUpdatingStatus ||
+                      Boolean(
+                        selectedOrder?.refundRequests &&
+                        selectedOrder.refundRequests.some((r: any) => r.status === "PENDING" || r.status === "APPROVED")
+                      )
+                    }
+                    className="px-7 py-2.5 rounded-xl text-xs font-bold btn-primary shadow-lg shadow-blue-500/25 disabled:opacity-50"
+                  >
+                    {isUpdatingStatus ? "Updating..." : "Save Order Status & Notes"}
+                  </button>
+                </div>
               </div>
             </form>
 
@@ -738,6 +814,49 @@ export default function AdminOrdersPage() {
                 className="max-w-full max-h-[72vh] object-contain rounded-xl select-none shadow-2xl"
                 loading="eager"
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE ORDER CONFIRMATION MODAL */}
+      {orderToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-[#0b1026] border border-rose-500/30 rounded-3xl p-6 sm:p-8 max-w-md w-full space-y-5 shadow-2xl">
+            <div className="flex items-center gap-3 text-rose-400">
+              <div className="p-3 rounded-2xl bg-rose-500/15 border border-rose-500/30">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-white">Delete Order Permanently?</h3>
+                <p className="text-xs text-rose-300 font-mono">{orderToDelete.orderNumber}</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Are you sure you want to delete order <strong className="text-white font-mono">{orderToDelete.orderNumber}</strong> belonging to <strong className="text-white">{orderToDelete.customerName}</strong> ({orderToDelete.totalAmount?.toLocaleString()} {orderToDelete.currency})?
+            </p>
+            <p className="text-[11px] text-slate-400 bg-white/[0.03] p-3 rounded-xl border border-white/5">
+              ⚠️ This will permanently remove all ordered item snapshots, payment receipt screenshots from storage, and timeline history. This cannot be undone.
+            </p>
+
+            <div className="flex gap-2.5 pt-2">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setOrderToDelete(null)}
+                className="flex-1 py-2.5 rounded-xl text-xs font-semibold btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={handleDeleteOrder}
+                className="flex-1 py-2.5 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/30 disabled:opacity-50"
+              >
+                {isDeleting ? "Deleting..." : "Yes, Delete Order"}
+              </button>
             </div>
           </div>
         </div>

@@ -98,7 +98,7 @@ export default async function HomePage() {
           {/* Subtitle */}
           <p className="text-base sm:text-lg text-slate-300 max-w-2xl mx-auto leading-relaxed">
             {customSubheading ||
-              "Upgrade your PC with 100% authentic lifetime activation keys for Windows 11, Microsoft Office, and professional software suites. Instant fulfillment with direct manual payment verification via InstaPay & Vodafone Cash."}
+              "Upgrade your PC with 100% authentic lifetime activation keys for Windows 11, Microsoft Office, and professional software suites. Instant fulfillment and verified order processing."}
           </p>
 
           {/* Primary CTAs */}
@@ -127,8 +127,8 @@ export default async function HomePage() {
               <div className="text-xs text-slate-400">Genuine Licenses</div>
             </div>
             <div className="p-3 sm:p-4 rounded-xl bg-white/[0.02] border border-white/5">
-              <div className="text-lg font-black text-cyan-400">InstaPay</div>
-              <div className="text-xs text-slate-400">Direct Manual Pay</div>
+              <div className="text-lg font-black text-cyan-400">24/7</div>
+              <div className="text-xs text-slate-400">Instant Delivery</div>
             </div>
             <div className="p-3 sm:p-4 rounded-xl bg-white/[0.02] border border-white/5">
               <div className="text-lg font-black text-emerald-400">Verified</div>
@@ -181,69 +181,6 @@ export default async function HomePage() {
                 category={product.category}
                 images={product.images}
               />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* CATEGORIES GRID */}
-      {categories.length > 0 && (
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
-            <div>
-              <div className="flex items-center gap-2 text-xs font-bold text-cyan-400 uppercase tracking-widest">
-                <Layers className="w-4 h-4" />
-                <span>Explore Software Collections</span>
-              </div>
-              <h2 className="text-2xl sm:text-3xl font-extrabold text-white mt-1">
-                Curated Software Suites
-              </h2>
-            </div>
-            <Link
-              href="/products"
-              className="text-xs font-semibold text-slate-400 hover:text-cyan-300 flex items-center gap-1 transition-colors"
-            >
-              <span>See All Products</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {categories.map((cat) => (
-              <Link
-                key={cat.id}
-                href={`/products?category=${cat.slug}`}
-                className="glass-card rounded-2xl p-6 group block hover:border-cyan-400/40 relative overflow-hidden transition-all duration-300 gpu-layer"
-              >
-                <div className="relative h-28 w-full rounded-xl overflow-hidden mb-4 bg-slate-900 border border-white/5">
-                  {cat.image ? (
-                    <Image
-                      src={cat.image}
-                      alt={cat.name}
-                      fill
-                      sizes="(max-width: 640px) 100vw, 25vw"
-                      className="object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-slate-600">
-                      <Cpu className="w-8 h-8" />
-                    </div>
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <h3 className="font-bold text-white text-base group-hover:text-cyan-300 transition-colors">
-                    {cat.name}
-                  </h3>
-                  <span className="text-xs font-semibold text-slate-400 px-2 py-0.5 rounded-md bg-white/5 border border-white/10">
-                    {cat._count.products}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-400 mt-2 line-clamp-2 leading-relaxed">
-                  {cat.description || "Browse genuine software and activation licenses."}
-                </p>
-              </Link>
             ))}
           </div>
         </section>

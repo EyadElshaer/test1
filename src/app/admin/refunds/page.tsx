@@ -14,6 +14,7 @@ import {
   X,
   FileText,
   ExternalLink,
+  Trash2,
 } from "lucide-react";
 
 export default function AdminRefundsPage() {
@@ -30,6 +31,33 @@ export default function AdminRefundsPage() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateSuccess, setUpdateSuccess] = useState("");
   const [updateError, setUpdateError] = useState("");
+
+  // Deletion modal state
+  const [refundToDelete, setRefundToDelete] = useState<any | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeleteRefund = async () => {
+    if (!refundToDelete) return;
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/admin/refunds/${refundToDelete.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to delete refund request.");
+      }
+      setRefundToDelete(null);
+      if (selectedRefund?.id === refundToDelete.id) {
+        setSelectedRefund(null);
+      }
+      fetchRefunds();
+    } catch (err: any) {
+      alert(err.message || "Failed to delete refund request.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   // Screenshot modal preview
   const [screenshotModalUrl, setScreenshotModalUrl] = useState<string | null>(null);
@@ -219,12 +247,22 @@ export default function AdminRefundsPage() {
                       </span>
                     </td>
                     <td className="py-3.5 px-4 text-right">
-                      <button
-                        onClick={() => openRefundDetail(rf)}
-                        className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/10 hover:bg-white/20 text-white transition-colors"
-                      >
-                        Review Refund
-                      </button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => openRefundDetail(rf)}
+                          className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/10 hover:bg-white/20 text-white transition-colors"
+                        >
+                          Review Refund
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setRefundToDelete(rf)}
+                          className="p-1.5 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                          title="Delete Refund Request"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -389,21 +427,32 @@ export default function AdminRefundsPage() {
                 <strong>Manual Transfer Safeguard:</strong> Marking a refund as &quot;Done&quot; confirms you have manually issued the transfer through your bank/wallet app.
               </div>
 
-              <div className="flex justify-end gap-3 pt-2">
+              <div className="flex items-center justify-between gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setSelectedRefund(null)}
-                  className="px-5 py-2.5 rounded-xl text-xs font-semibold btn-secondary"
+                  onClick={() => setRefundToDelete(selectedRefund)}
+                  className="px-4 py-2.5 rounded-xl text-xs font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30 hover:bg-rose-500/25 flex items-center gap-1.5 transition-colors"
                 >
-                  Close
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Delete Request</span>
                 </button>
-                <button
-                  type="submit"
-                  disabled={isUpdating}
-                  className="px-6 py-2.5 rounded-xl text-xs font-bold btn-danger disabled:opacity-50"
-                >
-                  {isUpdating ? "Saving..." : "Save Refund Status"}
-                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRefund(null)}
+                    className="px-5 py-2.5 rounded-xl text-xs font-semibold btn-secondary"
+                  >
+                    Close
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isUpdating}
+                    className="px-6 py-2.5 rounded-xl text-xs font-bold btn-danger disabled:opacity-50"
+                  >
+                    {isUpdating ? "Saving..." : "Save Refund Status"}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -457,6 +506,49 @@ export default function AdminRefundsPage() {
                 className="max-w-full max-h-[72vh] object-contain rounded-xl select-none shadow-2xl"
                 loading="eager"
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE REFUND CONFIRMATION MODAL */}
+      {refundToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-[#0b1026] border border-rose-500/30 rounded-3xl p-6 sm:p-8 max-w-md w-full space-y-5 shadow-2xl">
+            <div className="flex items-center gap-3 text-rose-400">
+              <div className="p-3 rounded-2xl bg-rose-500/15 border border-rose-500/30">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-white">Delete Refund Request?</h3>
+                <p className="text-xs text-rose-300 font-mono">{refundToDelete.refundNumber}</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Are you sure you want to permanently delete refund request <strong className="text-white font-mono">{refundToDelete.refundNumber}</strong> for order <strong className="text-white font-mono">{refundToDelete.order?.orderNumber || "unknown"}</strong> ({refundToDelete.requestedAmount?.toLocaleString()} EGP)?
+            </p>
+            <p className="text-[11px] text-slate-400 bg-white/[0.03] p-3 rounded-xl border border-white/5">
+              ⚠️ This will remove this refund request ticket and its staff history logs.
+            </p>
+
+            <div className="flex gap-2.5 pt-2">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setRefundToDelete(null)}
+                className="flex-1 py-2.5 rounded-xl text-xs font-semibold btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={handleDeleteRefund}
+                className="flex-1 py-2.5 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/30 disabled:opacity-50"
+              >
+                {isDeleting ? "Deleting..." : "Yes, Delete Refund"}
+              </button>
             </div>
           </div>
         </div>

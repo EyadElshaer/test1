@@ -17,6 +17,7 @@ model Admin {
   email              String         @unique
   passwordHash       String
   role               String         @default("ADMIN") // SUPER_ADMIN, ADMIN
+  permissions        String?        // Comma-separated allowed sections e.g. "orders,refunds"
   mustChangePassword Boolean        @default(true)
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt

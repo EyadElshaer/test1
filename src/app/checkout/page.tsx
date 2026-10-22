@@ -361,9 +361,12 @@ export default function CheckoutPage() {
                     <input
                       type="tel"
                       required
-                      placeholder="e.g. 01012345678"
+                      placeholder="e.g. 1012345678"
                       value={customerPhone}
-                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, "").replace(/^0+/, "");
+                        setCustomerPhone(val);
+                      }}
                       className="flex-1 glass-input px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-mono"
                     />
 

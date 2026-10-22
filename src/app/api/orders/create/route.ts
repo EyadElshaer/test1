@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { generateUniqueOrderNumber } from "@/lib/orderNumber";
 import { normalizePhoneNumber } from "@/lib/countryCodes";
 import { getUserSession, createUserSession } from "@/lib/userAuth";
+import { sendTelegramOrderAlert } from "@/lib/telegram";
 
 export async function POST(req: Request) {
   try {
@@ -291,6 +292,23 @@ export async function POST(req: Request) {
 
       return order;
     });
+
+    // Fire-and-forget Telegram notification to store admin
+    sendTelegramOrderAlert({
+      orderNumber: newOrder.orderNumber,
+      totalAmount: newOrder.totalAmount,
+      currency: newOrder.currency,
+      paymentMethodName: newOrder.paymentMethodName,
+      customerName: newOrder.customerName,
+      customerPhone: newOrder.customerPhone,
+      customerEmail: newOrder.customerEmail,
+      customerNotes: newOrder.customerNotes,
+      items: newOrder.items.map((i: any) => ({
+        productTitle: i.productTitle,
+        quantity: i.quantity,
+        lineTotal: i.lineTotal,
+      })),
+    }).catch((err) => console.error("Telegram notification error:", err));
 
     return NextResponse.json({
       success: true,

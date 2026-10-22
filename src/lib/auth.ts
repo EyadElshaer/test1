@@ -46,6 +46,7 @@ export async function getAdminSession() {
             username: true,
             email: true,
             role: true,
+            permissions: true,
             mustChangePassword: true,
           },
         },

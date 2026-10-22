@@ -18,6 +18,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { COUNTRY_CODES, CountryCode } from "@/lib/countryCodes";
 
 function AuthForm() {
   const router = useRouter();
@@ -30,9 +31,15 @@ function AuthForm() {
   const [activeTab, setActiveTab] = useState<"login" | "register">(initialTab);
   const [identifierType, setIdentifierType] = useState<"phone" | "email">("phone");
 
+  // Country Code selector for phone
+  const [selectedCountry, setSelectedCountry] = useState<CountryCode>(COUNTRY_CODES[0]); // Default Egypt (+20)
+  const [isCountryDropdownOpen, setIsCountryDropdownOpen] = useState(false);
+  const [countrySearch, setCountrySearch] = useState("");
+
   // Form fields
   const [name, setName] = useState("");
-  const [identifier, setIdentifier] = useState("");
+  const [phoneInput, setPhoneInput] = useState("");
+  const [emailInput, setEmailInput] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -41,6 +48,31 @@ function AuthForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+
+  // Filter countries
+  const filteredCountries = COUNTRY_CODES.filter(
+    (c) =>
+      c.name.toLowerCase().includes(countrySearch.toLowerCase()) ||
+      c.dialCode.includes(countrySearch)
+  );
+
+  // Handle phone input with automatic leading zero(s) removal
+  const handlePhoneChange = (val: string) => {
+    let raw = val.trim();
+    // If customer pasted full international format e.g. +20..., detect country
+    if (raw.startsWith("+")) {
+      const match = COUNTRY_CODES.find((c) => raw.startsWith(c.dialCode));
+      if (match) {
+        setSelectedCountry(match);
+        raw = raw.slice(match.dialCode.length);
+      }
+    }
+    // Remove all non-digits
+    let digits = raw.replace(/\D/g, "");
+    // Auto-delete leading zeros (e.g. 012... -> 12...)
+    digits = digits.replace(/^0+/, "");
+    setPhoneInput(digits);
+  };
 
   // If already logged in, redirect
   React.useEffect(() => {
@@ -54,12 +86,18 @@ function AuthForm() {
     setErrorMessage("");
     setSuccessMessage("");
 
-    if (!identifier.trim()) {
-      setErrorMessage(
-        identifierType === "phone"
-          ? "Please enter your phone number."
-          : "Please enter your email address."
-      );
+    const finalIdentifier =
+      identifierType === "phone"
+        ? `${selectedCountry.dialCode}${phoneInput}`
+        : emailInput.trim();
+
+    if (identifierType === "phone" && !phoneInput.trim()) {
+      setErrorMessage("Please enter your mobile phone number.");
+      return;
+    }
+
+    if (identifierType === "email" && !emailInput.trim()) {
+      setErrorMessage("Please enter your email address.");
       return;
     }
 
@@ -85,7 +123,7 @@ function AuthForm() {
       setIsLoading(true);
       const res = await register({
         name: name.trim(),
-        identifier: identifier.trim(),
+        identifier: finalIdentifier,
         password,
       });
 
@@ -101,7 +139,7 @@ function AuthForm() {
       }, 700);
     } else {
       setIsLoading(true);
-      const res = await login(identifier.trim(), password);
+      const res = await login(finalIdentifier, password);
 
       if (!res.success) {
         setErrorMessage(res.error || "Login failed. Please check your credentials.");
@@ -221,7 +259,7 @@ function AuthForm() {
                   type="button"
                   onClick={() => {
                     setIdentifierType(identifierType === "phone" ? "email" : "phone");
-                    setIdentifier("");
+                    setErrorMessage("");
                   }}
                   className="text-[11px] text-cyan-400 hover:text-cyan-300 transition-colors flex items-center gap-1 font-medium"
                 >
@@ -239,25 +277,88 @@ function AuthForm() {
                 </button>
               </div>
 
-              <div className="relative">
-                {identifierType === "phone" ? (
-                  <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                ) : (
+              {identifierType === "phone" ? (
+                <div className="space-y-1.5">
+                  <div className="relative flex items-center gap-2">
+                    {/* Country Code Trigger */}
+                    <button
+                      type="button"
+                      onClick={() => setIsCountryDropdownOpen(!isCountryDropdownOpen)}
+                      className="glass-input px-3 py-2.5 rounded-xl text-xs flex items-center gap-1.5 shrink-0 hover:border-cyan-400/50 transition-colors"
+                    >
+                      <span className="text-base">{selectedCountry.flag}</span>
+                      <span className="font-semibold text-white font-mono">{selectedCountry.dialCode}</span>
+                    </button>
+
+                    {/* Phone Input */}
+                    <div className="relative flex-1">
+                      <Phone className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="tel"
+                        required
+                        placeholder="e.g. 1012345678"
+                        value={phoneInput}
+                        onChange={(e) => handlePhoneChange(e.target.value)}
+                        className="w-full glass-input pl-9 pr-3 py-2.5 rounded-xl text-xs font-mono"
+                      />
+                    </div>
+
+                    {/* Country Selector Dropdown */}
+                    {isCountryDropdownOpen && (
+                      <div className="absolute top-12 left-0 w-72 max-h-64 bg-[#0a102b] border border-white/15 rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col">
+                        <div className="p-2 border-b border-white/10">
+                          <input
+                            type="text"
+                            placeholder="Search country or dial code..."
+                            value={countrySearch}
+                            onChange={(e) => setCountrySearch(e.target.value)}
+                            className="w-full glass-input px-2.5 py-1.5 rounded-lg text-xs"
+                          />
+                        </div>
+                        <div className="overflow-y-auto flex-1 divide-y divide-white/5">
+                          {filteredCountries.map((c) => (
+                            <button
+                              key={c.code}
+                              type="button"
+                              onClick={() => {
+                                setSelectedCountry(c);
+                                setIsCountryDropdownOpen(false);
+                              }}
+                              className="w-full px-3 py-2 text-left text-xs flex items-center justify-between hover:bg-white/10 text-slate-300 hover:text-white"
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="text-base">{c.flag}</span>
+                                <span>{c.name}</span>
+                              </div>
+                              <span className="font-mono text-cyan-400 font-semibold">{c.dialCode}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {phoneInput && (
+                    <span className="text-[10px] text-cyan-400/90 font-mono block pl-1">
+                      Full International: {selectedCountry.dialCode}{phoneInput}
+                    </span>
+                  )}
+                  <span className="text-[10px] text-slate-400 block pl-1">
+                    Leading 0 is automatically removed for international accuracy.
+                  </span>
+                </div>
+              ) : (
+                <div className="relative">
                   <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                )}
-                <input
-                  type={identifierType === "phone" ? "tel" : "email"}
-                  required
-                  placeholder={
-                    identifierType === "phone"
-                      ? "e.g. 01012345678 or +201012345678"
-                      : "e.g. ahmed@gmail.com"
-                  }
-                  value={identifier}
-                  onChange={(e) => setIdentifier(e.target.value)}
-                  className="w-full glass-input pl-10 pr-4 py-2.5 rounded-xl text-xs font-mono"
-                />
-              </div>
+                  <input
+                    type="email"
+                    required
+                    placeholder="e.g. ahmed@gmail.com"
+                    value={emailInput}
+                    onChange={(e) => setEmailInput(e.target.value)}
+                    className="w-full glass-input pl-10 pr-4 py-2.5 rounded-xl text-xs font-mono"
+                  />
+                </div>
+              )}
             </div>
 
             {/* Password Field */}

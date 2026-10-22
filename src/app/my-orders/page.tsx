@@ -28,19 +28,12 @@ function MyOrdersContent() {
   const searchParams = useSearchParams();
   const initialOrderNumber = searchParams.get("orderNumber") || "";
 
-  const [lookupMode, setLookupMode] = useState<"orderNumber" | "phone">("orderNumber");
   const [orderNumberInput, setOrderNumberInput] = useState(initialOrderNumber);
-  const [phoneInput, setPhoneInput] = useState("");
-  const [otpInput, setOtpInput] = useState("");
-  const [isOtpSent, setIsOtpSent] = useState(false);
-  const [otpHint, setOtpHint] = useState("");
-
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
   // Result state
   const [activeOrder, setActiveOrder] = useState<any | null>(null);
-  const [phoneOrdersList, setPhoneOrdersList] = useState<any[]>([]);
 
   // Refund modal/form state
   const [showRefundModal, setShowRefundModal] = useState(false);
@@ -65,19 +58,11 @@ function MyOrdersContent() {
     setTimeout(() => setCopiedKey(false), 2000);
   };
 
-  // Auto-search if URL contains orderNumber
-  useEffect(() => {
-    if (initialOrderNumber) {
-      lookupByOrderNumber(initialOrderNumber);
-    }
-  }, [initialOrderNumber]);
-
   const lookupByOrderNumber = async (numToSearch: string) => {
     if (!numToSearch.trim()) return;
     setIsLoading(true);
     setErrorMessage("");
     setActiveOrder(null);
-    setPhoneOrdersList([]);
 
     try {
       const res = await fetch("/api/orders/lookup", {
@@ -97,65 +82,12 @@ function MyOrdersContent() {
     }
   };
 
-  const handleRequestOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!phoneInput.trim()) return;
-    setIsLoading(true);
-    setErrorMessage("");
-    setOtpHint("");
-
-    try {
-      const res = await fetch("/api/orders/phone-verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "REQUEST_OTP", phone: phoneInput.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || "Phone verification request failed.");
-      }
-      setIsOtpSent(true);
-      setOtpHint(data.message);
-      if (data.debugCode) {
-        setOtpInput(data.debugCode);
-      }
-    } catch (err: any) {
-      setErrorMessage(err.message || "Error requesting verification code.");
-    } finally {
-      setIsLoading(false);
+  // Auto-search if URL contains orderNumber
+  useEffect(() => {
+    if (initialOrderNumber) {
+      lookupByOrderNumber(initialOrderNumber);
     }
-  };
-
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!otpInput.trim()) return;
-    setIsLoading(true);
-    setErrorMessage("");
-
-    try {
-      const res = await fetch("/api/orders/phone-verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "VERIFY_OTP",
-          phone: phoneInput.trim(),
-          code: otpInput.trim(),
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || "Incorrect or expired verification code.");
-      }
-      setPhoneOrdersList(data.orders || []);
-      if (data.orders.length > 0) {
-        setActiveOrder(data.orders[0]);
-      }
-    } catch (err: any) {
-      setErrorMessage(err.message || "Verification failed.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }, [initialOrderNumber]);
 
   const handleRefundSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -233,148 +165,41 @@ function MyOrdersContent() {
 
       {/* Lookup Card */}
       <div className="glass-card rounded-3xl p-6 sm:p-8 border border-white/10 max-w-2xl mx-auto space-y-6">
-        {/* Lookup Tabs */}
-        <div className="grid grid-cols-2 p-1 rounded-xl bg-slate-900 border border-white/10 text-xs font-bold">
-          <button
-            type="button"
-            onClick={() => {
-              setLookupMode("orderNumber");
-              setErrorMessage("");
-            }}
-            className={`py-2.5 rounded-lg transition-all ${
-              lookupMode === "orderNumber"
-                ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            By Order Number (#DN...)
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setLookupMode("phone");
-              setErrorMessage("");
-            }}
-            className={`py-2.5 rounded-lg transition-all ${
-              lookupMode === "phone"
-                ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            By Phone Number (OTP)
-          </button>
-        </div>
-
-        {/* Mode 1: Order Number Form */}
-        {lookupMode === "orderNumber" && (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              lookupByOrderNumber(orderNumberInput);
-            }}
-            className="space-y-4"
-          >
-            <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1.5">
-                Enter Your Order Number
-              </label>
-              <div className="relative">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. #DN7K4P9X2"
-                  value={orderNumberInput}
-                  onChange={(e) => setOrderNumberInput(e.target.value.toUpperCase())}
-                  className="w-full glass-input pl-10 pr-4 py-3 rounded-xl text-sm font-mono uppercase tracking-wider"
-                />
-              </div>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            lookupByOrderNumber(orderNumberInput);
+          }}
+          className="space-y-4"
+        >
+          <div>
+            <label className="text-xs font-semibold text-slate-300 block mb-1.5">
+              Enter Your Order Number
+            </label>
+            <div className="relative">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                required
+                placeholder="e.g. #DN7K4P9X2"
+                value={orderNumberInput}
+                onChange={(e) => setOrderNumberInput(e.target.value.toUpperCase())}
+                className="w-full glass-input pl-10 pr-4 py-3.5 rounded-xl text-sm font-mono uppercase tracking-wider"
+              />
             </div>
-
-            <button
-              type="submit"
-              disabled={isLoading || !orderNumberInput.trim()}
-              className="w-full py-3.5 rounded-xl font-bold text-xs sm:text-sm text-white btn-primary shadow-lg shadow-blue-500/30 disabled:opacity-50"
-            >
-              {isLoading ? "Searching Order..." : "Lookup Order Status"}
-            </button>
-          </form>
-        )}
-
-        {/* Mode 2: Phone Verification Form */}
-        {lookupMode === "phone" && (
-          <div className="space-y-4">
-            {!isOtpSent ? (
-              <form onSubmit={handleRequestOtp} className="space-y-4">
-                <div>
-                  <label className="text-xs font-semibold text-slate-300 block mb-1.5">
-                    Mobile Phone Number Used at Checkout
-                  </label>
-                  <div className="relative">
-                    <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="tel"
-                      required
-                      placeholder="e.g. 01012345678"
-                      value={phoneInput}
-                      onChange={(e) => setPhoneInput(e.target.value)}
-                      className="w-full glass-input pl-10 pr-4 py-3 rounded-xl text-sm font-mono"
-                    />
-                  </div>
-                  <span className="text-[11px] text-slate-400 mt-1 block">
-                    A secure 6-digit verification code will be dispatched to confirm ownership.
-                  </span>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isLoading || !phoneInput.trim()}
-                  className="w-full py-3.5 rounded-xl font-bold text-xs sm:text-sm text-white btn-primary shadow-lg shadow-blue-500/30 disabled:opacity-50"
-                >
-                  {isLoading ? "Sending Code..." : "Send Verification Code"}
-                </button>
-              </form>
-            ) : (
-              <form onSubmit={handleVerifyOtp} className="space-y-4">
-                <div className="p-3.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-cyan-200">
-                  {otpHint || "Enter the 6-digit code sent to your phone."}
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-slate-300 block mb-1.5">
-                    6-Digit Verification Code
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    maxLength={6}
-                    placeholder="123456"
-                    value={otpInput}
-                    onChange={(e) => setOtpInput(e.target.value)}
-                    className="w-full glass-input px-4 py-3 rounded-xl text-center text-lg font-mono tracking-widest"
-                  />
-                </div>
-
-                <div className="flex gap-2">
-                  <button
-                    type="submit"
-                    disabled={isLoading || otpInput.length < 6}
-                    className="flex-1 py-3.5 rounded-xl font-bold text-xs sm:text-sm text-white btn-primary shadow-lg shadow-blue-500/30 disabled:opacity-50"
-                  >
-                    {isLoading ? "Verifying..." : "Verify & View Orders"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsOtpSent(false)}
-                    className="px-4 py-3.5 rounded-xl text-xs font-semibold btn-secondary"
-                  >
-                    Back
-                  </button>
-                </div>
-              </form>
-            )}
+            <p className="text-[11px] text-slate-400 mt-2">
+              Found on your order confirmation receipt or email. All your purchased licenses and real-time status appear below.
+            </p>
           </div>
-        )}
+
+          <button
+            type="submit"
+            disabled={isLoading || !orderNumberInput.trim()}
+            className="w-full py-3.5 rounded-xl font-bold text-xs sm:text-sm text-white btn-primary shadow-lg shadow-blue-500/30 disabled:opacity-50"
+          >
+            {isLoading ? "Searching Order..." : "Lookup Order Status"}
+          </button>
+        </form>
 
         {errorMessage && (
           <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
@@ -382,38 +207,19 @@ function MyOrdersContent() {
             <span>{errorMessage}</span>
           </div>
         )}
-      </div>
 
-      {/* Multiple Orders Selector (if verified via phone) */}
-      {phoneOrdersList.length > 1 && (
-        <div className="space-y-3">
-          <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-            Orders Linked to {phoneInput} ({phoneOrdersList.length})
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {phoneOrdersList.map((order) => (
-              <button
-                key={order.id}
-                type="button"
-                onClick={() => setActiveOrder(order)}
-                className={`p-4 rounded-2xl border text-left transition-all ${
-                  activeOrder?.id === order.id
-                    ? "bg-blue-600/20 border-cyan-400 text-white"
-                    : "glass-card text-slate-400 hover:text-white"
-                }`}
-              >
-                <div className="font-mono font-bold text-sm text-cyan-300">{order.orderNumber}</div>
-                <div className="text-xs text-slate-300 mt-1">
-                  {order.totalAmount.toLocaleString()} {order.currency}
-                </div>
-                <div className="text-[11px] text-slate-500 mt-0.5">
-                  Status: <strong className="text-white">{order.status}</strong>
-                </div>
-              </button>
-            ))}
-          </div>
+        {/* Notice for account owners */}
+        <div className="pt-3 border-t border-white/5 flex items-center justify-between text-xs text-slate-400">
+          <span>Looking for all your past purchases?</span>
+          <Link
+            href="/account/orders"
+            className="text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-1 transition-colors"
+          >
+            <span>View Account History</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </Link>
         </div>
-      )}
+      </div>
 
       {/* Order Details Display */}
       {activeOrder && (
@@ -646,20 +452,25 @@ function MyOrdersContent() {
             <div className="divide-y divide-white/5 border-t border-b border-white/10">
               {activeOrder.items.map((item: any) => (
                 <div key={item.id} className="py-4 flex items-center justify-between text-xs sm:text-sm">
-                  <div className="flex items-center gap-3">
-                    <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-slate-900 border border-white/10 shrink-0">
+                  <Link
+                    href={`/products/${item.productSlug}`}
+                    className="flex items-center gap-3 group/item hover:opacity-90 transition-opacity"
+                  >
+                    <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-slate-900 border border-white/10 shrink-0 group-hover/item:border-cyan-400/50 transition-colors">
                       <Image
                         src={item.productImage || "/images/premikeys-logo.png"}
                         alt={item.productTitle}
                         fill
-                        className="object-cover"
+                        className="object-cover group-hover/item:scale-105 transition-transform duration-300"
                       />
                     </div>
                     <div>
-                      <span className="font-bold text-white block">{item.productTitle}</span>
+                      <span className="font-bold text-white block group-hover/item:text-cyan-300 transition-colors">
+                        {item.productTitle}
+                      </span>
                       <span className="text-xs text-slate-400">Qty: {item.quantity}</span>
                     </div>
-                  </div>
+                  </Link>
                   <div className="font-mono font-bold text-white">
                     {item.lineTotal.toLocaleString()} {activeOrder.currency}
                   </div>
@@ -677,43 +488,174 @@ function MyOrdersContent() {
           </div>
 
           {/* Refund Status or Request Refund Trigger */}
-          <div className="pt-6 border-t border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="pt-6 border-t border-white/10">
             {activeOrder.refundRequests && activeOrder.refundRequests.length > 0 ? (
-              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs space-y-1 w-full">
-                <span className="font-bold text-amber-300 flex items-center gap-1.5">
-                  <RotateCcw className="w-4 h-4" />
-                  Refund Request {activeOrder.refundRequests[0].refundNumber} ({activeOrder.refundRequests[0].status})
-                </span>
-                <p className="text-slate-300 text-[11px]">
-                  Reason: {activeOrder.refundRequests[0].reason}. Amount: {activeOrder.refundRequests[0].requestedAmount} {activeOrder.currency}
-                </p>
+              <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-br from-slate-900/95 to-slate-950/95 border border-amber-500/30 text-xs space-y-5 w-full shadow-xl">
+                {/* Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                      <RotateCcw className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase tracking-wider text-amber-400 font-bold block">
+                        Refund Request Case
+                      </span>
+                      <h4 className="font-mono font-bold text-base text-white">
+                        {activeOrder.refundRequests[0].refundNumber}
+                      </h4>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-bold ${
+                        activeOrder.refundRequests[0].status === "APPROVED"
+                          ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                          : activeOrder.refundRequests[0].status === "DECLINED"
+                          ? "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                          : "bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse"
+                      }`}
+                    >
+                      {activeOrder.refundRequests[0].status === "PENDING"
+                        ? "Under Staff Review"
+                        : activeOrder.refundRequests[0].status === "APPROVED"
+                        ? "Approved & Refunded"
+                        : "Declined"}
+                    </span>
+                    <span className="text-slate-400 text-[11px] font-mono">
+                      {new Date(activeOrder.refundRequests[0].createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Multi-Step Visual Progress Bar */}
+                <div className="py-2 px-2 sm:px-6">
+                  <div className="relative flex items-center justify-between">
+                    <div className="absolute left-6 right-6 top-1/2 -translate-y-1/2 h-1 bg-white/10 -z-0" />
+                    <div
+                      className={`absolute left-6 top-1/2 -translate-y-1/2 h-1 -z-0 transition-all duration-500 ${
+                        activeOrder.refundRequests[0].status === "APPROVED"
+                          ? "right-6 bg-emerald-500"
+                          : activeOrder.refundRequests[0].status === "DECLINED"
+                          ? "right-6 bg-rose-500"
+                          : "w-1/2 bg-amber-500"
+                      }`}
+                    />
+
+                    {/* Step 1 */}
+                    <div className="flex flex-col items-center gap-2 z-10 bg-[#0a0f24] px-2">
+                      <div className="w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-bold shadow-lg shadow-emerald-500/30">
+                        <Check className="w-4 h-4" />
+                      </div>
+                      <span className="text-[11px] font-bold text-slate-300 text-center">Submitted</span>
+                    </div>
+
+                    {/* Step 2 */}
+                    <div className="flex flex-col items-center gap-2 z-10 bg-[#0a0f24] px-2">
+                      <div
+                        className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                          activeOrder.refundRequests[0].status !== "PENDING"
+                            ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30"
+                            : "bg-amber-500 text-slate-950 font-black shadow-lg shadow-amber-500/40 animate-bounce"
+                        }`}
+                      >
+                        {activeOrder.refundRequests[0].status !== "PENDING" ? (
+                          <Check className="w-4 h-4" />
+                        ) : (
+                          <Clock className="w-4 h-4" />
+                        )}
+                      </div>
+                      <span className="text-[11px] font-bold text-slate-300 text-center">Staff Review</span>
+                    </div>
+
+                    {/* Step 3 */}
+                    <div className="flex flex-col items-center gap-2 z-10 bg-[#0a0f24] px-2">
+                      <div
+                        className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                          activeOrder.refundRequests[0].status === "APPROVED"
+                            ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/40"
+                            : activeOrder.refundRequests[0].status === "DECLINED"
+                            ? "bg-rose-500 text-white shadow-lg shadow-rose-500/40"
+                            : "bg-slate-800 text-slate-500 border border-white/20"
+                        }`}
+                      >
+                        {activeOrder.refundRequests[0].status === "APPROVED" ? (
+                          <Check className="w-4 h-4" />
+                        ) : activeOrder.refundRequests[0].status === "DECLINED" ? (
+                          <XCircle className="w-4 h-4" />
+                        ) : (
+                          "3"
+                        )}
+                      </div>
+                      <span className="text-[11px] font-bold text-slate-300 text-center">
+                        {activeOrder.refundRequests[0].status === "APPROVED"
+                          ? "Approved"
+                          : activeOrder.refundRequests[0].status === "DECLINED"
+                          ? "Declined"
+                          : "Resolution"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Details Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                  <div className="p-3.5 rounded-xl bg-white/[0.03] border border-white/5">
+                    <span className="text-[10px] text-slate-400 block uppercase font-medium">Requested Refund Amount</span>
+                    <span className="text-sm font-bold text-cyan-300 font-mono">
+                      {activeOrder.refundRequests[0].requestedAmount.toLocaleString()} {activeOrder.currency}
+                    </span>
+                  </div>
+                  <div className="p-3.5 rounded-xl bg-white/[0.03] border border-white/5">
+                    <span className="text-[10px] text-slate-400 block uppercase font-medium">Claim Reason</span>
+                    <span className="text-xs font-semibold text-white">
+                      {activeOrder.refundRequests[0].reason}
+                    </span>
+                  </div>
+                </div>
+
+                {activeOrder.refundRequests[0].explanation && (
+                  <div className="p-3.5 rounded-xl bg-black/40 border border-white/5">
+                    <span className="text-[10px] text-slate-400 block mb-1">Your Explanation:</span>
+                    <p className="text-xs text-slate-300 italic">{activeOrder.refundRequests[0].explanation}</p>
+                  </div>
+                )}
+
                 {activeOrder.refundRequests[0].adminCustomerNote && (
-                  <p className="text-white text-[11px] pt-1">
-                    Staff Note: {activeOrder.refundRequests[0].adminCustomerNote}
-                  </p>
+                  <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/30 space-y-1">
+                    <div className="flex items-center gap-1.5 text-cyan-300 font-bold text-xs">
+                      <ShieldCheck className="w-4 h-4" />
+                      <span>Official Staff Decision & Instructions:</span>
+                    </div>
+                    <p className="text-xs text-white leading-relaxed">
+                      {activeOrder.refundRequests[0].adminCustomerNote}
+                    </p>
+                  </div>
                 )}
               </div>
             ) : (
-              <div>
-                <span className="text-xs text-slate-400 block">Issue with your order?</span>
-                <button
-                  type="button"
-                  onClick={() => setShowRefundModal(true)}
-                  className="mt-1 text-xs text-rose-400 hover:text-rose-300 underline font-semibold flex items-center gap-1"
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <span className="text-xs text-slate-400 block">Issue with your order?</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowRefundModal(true)}
+                    className="mt-1 text-xs text-rose-400 hover:text-rose-300 underline font-semibold flex items-center gap-1"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Request a Refund for this Order</span>
+                  </button>
+                </div>
+
+                <Link
+                  href="/faq"
+                  className="text-xs text-slate-400 hover:text-white flex items-center gap-1"
                 >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  <span>Request a Refund for this Order</span>
-                </button>
+                  <Info className="w-3.5 h-3.5" />
+                  <span>Questions about delivery & statuses?</span>
+                </Link>
               </div>
             )}
-
-            <Link
-              href="/faq"
-              className="text-xs text-slate-400 hover:text-white flex items-center gap-1"
-            >
-              <Info className="w-3.5 h-3.5" />
-              <span>Questions about delivery & statuses?</span>
-            </Link>
           </div>
         </div>
       )}

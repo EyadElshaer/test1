@@ -14,6 +14,7 @@ export async function GET() {
       username: admin.username,
       email: admin.email,
       role: admin.role,
+      permissions: (admin as any).permissions || null,
       mustChangePassword: admin.mustChangePassword,
     },
   });

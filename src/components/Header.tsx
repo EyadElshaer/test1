@@ -49,9 +49,10 @@ export default function Header() {
     return null;
   }
 
-  // "My Orders" removed from here and relocated inside account per requirements
+  // Header navigation links
   const navLinks = [
     { name: "Browse Products", href: "/products" },
+    { name: "Contact Us", href: "/contact" },
     { name: "FAQ", href: "/faq" },
   ];
 

@@ -14,6 +14,10 @@ import {
   FileCode,
   Info,
   ShieldCheck,
+  Send,
+  Bell,
+  ExternalLink,
+  Key,
 } from "lucide-react";
 
 export default function AdminSettingsPage() {
@@ -22,6 +26,9 @@ export default function AdminSettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState("");
   const [saveError, setSaveError] = useState("");
+  const [isTestingTelegram, setIsTestingTelegram] = useState(false);
+  const [telegramTestSuccess, setTelegramTestSuccess] = useState("");
+  const [telegramTestError, setTelegramTestError] = useState("");
 
   const loadSettings = async () => {
     setLoading(true);
@@ -70,6 +77,47 @@ export default function AdminSettingsPage() {
       setSaveError(err.message || "Failed to update settings.");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleTestTelegram = async () => {
+    setIsTestingTelegram(true);
+    setTelegramTestSuccess("");
+    setTelegramTestError("");
+
+    const botToken = settings.telegram_bot_token;
+    const chatId = settings.telegram_chat_id;
+
+    if (!botToken || !botToken.trim()) {
+      setTelegramTestError("Please enter your Telegram Bot Token before testing.");
+      setIsTestingTelegram(false);
+      return;
+    }
+
+    if (!chatId || !chatId.trim()) {
+      setTelegramTestError("Please enter your Telegram Chat ID before testing.");
+      setIsTestingTelegram(false);
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/admin/telegram-test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ botToken, chatId }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to send test notification.");
+      }
+
+      setTelegramTestSuccess(data.message || "Test notification successfully delivered to your Telegram!");
+      setTimeout(() => setTelegramTestSuccess(""), 6000);
+    } catch (err: any) {
+      setTelegramTestError(err.message || "Failed to connect to Telegram.");
+    } finally {
+      setIsTestingTelegram(false);
     }
   };
 
@@ -300,7 +348,149 @@ export default function AdminSettingsPage() {
           </div>
         </div>
 
-        {/* 4. External Integrations Guide & Credentials Checklist */}
+        {/* 4. Telegram Order Notifications & BotFather Setup */}
+        <div className="glass-card rounded-3xl p-6 sm:p-8 border border-white/10 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
+            <div>
+              <h3 className="font-bold text-white text-base flex items-center gap-2">
+                <Bell className="w-5 h-5 text-sky-400" />
+                <span>Telegram Mobile Order Notifications</span>
+              </h3>
+              <p className="text-xs text-slate-400 mt-1">
+                Get an instant ping on your smartphone via Telegram every time a customer submits a new order.
+              </p>
+            </div>
+
+            <label className="flex items-center gap-2.5 cursor-pointer bg-white/[0.04] hover:bg-white/[0.08] px-3.5 py-2 rounded-xl border border-white/10 transition-colors">
+              <input
+                type="checkbox"
+                checked={settings.telegram_enabled === "true" || settings.telegram_enabled === "1"}
+                onChange={(e) =>
+                  handleChange("telegram_enabled", e.target.checked ? "true" : "false")
+                }
+                className="rounded border-slate-700 text-sky-500 focus:ring-sky-500 w-4 h-4 cursor-pointer"
+              />
+              <span className="text-xs font-semibold text-white">Enable Notifications</span>
+            </label>
+          </div>
+
+          {/* Test alert banners */}
+          {telegramTestSuccess && (
+            <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <span>{telegramTestSuccess}</span>
+            </div>
+          )}
+          {telegramTestError && (
+            <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{telegramTestError}</span>
+            </div>
+          )}
+
+          {/* Configuration Inputs */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-semibold text-slate-300 block mb-1">
+                Telegram Bot Token
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="e.g. 748392019:AAHkYQ_82..."
+                  value={settings.telegram_bot_token || ""}
+                  onChange={(e) => handleChange("telegram_bot_token", e.target.value)}
+                  className="w-full glass-input px-3.5 py-2 rounded-xl text-xs font-mono text-sky-300 placeholder:text-slate-600"
+                />
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1">
+                Generated by @BotFather when you create your bot.
+              </p>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-slate-300 block mb-1">
+                Your Telegram Chat ID
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="e.g. 123456789 or -100123456789"
+                  value={settings.telegram_chat_id || ""}
+                  onChange={(e) => handleChange("telegram_chat_id", e.target.value)}
+                  className="w-full glass-input px-3.5 py-2 rounded-xl text-xs font-mono text-sky-300 placeholder:text-slate-600"
+                />
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1">
+                Your personal numeric ID or group chat ID where alerts will be sent.
+              </p>
+            </div>
+          </div>
+
+          {/* Test Dispatch Button */}
+          <div className="flex justify-end pt-2">
+            <button
+              type="button"
+              onClick={handleTestTelegram}
+              disabled={isTestingTelegram}
+              className="px-4 py-2.5 rounded-xl text-xs font-bold bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/40 flex items-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+            >
+              <Send className="w-3.5 h-3.5" />
+              <span>{isTestingTelegram ? "Sending Test Ping..." : "Send Test Notification"}</span>
+            </button>
+          </div>
+
+          {/* Step-by-Step BotFather Guide Card */}
+          <div className="p-5 rounded-2xl bg-sky-950/20 border border-sky-500/20 space-y-4">
+            <div className="flex items-center gap-2 text-sky-300 font-bold text-xs uppercase tracking-wider">
+              <HelpCircle className="w-4 h-4" />
+              <span>How to Setup Your Telegram Bot with @BotFather (Takes 2 Minutes)</span>
+            </div>
+
+            <ol className="space-y-3 text-xs text-slate-300 list-decimal list-inside leading-relaxed">
+              <li className="pl-1">
+                <strong className="text-white">Open Telegram &amp; Find BotFather:</strong> Open Telegram on your phone or computer, search for{" "}
+                <a
+                  href="https://t.me/BotFather"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sky-400 font-mono hover:underline inline-flex items-center gap-0.5"
+                >
+                  @BotFather <ExternalLink className="w-3 h-3 inline" />
+                </a>{" "}
+                (verified bot with a blue tick mark), and press <strong className="text-white">Start</strong>.
+              </li>
+              <li className="pl-1">
+                <strong className="text-white">Create a New Bot:</strong> Send the command{" "}
+                <code className="text-sky-300 bg-black/40 px-1.5 py-0.5 rounded font-mono">/newbot</code>.
+                When asked, give your bot a name (e.g. <em>PremiKeys Order Alerts</em>), and then choose a username ending in <code className="text-sky-300 font-mono">bot</code> (e.g. <em>premikeys_orders_bot</em>).
+              </li>
+              <li className="pl-1">
+                <strong className="text-white">Copy the Bot Token:</strong> BotFather will send you a message with your <strong className="text-white">HTTP API Token</strong> (looks like <code className="text-sky-300 font-mono">712345678:ABCdefGHI...</code>). Copy it and paste it into the <strong className="text-white">Telegram Bot Token</strong> input above.
+              </li>
+              <li className="pl-1">
+                <strong className="text-white">Start Your New Bot:</strong> Click on your bot&apos;s link (e.g. <code className="text-sky-300 font-mono">t.me/premikeys_orders_bot</code>) and press <strong className="text-white">START</strong>. This authorizes the bot to message you.
+              </li>
+              <li className="pl-1">
+                <strong className="text-white">Get Your Chat ID:</strong> Search for the bot{" "}
+                <a
+                  href="https://t.me/userinfobot"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sky-400 font-mono hover:underline inline-flex items-center gap-0.5"
+                >
+                  @userinfobot <ExternalLink className="w-3 h-3 inline" />
+                </a>{" "}
+                in Telegram and click <strong className="text-white">Start</strong>. It will immediately show your numeric <code className="text-sky-300 font-mono">Id</code> (e.g. <code className="text-sky-300 font-mono">123456789</code>). Copy and paste this into the <strong className="text-white">Your Telegram Chat ID</strong> field above.
+              </li>
+              <li className="pl-1">
+                <strong className="text-white">Save and Test:</strong> Click <strong className="text-white">Save All Changes</strong> at the top, then press <strong className="text-white">Send Test Notification</strong>. You will immediately receive a test ping on your phone!
+              </li>
+            </ol>
+          </div>
+        </div>
+
+        {/* 5. External Integrations Guide & Credentials Checklist */}
         <div className="p-6 rounded-3xl bg-blue-950/30 border border-blue-500/30 space-y-4 text-xs">
           <div className="flex items-center gap-2 text-cyan-300 font-bold text-sm">
             <ShieldCheck className="w-4 h-4" />

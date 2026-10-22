@@ -5,8 +5,17 @@ export async function GET() {
   try {
     const settings = await prisma.storeSetting.findMany();
     const settingsMap: Record<string, string> = {};
+    const SENSITIVE_KEYS = new Set([
+      "telegram_bot_token",
+      "telegram_chat_id",
+      "smtp_password",
+      "api_secret",
+    ]);
+
     for (const s of settings) {
-      settingsMap[s.key] = s.value;
+      if (!SENSITIVE_KEYS.has(s.key)) {
+        settingsMap[s.key] = s.value;
+      }
     }
 
     return NextResponse.json({ success: true, settings: settingsMap });

@@ -126,18 +126,31 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   const navItems = [
-    { name: "Overview", href: "/admin/dashboard", icon: LayoutDashboard },
-    { name: "Orders", href: "/admin/orders", icon: ShoppingBag },
-    { name: "Customers", href: "/admin/customers", icon: Users },
-    { name: "Refunds", href: "/admin/refunds", icon: RotateCcw },
-    { name: "Products", href: "/admin/products", icon: Package },
-    { name: "Categories", href: "/admin/categories", icon: Layers },
-    { name: "Catalog Filters", href: "/admin/filters", icon: SlidersHorizontal },
-    { name: "Payment Methods", href: "/admin/payment-methods", icon: CreditCard },
-    { name: "Promo Codes", href: "/admin/promo-codes", icon: Tag },
-    { name: "FAQ Management", href: "/admin/faq", icon: HelpCircle },
-    { name: "Store Settings", href: "/admin/settings", icon: Settings },
+    { name: "Overview", href: "/admin/dashboard", icon: LayoutDashboard, permissionKey: "overview" },
+    { name: "Orders", href: "/admin/orders", icon: ShoppingBag, permissionKey: "orders" },
+    { name: "Customers", href: "/admin/customers", icon: Users, permissionKey: "customers" },
+    { name: "Refunds", href: "/admin/refunds", icon: RotateCcw, permissionKey: "refunds" },
+    { name: "Products", href: "/admin/products", icon: Package, permissionKey: "products" },
+    { name: "Categories", href: "/admin/categories", icon: Layers, permissionKey: "categories" },
+    { name: "Catalog Filters", href: "/admin/filters", icon: SlidersHorizontal, permissionKey: "filters" },
+    { name: "Payment Methods", href: "/admin/payment-methods", icon: CreditCard, permissionKey: "payment-methods" },
+    { name: "Promo Codes", href: "/admin/promo-codes", icon: Tag, permissionKey: "promo-codes" },
+    { name: "FAQ Management", href: "/admin/faq", icon: HelpCircle, permissionKey: "faq" },
+    { name: "Admin Staff", href: "/admin/staff", icon: ShieldCheck, permissionKey: "staff" },
+    { name: "Store Settings", href: "/admin/settings", icon: Settings, permissionKey: "settings" },
   ];
+
+  const visibleNavItems = navItems.filter((item) => {
+    if (!adminUser) return true;
+    if (adminUser.role === "SUPER_ADMIN") return true;
+    if (item.name === "Overview") return true;
+    if (!adminUser.permissions || adminUser.permissions === "*") return true;
+    const allowed = adminUser.permissions.split(",").map((s: string) => s.trim().toLowerCase());
+    return (
+      allowed.includes(item.permissionKey.toLowerCase()) ||
+      allowed.includes(item.name.toLowerCase())
+    );
+  });
 
   const isActive = (href: string) => {
     if (href === "/admin/dashboard") return pathname === "/admin/dashboard";
@@ -181,7 +194,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Navigation Items */}
         <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
             return (

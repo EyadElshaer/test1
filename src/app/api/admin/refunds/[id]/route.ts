@@ -92,3 +92,43 @@ export async function PATCH(
     return NextResponse.json({ error: "Failed to update refund." }, { status: 500 });
   }
 }
+
+export async function DELETE(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const admin = await getAdminSession();
+    if (!admin) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const existing = await prisma.refundRequest.findUnique({
+      where: { id },
+      include: { order: true },
+    });
+
+    if (!existing) {
+      return NextResponse.json({ error: "Refund request not found." }, { status: 404 });
+    }
+
+    await prisma.refundRequest.delete({
+      where: { id },
+    });
+
+    await logAdminAudit(
+      admin.id,
+      "REFUND_DELETED",
+      `Refund request ${existing.refundNumber} for order ${existing.order?.orderNumber || "unknown"} deleted permanently by ${admin.username}.`
+    );
+
+    return NextResponse.json({
+      success: true,
+      message: `Refund request ${existing.refundNumber} deleted successfully.`,
+    });
+  } catch (error) {
+    console.error("Failed to delete refund request:", error);
+    return NextResponse.json({ error: "Failed to delete refund request." }, { status: 500 });
+  }
+}

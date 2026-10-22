@@ -320,22 +320,27 @@ export default function AccountOrdersPage() {
               <div className="p-5 divide-y divide-white/5">
                 {order.items?.map((item: any) => (
                   <div key={item.id} className="py-3.5 first:pt-0 last:pb-0 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3.5">
-                      <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-slate-900 border border-white/10 shrink-0">
+                    <Link
+                      href={`/products/${item.productSlug}`}
+                      className="flex items-center gap-3.5 group/item hover:opacity-90 transition-opacity"
+                    >
+                      <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-slate-900 border border-white/10 shrink-0 group-hover/item:border-cyan-400/50 transition-colors">
                         <Image
                           src={item.productImage || "/images/premikeys-logo.png"}
                           alt={item.productTitle}
                           fill
-                          className="object-cover"
+                          className="object-cover group-hover/item:scale-105 transition-transform duration-300"
                         />
                       </div>
                       <div>
-                        <h4 className="text-xs font-bold text-white">{item.productTitle}</h4>
+                        <h4 className="text-xs font-bold text-white group-hover/item:text-cyan-300 transition-colors">
+                          {item.productTitle}
+                        </h4>
                         <p className="text-[11px] text-slate-400">
                           Qty: {item.quantity} × {item.salePrice.toLocaleString()} {order.currency}
                         </p>
                       </div>
-                    </div>
+                    </Link>
 
                     <div className="text-right">
                       <span className="font-mono font-bold text-white text-xs">

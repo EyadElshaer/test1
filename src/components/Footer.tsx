@@ -193,12 +193,12 @@ export default function Footer() {
             <span className="text-base sm:text-lg font-medium text-slate-300 tracking-wide">
               Created by
             </span>
-            <div className="relative h-8 sm:h-9 w-28 sm:w-32 transition-transform duration-200 hover:scale-105">
+            <div className="relative h-10 sm:h-12 w-36 sm:w-44 transition-transform duration-200 hover:scale-105">
               <Image
-                src="/images/nexifing-logo.png"
+                src="/images/nexifing-logo-white.png"
                 alt="Nexifing"
                 fill
-                sizes="144px"
+                sizes="176px"
                 className="object-contain"
               />
             </div>

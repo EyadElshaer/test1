@@ -21,6 +21,7 @@ import {
   Package,
   Layers,
   X,
+  Trash2,
 } from "lucide-react";
 
 export default function AdminCustomersPage() {
@@ -29,6 +30,33 @@ export default function AdminCustomersPage() {
   const [search, setSearch] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
   const [copiedText, setCopiedText] = useState<string | null>(null);
+
+  // Customer Deletion Modal
+  const [customerToDelete, setCustomerToDelete] = useState<any | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeleteCustomer = async () => {
+    if (!customerToDelete) return;
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/admin/customers/${customerToDelete.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to delete customer.");
+      }
+      setCustomerToDelete(null);
+      if (selectedCustomer?.id === customerToDelete.id) {
+        setSelectedCustomer(null);
+      }
+      fetchCustomers(search);
+    } catch (err: any) {
+      alert(err.message || "Failed to delete customer.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const fetchCustomers = async (query = "") => {
     setLoading(true);
@@ -276,18 +304,31 @@ export default function AdminCustomersPage() {
 
                     {/* Action */}
                     <td className="py-4 px-4 text-right">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedCustomer(c);
-                        }}
-                        className="px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-600/20 text-cyan-300 border border-blue-500/30 hover:bg-blue-600/30 transition-all inline-flex items-center gap-1"
-                      >
-                        <Package className="w-3.5 h-3.5" />
-                        <span>Inspect ({c.everythingBought.length} items)</span>
-                        <ChevronRight className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedCustomer(c);
+                          }}
+                          className="px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-600/20 text-cyan-300 border border-blue-500/30 hover:bg-blue-600/30 transition-all inline-flex items-center gap-1"
+                        >
+                          <Package className="w-3.5 h-3.5" />
+                          <span>Inspect ({c.everythingBought.length} items)</span>
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCustomerToDelete(c);
+                          }}
+                          className="p-1.5 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                          title="Delete Customer Account"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -464,13 +505,65 @@ export default function AdminCustomersPage() {
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 border-t border-white/10 flex justify-end">
+            <div className="p-4 border-t border-white/10 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setCustomerToDelete(selectedCustomer)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30 hover:bg-rose-500/25 flex items-center gap-1.5 transition-colors"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete Account</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => setSelectedCustomer(null)}
                 className="px-5 py-2 rounded-xl text-xs font-semibold btn-secondary"
               >
                 Close Customer Details
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE CUSTOMER CONFIRMATION MODAL */}
+      {customerToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-[#0b1026] border border-rose-500/30 rounded-3xl p-6 sm:p-8 max-w-md w-full space-y-5 shadow-2xl">
+            <div className="flex items-center gap-3 text-rose-400">
+              <div className="p-3 rounded-2xl bg-rose-500/15 border border-rose-500/30">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-white">Delete Customer Account?</h3>
+                <p className="text-xs text-rose-300">{customerToDelete.name}</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Are you sure you want to permanently delete the account of customer <strong className="text-white">{customerToDelete.name}</strong> ({customerToDelete.email || customerToDelete.phone || "No contact info"})?
+            </p>
+            <p className="text-[11px] text-slate-400 bg-white/[0.03] p-3 rounded-xl border border-white/5">
+              ⚠️ This will delete the user profile and their active sign-in sessions. Their order history will remain preserved as historical records.
+            </p>
+
+            <div className="flex gap-2.5 pt-2">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setCustomerToDelete(null)}
+                className="flex-1 py-2.5 rounded-xl text-xs font-semibold btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={handleDeleteCustomer}
+                className="flex-1 py-2.5 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/30 disabled:opacity-50"
+              >
+                {isDeleting ? "Deleting..." : "Yes, Delete Account"}
               </button>
             </div>
           </div>
