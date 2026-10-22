@@ -66,6 +66,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       .finally(() => setAuthChecked(true));
   }, [router, pathname]);
 
+  // Sync actions from Telegram buttons automatically while in admin dashboard
+  useEffect(() => {
+    if (pathname === "/admin") return;
+    const interval = setInterval(() => {
+      fetch("/api/telegram/sync")
+        .then((r) => r.json())
+        .then((data) => {
+          if (data?.pollResult?.processed > 0) {
+            router.refresh();
+          }
+        })
+        .catch(() => {});
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [pathname, router]);
+
   const handleLogout = async () => {
     try {
       await fetch("/api/admin/logout", { method: "POST" });

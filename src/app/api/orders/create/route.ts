@@ -293,22 +293,32 @@ export async function POST(req: Request) {
       return order;
     });
 
-    // Fire-and-forget Telegram notification to store admin
-    sendTelegramOrderAlert({
-      orderNumber: newOrder.orderNumber,
-      totalAmount: newOrder.totalAmount,
-      currency: newOrder.currency,
-      paymentMethodName: newOrder.paymentMethodName,
-      customerName: newOrder.customerName,
-      customerPhone: newOrder.customerPhone,
-      customerEmail: newOrder.customerEmail,
-      customerNotes: newOrder.customerNotes,
-      items: newOrder.items.map((i: any) => ({
-        productTitle: i.productTitle,
-        quantity: i.quantity,
-        lineTotal: i.lineTotal,
-      })),
-    }).catch((err) => console.error("Telegram notification error:", err));
+    // Dispatch Telegram notification with payment screenshot & interactive action buttons
+    try {
+      await sendTelegramOrderAlert({
+        id: newOrder.id,
+        orderNumber: newOrder.orderNumber,
+        totalAmount: newOrder.totalAmount,
+        subtotal: newOrder.subtotal,
+        discountAmount: newOrder.discountAmount,
+        promoCodeCode: newOrder.promoCodeCode,
+        currency: newOrder.currency,
+        paymentMethodName: newOrder.paymentMethodName,
+        paymentReference: newOrder.paymentReference,
+        paymentScreenshotUrl: newOrder.paymentScreenshotUrl,
+        customerName: newOrder.customerName,
+        customerPhone: newOrder.customerPhone,
+        customerEmail: newOrder.customerEmail,
+        customerNotes: newOrder.customerNotes,
+        items: newOrder.items.map((i: any) => ({
+          productTitle: i.productTitle,
+          quantity: i.quantity,
+          lineTotal: i.lineTotal,
+        })),
+      });
+    } catch (telegramErr) {
+      console.error("Telegram notification error:", telegramErr);
+    }
 
     return NextResponse.json({
       success: true,

@@ -18,6 +18,9 @@ import {
   Bell,
   ExternalLink,
   Key,
+  RefreshCw,
+  Zap,
+  Link2,
 } from "lucide-react";
 
 export default function AdminSettingsPage() {
@@ -29,6 +32,9 @@ export default function AdminSettingsPage() {
   const [isTestingTelegram, setIsTestingTelegram] = useState(false);
   const [telegramTestSuccess, setTelegramTestSuccess] = useState("");
   const [telegramTestError, setTelegramTestError] = useState("");
+  const [isRegisteringWebhook, setIsRegisteringWebhook] = useState(false);
+  const [webhookInfo, setWebhookInfo] = useState<any>(null);
+  const [isPolling, setIsPolling] = useState(false);
 
   const loadSettings = async () => {
     setLoading(true);
@@ -118,6 +124,82 @@ export default function AdminSettingsPage() {
       setTelegramTestError(err.message || "Failed to connect to Telegram.");
     } finally {
       setIsTestingTelegram(false);
+    }
+  };
+
+  const checkWebhookStatus = async () => {
+    try {
+      const res = await fetch("/api/telegram/sync");
+      const data = await res.json();
+      if (data.success && data.webhookInfo) {
+        setWebhookInfo(data.webhookInfo);
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    if (settings.telegram_bot_token) {
+      checkWebhookStatus();
+    }
+  }, [settings.telegram_bot_token]);
+
+  const handleRegisterWebhook = async () => {
+    setIsRegisteringWebhook(true);
+    setTelegramTestSuccess("");
+    setTelegramTestError("");
+
+    try {
+      const siteUrl = (settings.site_url || window.location.origin).replace(/\/$/, "");
+      const webhookUrl = `${siteUrl}/api/telegram/webhook`;
+
+      const res = await fetch("/api/telegram/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "set_webhook", webhookUrl }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.description || data.error || "Failed to register webhook with Telegram.");
+      }
+
+      setTelegramTestSuccess(`Telegram Webhook active! URL: ${webhookUrl}`);
+      checkWebhookStatus();
+      setTimeout(() => setTelegramTestSuccess(""), 6000);
+    } catch (err: any) {
+      setTelegramTestError(err.message || "Failed to register webhook.");
+    } finally {
+      setIsRegisteringWebhook(false);
+    }
+  };
+
+  const handleSyncUpdates = async () => {
+    setIsPolling(true);
+    setTelegramTestSuccess("");
+    setTelegramTestError("");
+
+    try {
+      const res = await fetch("/api/telegram/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "poll_now" }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setTelegramTestSuccess(
+          data.processed > 0
+            ? `Processed ${data.processed} actions from Telegram buttons!`
+            : "No pending Telegram actions. All statuses are up to date."
+        );
+        setTimeout(() => setTelegramTestSuccess(""), 5000);
+      } else {
+        throw new Error(data.error || "Sync failed.");
+      }
+    } catch (err: any) {
+      setTelegramTestError(err.message || "Failed to sync updates.");
+    } finally {
+      setIsPolling(false);
     }
   };
 
@@ -427,17 +509,78 @@ export default function AdminSettingsPage() {
             </div>
           </div>
 
-          {/* Test Dispatch Button */}
-          <div className="flex justify-end pt-2">
-            <button
-              type="button"
-              onClick={handleTestTelegram}
-              disabled={isTestingTelegram}
-              className="px-4 py-2.5 rounded-xl text-xs font-bold bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/40 flex items-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
-            >
-              <Send className="w-3.5 h-3.5" />
-              <span>{isTestingTelegram ? "Sending Test Ping..." : "Send Test Notification"}</span>
-            </button>
+          {/* Webhook & Interactive Actions Toolbar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 p-4 rounded-2xl bg-white/[0.02] border border-white/5">
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-slate-400">Telegram Gateway:</span>
+              {webhookInfo?.url ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>Webhook Active ({webhookInfo.url.replace(/^https?:\/\//, "").slice(0, 30)}...)</span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                  <span>Polling / Direct Mode Active</span>
+                </span>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handleSyncUpdates}
+                disabled={isPolling}
+                className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 hover:text-white border border-white/10 flex items-center gap-1.5 transition-all disabled:opacity-50"
+                title="Check for any actions clicked in Telegram"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isPolling ? "animate-spin text-sky-400" : ""}`} />
+                <span>{isPolling ? "Checking..." : "Sync Actions"}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleRegisterWebhook}
+                disabled={isRegisteringWebhook}
+                className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center gap-1.5 transition-all disabled:opacity-50"
+                title="Register webhook URL with Telegram for instant button callbacks"
+              >
+                <Link2 className="w-3.5 h-3.5" />
+                <span>{isRegisteringWebhook ? "Registering..." : "Connect Webhook"}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleTestTelegram}
+                disabled={isTestingTelegram}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/40 flex items-center gap-1.5 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>{isTestingTelegram ? "Sending Ping..." : "Send Test Ping"}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Capabilities Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div className="p-3.5 rounded-2xl bg-white/[0.02] border border-white/5 space-y-1">
+              <strong className="text-white flex items-center gap-1.5">
+                <Zap className="w-3.5 h-3.5 text-amber-400" />
+                <span>Payment Screenshot Photos Attached</span>
+              </strong>
+              <p className="text-slate-400 text-[11px] leading-relaxed">
+                When a customer uploads an InstaPay, Vodafone Cash, or wire transfer receipt, the actual screenshot image is attached to the notification for instant verification.
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-white/[0.02] border border-white/5 space-y-1">
+              <strong className="text-white flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Interactive Approve / Reject Buttons</span>
+              </strong>
+              <p className="text-slate-400 text-[11px] leading-relaxed">
+                Orders and refund requests arrive with interactive Telegram buttons. Tapping &quot;Approve&quot; or &quot;Reject&quot; instantly updates order and refund statuses on the live website.
+              </p>
+            </div>
           </div>
 
           {/* Step-by-Step BotFather Guide Card */}

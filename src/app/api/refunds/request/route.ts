@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { generateUniqueRefundNumber } from "@/lib/orderNumber";
+import { sendTelegramRefundAlert } from "@/lib/telegram";
 
 export async function POST(req: Request) {
   try {
@@ -82,6 +83,24 @@ export async function POST(req: Request) {
 
       return refund;
     });
+
+    // Dispatch Telegram alert to store admin
+    try {
+      await sendTelegramRefundAlert({
+        id: newRefund.id,
+        refundNumber: newRefund.refundNumber,
+        orderNumber: order.orderNumber,
+        customerName: newRefund.customerName,
+        customerPhone: newRefund.customerPhone,
+        customerEmail: newRefund.customerEmail,
+        requestedAmount: newRefund.requestedAmount,
+        currency: order.currency,
+        reason: newRefund.reason,
+        explanation: newRefund.explanation,
+      });
+    } catch (telegramErr) {
+      console.error("Telegram refund alert error:", telegramErr);
+    }
 
     return NextResponse.json({
       success: true,
