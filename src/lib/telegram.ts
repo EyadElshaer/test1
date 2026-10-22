@@ -439,7 +439,14 @@ export async function handleTelegramCallbackQuery(callbackQuery: any): Promise<{
         return { success: true };
       }
 
-      // Update Order to APPROVED
+      // Answer Telegram IMMEDIATELY so the button spinner stops and user gets immediate feedback (<100ms)
+      await answerCallbackQuery(
+        token,
+        queryId,
+        `✅ Order ${order.orderNumber} Approved! Updating website...`
+      );
+
+      // Update Order in database
       await prisma.$transaction(async (tx) => {
         await tx.order.update({
           where: { id: order.id },
@@ -472,17 +479,19 @@ export async function handleTelegramCallbackQuery(callbackQuery: any): Promise<{
         } catch {}
       }
 
-      await answerCallbackQuery(
-        token,
-        queryId,
-        `✅ Order ${order.orderNumber} Approved! Status updated on website.`
-      );
+      // Format concise, high-visibility updated banner (well under 1024 char limit)
+      const adminName = callbackQuery.from?.username
+        ? `@${callbackQuery.from.username}`
+        : callbackQuery.from?.first_name || "Admin";
 
-      // Update Telegram message caption/text to show green APPROVED banner
-      const updatedBanner =
-        `✅ <b>ORDER APPROVED BY ADMIN</b> ✅\n` +
-        `<i>Action recorded on website at ${new Date().toLocaleTimeString()}</i>\n\n` +
-        originalText;
+      const updatedCard =
+        `✅ <b>ORDER APPROVED &amp; VERIFIED</b> ✅\n\n` +
+        `🧾 <b>Order:</b> <code>${order.orderNumber}</code>\n` +
+        `💰 <b>Total:</b> <b>${order.totalAmount} ${order.currency}</b>\n` +
+        `👤 <b>Customer:</b> ${escapeHtml(order.customerName)} (<code>${escapeHtml(order.customerPhone)}</code>)\n` +
+        `💳 <b>Payment:</b> ${escapeHtml(order.paymentMethodName)}\n` +
+        `📅 <b>Processed:</b> ${new Date().toLocaleTimeString()} by ${escapeHtml(adminName)}\n\n` +
+        `⚡ <i>Status updated to APPROVED on website. Payment verified.</i>`;
 
       const updatedKeyboard = {
         inline_keyboard: [
@@ -497,9 +506,9 @@ export async function handleTelegramCallbackQuery(callbackQuery: any): Promise<{
       };
 
       if (hasPhoto) {
-        await editMessageCaption(token, chat.id, messageId, updatedBanner, updatedKeyboard);
+        await editMessageCaption(token, chat.id, messageId, updatedCard, updatedKeyboard);
       } else {
-        await editMessageText(token, chat.id, messageId, updatedBanner, updatedKeyboard);
+        await editMessageText(token, chat.id, messageId, updatedCard, updatedKeyboard);
       }
 
       return { success: true, message: `Order ${order.orderNumber} approved` };
@@ -520,7 +529,14 @@ export async function handleTelegramCallbackQuery(callbackQuery: any): Promise<{
         return { success: false, message: "Order not found" };
       }
 
-      // Update Order to REJECTED
+      // Answer Telegram immediately
+      await answerCallbackQuery(
+        token,
+        queryId,
+        `❌ Order ${order.orderNumber} Rejected. Updating website...`
+      );
+
+      // Update Order in database
       await prisma.$transaction(async (tx) => {
         await tx.order.update({
           where: { id: order.id },
@@ -554,16 +570,18 @@ export async function handleTelegramCallbackQuery(callbackQuery: any): Promise<{
         } catch {}
       }
 
-      await answerCallbackQuery(
-        token,
-        queryId,
-        `❌ Order ${order.orderNumber} Rejected. Status updated on website.`
-      );
+      const adminName = callbackQuery.from?.username
+        ? `@${callbackQuery.from.username}`
+        : callbackQuery.from?.first_name || "Admin";
 
-      const updatedBanner =
-        `❌ <b>ORDER REJECTED BY ADMIN</b> ❌\n` +
-        `<i>Action recorded on website at ${new Date().toLocaleTimeString()}</i>\n\n` +
-        originalText;
+      const updatedCard =
+        `❌ <b>ORDER REJECTED BY ADMIN</b> ❌\n\n` +
+        `🧾 <b>Order:</b> <code>${order.orderNumber}</code>\n` +
+        `💰 <b>Total:</b> <b>${order.totalAmount} ${order.currency}</b>\n` +
+        `👤 <b>Customer:</b> ${escapeHtml(order.customerName)} (<code>${escapeHtml(order.customerPhone)}</code>)\n` +
+        `💳 <b>Payment:</b> ${escapeHtml(order.paymentMethodName)}\n` +
+        `📅 <b>Processed:</b> ${new Date().toLocaleTimeString()} by ${escapeHtml(adminName)}\n\n` +
+        `⚡ <i>Order status updated to REJECTED on website. Transfer proof declined.</i>`;
 
       const updatedKeyboard = {
         inline_keyboard: [
@@ -578,9 +596,9 @@ export async function handleTelegramCallbackQuery(callbackQuery: any): Promise<{
       };
 
       if (hasPhoto) {
-        await editMessageCaption(token, chat.id, messageId, updatedBanner, updatedKeyboard);
+        await editMessageCaption(token, chat.id, messageId, updatedCard, updatedKeyboard);
       } else {
-        await editMessageText(token, chat.id, messageId, updatedBanner, updatedKeyboard);
+        await editMessageText(token, chat.id, messageId, updatedCard, updatedKeyboard);
       }
 
       return { success: true, message: `Order ${order.orderNumber} rejected` };
@@ -599,6 +617,12 @@ export async function handleTelegramCallbackQuery(callbackQuery: any): Promise<{
         await answerCallbackQuery(token, queryId, "❌ Refund request not found.", true);
         return { success: false, message: "Refund not found" };
       }
+
+      await answerCallbackQuery(
+        token,
+        queryId,
+        `✅ Refund ${refund.refundNumber} Approved! Updating website...`
+      );
 
       await prisma.$transaction(async (tx) => {
         await tx.refundRequest.update({
@@ -640,16 +664,18 @@ export async function handleTelegramCallbackQuery(callbackQuery: any): Promise<{
         }
       });
 
-      await answerCallbackQuery(
-        token,
-        queryId,
-        `✅ Refund ${refund.refundNumber} Approved! Website updated.`
-      );
+      const adminName = callbackQuery.from?.username
+        ? `@${callbackQuery.from.username}`
+        : callbackQuery.from?.first_name || "Admin";
 
-      const updatedBanner =
-        `✅ <b>REFUND APPROVED VIA TELEGRAM</b> ✅\n` +
-        `<i>Approved by store manager at ${new Date().toLocaleTimeString()}</i>\n\n` +
-        originalText;
+      const updatedCard =
+        `✅ <b>REFUND APPROVED VIA TELEGRAM</b> ✅\n\n` +
+        `🎫 <b>Refund Request:</b> <code>${refund.refundNumber}</code>\n` +
+        `🧾 <b>Order:</b> <code>${refund.order?.orderNumber || "N/A"}</code>\n` +
+        `💵 <b>Amount:</b> <b>${refund.requestedAmount} ${refund.order?.currency || "EGP"}</b>\n` +
+        `👤 <b>Customer:</b> ${escapeHtml(refund.customerName)} (<code>${escapeHtml(refund.customerPhone)}</code>)\n` +
+        `📅 <b>Processed:</b> ${new Date().toLocaleTimeString()} by ${escapeHtml(adminName)}\n\n` +
+        `⚡ <i>Refund approved. Order status changed to REFUND_APPROVED on website.</i>`;
 
       const updatedKeyboard = {
         inline_keyboard: [
@@ -658,7 +684,7 @@ export async function handleTelegramCallbackQuery(callbackQuery: any): Promise<{
         ],
       };
 
-      await editMessageText(token, chat.id, messageId, updatedBanner, updatedKeyboard);
+      await editMessageText(token, chat.id, messageId, updatedCard, updatedKeyboard);
       return { success: true };
     }
 
@@ -675,6 +701,12 @@ export async function handleTelegramCallbackQuery(callbackQuery: any): Promise<{
         await answerCallbackQuery(token, queryId, "❌ Refund request not found.", true);
         return { success: false, message: "Refund not found" };
       }
+
+      await answerCallbackQuery(
+        token,
+        queryId,
+        `❌ Refund ${refund.refundNumber} Declined. Updating website...`
+      );
 
       await prisma.$transaction(async (tx) => {
         await tx.refundRequest.update({
@@ -703,16 +735,18 @@ export async function handleTelegramCallbackQuery(callbackQuery: any): Promise<{
         }
       });
 
-      await answerCallbackQuery(
-        token,
-        queryId,
-        `❌ Refund ${refund.refundNumber} Declined! Website updated.`
-      );
+      const adminName = callbackQuery.from?.username
+        ? `@${callbackQuery.from.username}`
+        : callbackQuery.from?.first_name || "Admin";
 
-      const updatedBanner =
-        `❌ <b>REFUND DECLINED VIA TELEGRAM</b> ❌\n` +
-        `<i>Declined by store manager at ${new Date().toLocaleTimeString()}</i>\n\n` +
-        originalText;
+      const updatedCard =
+        `❌ <b>REFUND DECLINED VIA TELEGRAM</b> ❌\n\n` +
+        `🎫 <b>Refund Request:</b> <code>${refund.refundNumber}</code>\n` +
+        `🧾 <b>Order:</b> <code>${refund.order?.orderNumber || "N/A"}</code>\n` +
+        `💵 <b>Amount:</b> <b>${refund.requestedAmount} ${refund.order?.currency || "EGP"}</b>\n` +
+        `👤 <b>Customer:</b> ${escapeHtml(refund.customerName)} (<code>${escapeHtml(refund.customerPhone)}</code>)\n` +
+        `📅 <b>Processed:</b> ${new Date().toLocaleTimeString()} by ${escapeHtml(adminName)}\n\n` +
+        `⚡ <i>Refund request was declined by store administration.</i>`;
 
       const updatedKeyboard = {
         inline_keyboard: [
@@ -721,7 +755,7 @@ export async function handleTelegramCallbackQuery(callbackQuery: any): Promise<{
         ],
       };
 
-      await editMessageText(token, chat.id, messageId, updatedBanner, updatedKeyboard);
+      await editMessageText(token, chat.id, messageId, updatedCard, updatedKeyboard);
       return { success: true };
     }
 
