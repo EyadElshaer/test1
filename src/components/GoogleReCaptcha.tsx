@@ -12,8 +12,8 @@ interface GoogleReCaptchaProps {
   className?: string;
 }
 
-// Google official test site key (always renders and works on localhost out-of-the-box)
-const DEFAULT_TEST_SITE_KEY = "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI";
+// User's Google reCAPTCHA v2 Site Key
+const DEFAULT_SITE_KEY = "6LdgTv8tAAAAALYWflhFxomBQdEF7ofPsUq7N3pM";
 
 export const GoogleReCaptcha = forwardRef<GoogleReCaptchaRef, GoogleReCaptchaProps>(
   function GoogleReCaptcha({ onVerify, onExpire, className = "" }, ref) {
@@ -21,7 +21,7 @@ export const GoogleReCaptcha = forwardRef<GoogleReCaptchaRef, GoogleReCaptchaPro
     const widgetIdRef = useRef<number | null>(null);
     const [isRendered, setIsRendered] = useState(false);
 
-    const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY?.trim() || DEFAULT_TEST_SITE_KEY;
+    const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY?.trim() || DEFAULT_SITE_KEY;
 
     useImperativeHandle(ref, () => ({
       reset: () => {

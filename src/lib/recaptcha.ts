@@ -6,12 +6,12 @@ export interface RecaptchaVerifyResult {
   hostname?: string;
 }
 
-// Google official test keys (always passes on localhost out-of-the-box)
-export const DEFAULT_TEST_SITE_KEY = "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI";
-export const DEFAULT_TEST_SECRET_KEY = "6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe";
+// User's Google reCAPTCHA v2 production keys
+export const DEFAULT_SITE_KEY = "6LdgTv8tAAAAALYWflhFxomBQdEF7ofPsUq7N3pM";
+export const DEFAULT_SECRET_KEY = "6LdgTv8tAAAAACyhVDDfKoVgHsur9s9sqfs57P5D";
 
 export async function getRecaptchaConfig(): Promise<{ siteKey: string; enabled: boolean }> {
-  let siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY?.trim() || DEFAULT_TEST_SITE_KEY;
+  let siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY?.trim() || DEFAULT_SITE_KEY;
   try {
     const dbSetting = await prisma.storeSetting.findUnique({
       where: { key: "recaptcha_site_key" },
@@ -41,7 +41,7 @@ export async function getRecaptchaSecretKey(): Promise<string> {
     // Continue with env
   }
 
-  return secretKey || DEFAULT_TEST_SECRET_KEY;
+  return secretKey || DEFAULT_SECRET_KEY;
 }
 
 /**
