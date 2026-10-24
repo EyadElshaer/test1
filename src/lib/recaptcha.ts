@@ -2,85 +2,62 @@ import prisma from "@/lib/prisma";
 
 export interface RecaptchaVerifyResult {
   success: boolean;
-  score?: number;
-  action?: string;
   error?: string;
-  skipped?: boolean;
+  hostname?: string;
+}
+
+// Google official test keys (always passes on localhost out-of-the-box)
+export const DEFAULT_TEST_SITE_KEY = "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI";
+export const DEFAULT_TEST_SECRET_KEY = "6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe";
+
+export async function getRecaptchaConfig(): Promise<{ siteKey: string; enabled: boolean }> {
+  let siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY?.trim() || DEFAULT_TEST_SITE_KEY;
+  try {
+    const dbSetting = await prisma.storeSetting.findUnique({
+      where: { key: "recaptcha_site_key" },
+    });
+    if (dbSetting?.value?.trim()) {
+      siteKey = dbSetting.value.trim();
+    }
+  } catch (e) {}
+
+  return { siteKey, enabled: true };
 }
 
 /**
- * Retrieve Google reCAPTCHA v3 keys from environment or Store Settings
+ * Retrieve Google reCAPTCHA secret key from environment or database Store Settings
  */
-export async function getRecaptchaConfig(): Promise<{
-  siteKey: string;
-  secretKey: string;
-  enabled: boolean;
-}> {
-  let siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY?.trim() || "";
+export async function getRecaptchaSecretKey(): Promise<string> {
   let secretKey = process.env.RECAPTCHA_SECRET_KEY?.trim() || "";
 
   try {
-    const dbSettings = await prisma.storeSetting.findMany({
-      where: {
-        key: { in: ["recaptcha_site_key", "recaptcha_secret_key", "recaptcha_enabled"] },
-      },
+    const dbSetting = await prisma.storeSetting.findUnique({
+      where: { key: "recaptcha_secret_key" },
     });
-
-    let isExplicitlyDisabled = false;
-    for (const s of dbSettings) {
-      if (s.key === "recaptcha_site_key" && s.value?.trim()) {
-        siteKey = s.value.trim();
-      }
-      if (s.key === "recaptcha_secret_key" && s.value?.trim()) {
-        secretKey = s.value.trim();
-      }
-      if (s.key === "recaptcha_enabled" && s.value === "false") {
-        isExplicitlyDisabled = true;
-      }
-    }
-
-    if (isExplicitlyDisabled) {
-      return { siteKey: "", secretKey: "", enabled: false };
+    if (dbSetting?.value?.trim()) {
+      secretKey = dbSetting.value.trim();
     }
   } catch (err) {
-    // Continue with env variables if DB lookup fails
+    // Continue with env
   }
 
-  return {
-    siteKey,
-    secretKey,
-    enabled: Boolean(siteKey && secretKey),
-  };
+  return secretKey || DEFAULT_TEST_SECRET_KEY;
 }
 
 /**
- * Verify Google reCAPTCHA v3 token against Google's official verification API
- * @param token The token received from window.grecaptcha.execute() on client
- * @param expectedAction Expected action name (e.g. 'customer_login', 'admin_login')
- * @param minScore Minimum score threshold between 0.0 (bot) and 1.0 (human), default 0.5
+ * Verify Google reCAPTCHA token with Google official siteverify endpoint
  */
 export async function verifyGoogleRecaptcha(
-  token: string | null | undefined,
-  expectedAction: string,
-  minScore: number = 0.5
+  token: string | null | undefined
 ): Promise<RecaptchaVerifyResult> {
-  const config = await getRecaptchaConfig();
-
-  // If secret key is not yet configured, log development notice and allow access
-  if (!config.secretKey) {
-    return {
-      success: true,
-      skipped: true,
-      score: 1.0,
-    };
-  }
-
-  if (!token || typeof token !== "string") {
+  if (!token || typeof token !== "string" || !token.trim()) {
     return {
       success: false,
-      error: "Google reCAPTCHA verification token missing.",
+      error: "Please complete the Google reCAPTCHA 'I'm not a robot' checkbox.",
     };
   }
+
+  const secret = await getRecaptchaSecretKey();
 
   try {
     const verifyUrl = "https://www.google.com/recaptcha/api/siteverify";
@@ -88,8 +65,8 @@ export async function verifyGoogleRecaptcha(
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
-        secret: config.secretKey,
-        response: token,
+        secret,
+        response: token.trim(),
       }),
     });
 
@@ -99,31 +76,19 @@ export async function verifyGoogleRecaptcha(
       const errorCodes = data["error-codes"] ? data["error-codes"].join(", ") : "verification_failed";
       return {
         success: false,
-        error: `Google reCAPTCHA verification failed (${errorCodes}).`,
-      };
-    }
-
-    const score = typeof data.score === "number" ? data.score : 1.0;
-
-    // Reject automated bots with low risk score
-    if (score < minScore) {
-      return {
-        success: false,
-        score,
-        error: `High automated risk score detected by Google reCAPTCHA (${score.toFixed(2)}). Login blocked.`,
+        error: `reCAPTCHA verification failed (${errorCodes}). Please check the box again.`,
       };
     }
 
     return {
       success: true,
-      score,
-      action: data.action,
+      hostname: data.hostname,
     };
   } catch (err: any) {
     console.error("Google reCAPTCHA verification exception:", err);
     return {
       success: false,
-      error: "Unable to reach Google reCAPTCHA verification servers.",
+      error: "Unable to contact Google reCAPTCHA verification service.",
     };
   }
 }

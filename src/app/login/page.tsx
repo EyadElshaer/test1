@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { COUNTRY_CODES, CountryCode } from "@/lib/countryCodes";
-import { useRecaptcha } from "@/lib/useRecaptcha";
+import { GoogleReCaptcha, GoogleReCaptchaRef } from "@/components/GoogleReCaptcha";
 
 function AuthForm() {
   const router = useRouter();
@@ -29,7 +29,8 @@ function AuthForm() {
   const initialTab = searchParams.get("tab") === "register" ? "register" : "login";
 
   const { login, register, user } = useAuth();
-  const { executeRecaptcha } = useRecaptcha();
+  const [recaptchaToken, setRecaptchaToken] = useState("");
+  const recaptchaRef = React.useRef<GoogleReCaptchaRef>(null);
 
   const [activeTab, setActiveTab] = useState<"login" | "register">(initialTab);
   const [identifierType, setIdentifierType] = useState<"phone" | "email">("phone");
@@ -179,14 +180,18 @@ function AuthForm() {
         router.push(redirectUrl);
       }, 700);
     } else {
+      if (!recaptchaToken) {
+        setErrorMessage("Please check the 'I'm not a robot' reCAPTCHA box to continue.");
+        return;
+      }
+
       setIsLoading(true);
 
-      // Execute Google reCAPTCHA v3 invisibly
-      const recaptchaToken = await executeRecaptcha("customer_login");
-
-      const res = await login(finalIdentifier, password, recaptchaToken || undefined);
+      const res = await login(finalIdentifier, password, recaptchaToken);
 
       if (!res.success) {
+        recaptchaRef.current?.reset();
+        setRecaptchaToken("");
         setErrorMessage(res.error || "Login failed. Please check your credentials.");
 
         // Check if locked out
@@ -488,6 +493,20 @@ function AuthForm() {
                     className="w-full glass-input pl-10 pr-4 py-2.5 rounded-xl text-xs"
                   />
                 </div>
+              </div>
+            )}
+
+            {/* Visual Official Google reCAPTCHA Checkbox */}
+            {activeTab === "login" && (
+              <div className="py-2 flex justify-center">
+                <GoogleReCaptcha
+                  ref={recaptchaRef}
+                  onVerify={(token) => {
+                    setRecaptchaToken(token);
+                    setErrorMessage("");
+                  }}
+                  onExpire={() => setRecaptchaToken("")}
+                />
               </div>
             )}
 

@@ -49,8 +49,8 @@ export async function POST(req: Request) {
       );
     }
 
-    // 3. Official Google reCAPTCHA v3 Risk Scoring Verification
-    const recaptchaCheck = await verifyGoogleRecaptcha(recaptchaToken, "customer_login");
+    // 3. Official Google reCAPTCHA Verification
+    const recaptchaCheck = await verifyGoogleRecaptcha(recaptchaToken);
     if (!recaptchaCheck.success) {
       return NextResponse.json(
         {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
@@ -11,14 +11,15 @@ import {
   ShieldAlert,
   Clock,
 } from "lucide-react";
-import { useRecaptcha } from "@/lib/useRecaptcha";
+import { GoogleReCaptcha, GoogleReCaptchaRef } from "@/components/GoogleReCaptcha";
 
 export default function AdminLoginPage() {
   const router = useRouter();
-  const { executeRecaptcha } = useRecaptcha();
+  const recaptchaRef = useRef<GoogleReCaptchaRef>(null);
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [recaptchaToken, setRecaptchaToken] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -78,25 +79,29 @@ export default function AdminLoginPage() {
       return;
     }
 
+    if (!recaptchaToken) {
+      setErrorMessage("Please complete the reCAPTCHA 'I'm not a robot' verification checkbox.");
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      // Execute invisible Google reCAPTCHA v3
-      const recaptchaToken = await executeRecaptcha("admin_login");
-
       const res = await fetch("/api/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           username,
           password,
-          recaptchaToken: recaptchaToken || undefined,
+          recaptchaToken,
         }),
       });
 
       const data = await res.json();
 
       if (!res.ok || !data.success) {
+        recaptchaRef.current?.reset();
+        setRecaptchaToken("");
         setErrorMessage(data.error || "Login failed.");
 
         if (data.isLocked && data.retryAfterSeconds) {
@@ -118,6 +123,8 @@ export default function AdminLoginPage() {
         router.push("/admin/dashboard");
       }
     } catch (err: any) {
+      recaptchaRef.current?.reset();
+      setRecaptchaToken("");
       setErrorMessage(err.message || "Failed to authenticate.");
     } finally {
       setIsLoading(false);
@@ -224,6 +231,18 @@ export default function AdminLoginPage() {
             </div>
           </div>
 
+          {/* Visual Official Google reCAPTCHA Checkbox */}
+          <div className="py-2 flex justify-center">
+            <GoogleReCaptcha
+              ref={recaptchaRef}
+              onVerify={(token) => {
+                setRecaptchaToken(token);
+                setErrorMessage("");
+              }}
+              onExpire={() => setRecaptchaToken("")}
+            />
+          </div>
+
           <button
             type="submit"
             disabled={isLoading || isLocked || !username || !password}
@@ -235,7 +254,7 @@ export default function AdminLoginPage() {
                 <span>Locked Out ({formatLockoutTimer(lockoutRemainingSeconds)})</span>
               </>
             ) : isLoading ? (
-              <span>Authenticating with reCAPTCHA...</span>
+              <span>Authenticating...</span>
             ) : (
               <>
                 <ShieldCheck className="w-4 h-4" />
@@ -247,28 +266,10 @@ export default function AdminLoginPage() {
 
         <div className="p-3.5 rounded-2xl bg-white/[0.02] border border-white/5 space-y-1.5 text-center leading-relaxed">
           <p className="text-[11px] text-slate-400 font-semibold">
-            Protected by Google reCAPTCHA v3 & PremiKeys Anti-Brute Force Defense
+            Protected by Google reCAPTCHA & PremiKeys Anti-Brute Force Defense
           </p>
           <p className="text-[10px] text-slate-500">
-            This portal is protected by reCAPTCHA and the Google{" "}
-            <a
-              href="https://policies.google.com/privacy"
-              target="_blank"
-              rel="noreferrer"
-              className="text-slate-400 hover:text-cyan-400 underline underline-offset-2"
-            >
-              Privacy Policy
-            </a>{" "}
-            and{" "}
-            <a
-              href="https://policies.google.com/terms"
-              target="_blank"
-              rel="noreferrer"
-              className="text-slate-400 hover:text-cyan-400 underline underline-offset-2"
-            >
-              Terms of Service
-            </a>{" "}
-            apply.
+            Authorized personnel only. Protected by 256-bit encryption, strict IP lockout rate limiting, and real-time security auditing.
           </p>
         </div>
       </div>

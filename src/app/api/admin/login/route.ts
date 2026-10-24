@@ -46,13 +46,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Username and password are required." }, { status: 400 });
     }
 
-    // 3. Official Google reCAPTCHA v3 Verification
-    const recaptchaCheck = await verifyGoogleRecaptcha(recaptchaToken, "admin_login");
+    // 3. Official Google reCAPTCHA Verification
+    const recaptchaCheck = await verifyGoogleRecaptcha(recaptchaToken);
     if (!recaptchaCheck.success) {
       await logAdminAudit(
         null,
         "ADMIN_RECAPTCHA_FAILED",
-        `Google reCAPTCHA flagged request as high risk (Score: ${recaptchaCheck.score ?? "N/A"})`,
+        recaptchaCheck.error || "Google reCAPTCHA verification failed",
         ip
       );
 
