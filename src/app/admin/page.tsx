@@ -27,6 +27,26 @@ export default function AdminLoginPage() {
   const [isLocked, setIsLocked] = useState(false);
   const [lockoutRemainingSeconds, setLockoutRemainingSeconds] = useState(0);
   const [remainingAttempts, setRemainingAttempts] = useState<number | null>(null);
+  const [requiresCaptcha, setRequiresCaptcha] = useState(false);
+
+  // Check initial security state for this IP on mount
+  useEffect(() => {
+    fetch("/api/auth/security-check?scope=admin")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.isLocked && data.retryAfterSeconds) {
+          setIsLocked(true);
+          setLockoutRemainingSeconds(data.retryAfterSeconds);
+        }
+        if (data.requiresCaptcha) {
+          setRequiresCaptcha(true);
+        }
+        if (data.remainingAttempts !== undefined) {
+          setRemainingAttempts(data.remainingAttempts);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Lockout countdown timer
   useEffect(() => {
@@ -79,7 +99,7 @@ export default function AdminLoginPage() {
       return;
     }
 
-    if (!recaptchaToken) {
+    if (requiresCaptcha && !recaptchaToken) {
       setErrorMessage("Please complete the reCAPTCHA 'I'm not a robot' verification checkbox.");
       return;
     }
@@ -93,7 +113,7 @@ export default function AdminLoginPage() {
         body: JSON.stringify({
           username,
           password,
-          recaptchaToken,
+          recaptchaToken: recaptchaToken || undefined,
         }),
       });
 
@@ -103,6 +123,10 @@ export default function AdminLoginPage() {
         recaptchaRef.current?.reset();
         setRecaptchaToken("");
         setErrorMessage(data.error || "Login failed.");
+
+        if (data.requiresCaptcha) {
+          setRequiresCaptcha(true);
+        }
 
         if (data.isLocked && data.retryAfterSeconds) {
           setIsLocked(true);
@@ -231,17 +255,19 @@ export default function AdminLoginPage() {
             </div>
           </div>
 
-          {/* Visual Official Google reCAPTCHA Checkbox */}
-          <div className="py-2 flex justify-center">
-            <GoogleReCaptcha
-              ref={recaptchaRef}
-              onVerify={(token) => {
-                setRecaptchaToken(token);
-                setErrorMessage("");
-              }}
-              onExpire={() => setRecaptchaToken("")}
-            />
-          </div>
+          {/* Visual Official Google reCAPTCHA Checkbox (Only if security requires it) */}
+          {requiresCaptcha && (
+            <div className="py-2 flex justify-center">
+              <GoogleReCaptcha
+                ref={recaptchaRef}
+                onVerify={(token) => {
+                  setRecaptchaToken(token);
+                  setErrorMessage("");
+                }}
+                onExpire={() => setRecaptchaToken("")}
+              />
+            </div>
+          )}
 
           <button
             type="submit"

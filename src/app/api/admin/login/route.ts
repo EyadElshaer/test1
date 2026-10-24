@@ -46,23 +46,27 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Username and password are required." }, { status: 400 });
     }
 
-    // 3. Official Google reCAPTCHA Verification
-    const recaptchaCheck = await verifyGoogleRecaptcha(recaptchaToken);
-    if (!recaptchaCheck.success) {
-      await logAdminAudit(
-        null,
-        "ADMIN_RECAPTCHA_FAILED",
-        recaptchaCheck.error || "Google reCAPTCHA verification failed",
-        ip
-      );
+    // 3. Official Google reCAPTCHA Verification (Required only after repeated failed attempts)
+    if (securityStatus.requiresCaptcha) {
+      const recaptchaCheck = await verifyGoogleRecaptcha(recaptchaToken);
+      if (!recaptchaCheck.success) {
+        await logAdminAudit(
+          null,
+          "ADMIN_RECAPTCHA_FAILED",
+          recaptchaCheck.error || "Google reCAPTCHA verification failed",
+          ip
+        );
 
-      return NextResponse.json(
-        {
-          error: recaptchaCheck.error || "Security verification failed. Access denied by Google reCAPTCHA.",
-          recaptchaFailed: true,
-        },
-        { status: 403 }
-      );
+        return NextResponse.json(
+          {
+            error: recaptchaCheck.error || "Please complete the 'I'm not a robot' verification checkbox.",
+            requiresCaptcha: true,
+            recaptchaFailed: true,
+            remainingAttempts: securityStatus.remainingAttempts,
+          },
+          { status: 403 }
+        );
+      }
     }
 
     // 4. Find Admin in Database
@@ -79,6 +83,7 @@ export async function POST(req: Request) {
         {
           error: failResult.isLocked ? failResult.message : "Invalid username or password.",
           isLocked: failResult.isLocked,
+          requiresCaptcha: failResult.requiresCaptcha,
           remainingAttempts: failResult.remainingAttempts,
           retryAfterSeconds: failResult.retryAfterSeconds,
         },
@@ -101,6 +106,7 @@ export async function POST(req: Request) {
         {
           error: failResult.message,
           isLocked: failResult.isLocked,
+          requiresCaptcha: failResult.requiresCaptcha,
           remainingAttempts: failResult.remainingAttempts,
           retryAfterSeconds: failResult.retryAfterSeconds,
         },

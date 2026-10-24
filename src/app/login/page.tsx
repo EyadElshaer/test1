@@ -52,11 +52,31 @@ function AuthForm() {
   const [isLocked, setIsLocked] = useState(false);
   const [lockoutRemainingSeconds, setLockoutRemainingSeconds] = useState(0);
   const [remainingAttempts, setRemainingAttempts] = useState<number | null>(null);
+  const [requiresCaptcha, setRequiresCaptcha] = useState(false);
 
   // Status
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+
+  // Check initial security state for this IP on mount
+  useEffect(() => {
+    fetch("/api/auth/security-check?scope=customer")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.isLocked && data.retryAfterSeconds) {
+          setIsLocked(true);
+          setLockoutRemainingSeconds(data.retryAfterSeconds);
+        }
+        if (data.requiresCaptcha) {
+          setRequiresCaptcha(true);
+        }
+        if (data.remainingAttempts !== undefined) {
+          setRemainingAttempts(data.remainingAttempts);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Lockout countdown timer
   useEffect(() => {
@@ -180,19 +200,24 @@ function AuthForm() {
         router.push(redirectUrl);
       }, 700);
     } else {
-      if (!recaptchaToken) {
+      if (requiresCaptcha && !recaptchaToken) {
         setErrorMessage("Please check the 'I'm not a robot' reCAPTCHA box to continue.");
         return;
       }
 
       setIsLoading(true);
 
-      const res = await login(finalIdentifier, password, recaptchaToken);
+      const res = await login(finalIdentifier, password, recaptchaToken || undefined);
 
       if (!res.success) {
         recaptchaRef.current?.reset();
         setRecaptchaToken("");
         setErrorMessage(res.error || "Login failed. Please check your credentials.");
+
+        // Require CAPTCHA if failed attempt threshold is reached
+        if (res.requiresCaptcha) {
+          setRequiresCaptcha(true);
+        }
 
         // Check if locked out
         if (res.isLocked && res.retryAfterSeconds) {
@@ -496,17 +521,23 @@ function AuthForm() {
               </div>
             )}
 
-            {/* Visual Official Google reCAPTCHA Checkbox */}
-            {activeTab === "login" && (
-              <div className="py-2 flex justify-center">
-                <GoogleReCaptcha
-                  ref={recaptchaRef}
-                  onVerify={(token) => {
-                    setRecaptchaToken(token);
-                    setErrorMessage("");
-                  }}
-                  onExpire={() => setRecaptchaToken("")}
-                />
+            {/* Official Google reCAPTCHA Checkbox (Revealed only after failed attempts) */}
+            {activeTab === "login" && requiresCaptcha && (
+              <div className="py-2.5 px-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="flex items-center gap-2 text-xs text-amber-300 font-medium">
+                  <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>Security verification required: Please verify you are human</span>
+                </div>
+                <div className="flex justify-center">
+                  <GoogleReCaptcha
+                    ref={recaptchaRef}
+                    onVerify={(token) => {
+                      setRecaptchaToken(token);
+                      setErrorMessage("");
+                    }}
+                    onExpire={() => setRecaptchaToken("")}
+                  />
+                </div>
               </div>
             )}
 

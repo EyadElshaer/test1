@@ -49,16 +49,20 @@ export async function POST(req: Request) {
       );
     }
 
-    // 3. Official Google reCAPTCHA Verification
-    const recaptchaCheck = await verifyGoogleRecaptcha(recaptchaToken);
-    if (!recaptchaCheck.success) {
-      return NextResponse.json(
-        {
-          error: recaptchaCheck.error || "Google reCAPTCHA verification failed. Access denied.",
-          recaptchaFailed: true,
-        },
-        { status: 403 }
-      );
+    // 3. Official Google reCAPTCHA Verification (Required only after repeated failed attempts)
+    if (securityStatus.requiresCaptcha) {
+      const recaptchaCheck = await verifyGoogleRecaptcha(recaptchaToken);
+      if (!recaptchaCheck.success) {
+        return NextResponse.json(
+          {
+            error: recaptchaCheck.error || "Please complete the 'I'm not a robot' verification checkbox.",
+            requiresCaptcha: true,
+            recaptchaFailed: true,
+            remainingAttempts: securityStatus.remainingAttempts,
+          },
+          { status: 403 }
+        );
+      }
     }
 
     // 4. Look up user account
@@ -87,6 +91,7 @@ export async function POST(req: Request) {
             ? failResult.message
             : "No account found with this email or phone number.",
           isLocked: failResult.isLocked,
+          requiresCaptcha: failResult.requiresCaptcha,
           remainingAttempts: failResult.remainingAttempts,
           retryAfterSeconds: failResult.retryAfterSeconds,
         },
@@ -110,6 +115,7 @@ export async function POST(req: Request) {
         {
           error: failResult.message,
           isLocked: failResult.isLocked,
+          requiresCaptcha: failResult.requiresCaptcha,
           remainingAttempts: failResult.remainingAttempts,
           retryAfterSeconds: failResult.retryAfterSeconds,
         },

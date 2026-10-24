@@ -14,6 +14,7 @@ export interface AuthLoginResponse {
   success: boolean;
   error?: string;
   isLocked?: boolean;
+  requiresCaptcha?: boolean;
   remainingAttempts?: number;
   retryAfterSeconds?: number;
   recaptchaFailed?: boolean;
@@ -105,6 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           success: false,
           error: data.error || "Login failed",
           isLocked: data.isLocked,
+          requiresCaptcha: data.requiresCaptcha || data.recaptchaRequired,
           remainingAttempts: data.remainingAttempts,
           retryAfterSeconds: data.retryAfterSeconds,
           recaptchaFailed: data.recaptchaFailed,
