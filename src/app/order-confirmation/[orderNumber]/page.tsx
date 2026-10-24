@@ -107,12 +107,18 @@ export default async function OrderConfirmationPage({
             {(order.items as any[]).map((item: any) => (
               <div key={item.id} className="py-4 flex items-center justify-between text-xs sm:text-sm">
                 <div className="flex items-center gap-3">
-                  <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-slate-900 border border-white/10 shrink-0">
+                  <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-slate-950 border border-white/10 shrink-0 flex items-center justify-center p-0.5">
+                    <Image
+                      src={item.productImage || "/images/premikeys-logo.png"}
+                      alt=""
+                      fill
+                      className="object-cover blur-xs opacity-25 scale-125 pointer-events-none"
+                    />
                     <Image
                       src={item.productImage || "/images/premikeys-logo.png"}
                       alt={item.productTitle}
                       fill
-                      className="object-cover"
+                      className="object-contain p-0.5"
                     />
                   </div>
                   <div>

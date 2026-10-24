@@ -324,12 +324,18 @@ export default function AccountOrdersPage() {
                       href={`/products/${item.productSlug}`}
                       className="flex items-center gap-3.5 group/item hover:opacity-90 transition-opacity"
                     >
-                      <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-slate-900 border border-white/10 shrink-0 group-hover/item:border-cyan-400/50 transition-colors">
+                      <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-slate-950 border border-white/10 shrink-0 group-hover/item:border-cyan-400/50 transition-colors flex items-center justify-center p-0.5">
+                        <Image
+                          src={item.productImage || "/images/premikeys-logo.png"}
+                          alt=""
+                          fill
+                          className="object-cover blur-xs opacity-25 scale-125 pointer-events-none"
+                        />
                         <Image
                           src={item.productImage || "/images/premikeys-logo.png"}
                           alt={item.productTitle}
                           fill
-                          className="object-cover group-hover/item:scale-105 transition-transform duration-300"
+                          className="object-contain p-0.5 group-hover/item:scale-105 transition-transform duration-300"
                         />
                       </div>
                       <div>

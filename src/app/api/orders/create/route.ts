@@ -290,6 +290,14 @@ export async function POST(req: Request) {
         });
       }
 
+      // Clear cart for logged-in user upon order completion
+      if (orderUserId) {
+        await (tx.user as any).update({
+          where: { id: orderUserId },
+          data: { cartData: null, cartUpdatedAt: new Date() },
+        }).catch(() => {});
+      }
+
       return order;
     });
 

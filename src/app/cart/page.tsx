@@ -111,13 +111,19 @@ export default function CartPage() {
                 <div className="flex items-center gap-4">
                   <Link
                     href={`/products/${item.slug}`}
-                    className="relative w-20 h-20 rounded-xl overflow-hidden bg-slate-900 shrink-0 border border-white/10 hover:border-cyan-400/50 transition-colors block group/thumb"
+                    className="relative w-20 h-20 rounded-xl overflow-hidden bg-slate-950 shrink-0 border border-white/10 hover:border-cyan-400/50 transition-colors flex items-center justify-center p-1 group/thumb"
                   >
+                    <Image
+                      src={item.image || "/images/premikeys-logo.png"}
+                      alt=""
+                      fill
+                      className="object-cover blur-sm opacity-25 scale-125 pointer-events-none"
+                    />
                     <Image
                       src={item.image || "/images/premikeys-logo.png"}
                       alt={item.title}
                       fill
-                      className="object-cover group-hover/thumb:scale-105 transition-transform duration-300"
+                      className="object-contain p-1 group-hover/thumb:scale-105 transition-transform duration-300"
                     />
                   </Link>
                   <div>

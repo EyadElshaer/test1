@@ -611,12 +611,20 @@ export default function CheckoutPage() {
 
                   {screenshotPreview ? (
                     <div className="relative rounded-2xl overflow-hidden border border-cyan-400/50 p-2 bg-slate-900 flex items-center gap-4">
-                      <div className="relative w-24 h-24 rounded-xl overflow-hidden shrink-0 border border-white/10">
+                      <div className="relative w-24 h-28 rounded-xl overflow-hidden shrink-0 border border-white/10 bg-slate-950 flex items-center justify-center p-1">
+                        <Image
+                          src={screenshotPreview}
+                          alt=""
+                          fill
+                          className="object-cover blur-xs opacity-25 scale-125 pointer-events-none"
+                          unoptimized
+                        />
                         <Image
                           src={screenshotPreview}
                           alt="Payment Proof Preview"
                           fill
-                          className="object-cover"
+                          className="object-contain p-1"
+                          unoptimized
                         />
                       </div>
                       <div className="flex-1 min-w-0 text-xs">
@@ -669,12 +677,18 @@ export default function CheckoutPage() {
                 {items.map((item) => (
                   <div key={item.productId} className="pt-3 first:pt-0 flex items-center justify-between text-xs">
                     <div className="flex items-center gap-3 min-w-0 pr-2">
-                      <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-slate-900 shrink-0 border border-white/10">
+                      <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-slate-950 shrink-0 border border-white/10 flex items-center justify-center p-0.5">
+                        <Image
+                          src={item.image || "/images/premikeys-logo.png"}
+                          alt=""
+                          fill
+                          className="object-cover blur-xs opacity-25 scale-125 pointer-events-none"
+                        />
                         <Image
                           src={item.image || "/images/premikeys-logo.png"}
                           alt={item.title}
                           fill
-                          className="object-cover"
+                          className="object-contain p-0.5"
                         />
                       </div>
                       <div className="min-w-0">

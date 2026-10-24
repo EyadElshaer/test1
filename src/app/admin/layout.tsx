@@ -144,7 +144,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const navItems = [
     { name: "Overview", href: "/admin/dashboard", icon: LayoutDashboard, permissionKey: "overview" },
     { name: "Orders", href: "/admin/orders", icon: ShoppingBag, permissionKey: "orders" },
-    { name: "Customers", href: "/admin/customers", icon: Users, permissionKey: "customers" },
+    { name: "Customer Accounts", href: "/admin/customers", icon: Users, permissionKey: "customers" },
     { name: "Refunds", href: "/admin/refunds", icon: RotateCcw, permissionKey: "refunds" },
     { name: "Products", href: "/admin/products", icon: Package, permissionKey: "products" },
     { name: "Categories", href: "/admin/categories", icon: Layers, permissionKey: "categories" },

@@ -191,9 +191,12 @@ export default function AdminCategoriesPage() {
                   <tr key={cat.id} className="hover:bg-white/[0.02]">
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-3">
-                        <div className="relative w-9 h-9 rounded-lg overflow-hidden bg-slate-900 border border-white/10 shrink-0">
+                        <div className="relative w-9 h-9 rounded-lg overflow-hidden bg-slate-950 border border-white/10 shrink-0 flex items-center justify-center p-0.5">
                           {cat.image ? (
-                            <Image src={cat.image} alt={cat.name} fill className="object-cover" />
+                            <>
+                              <Image src={cat.image} alt="" fill className="object-cover blur-xs opacity-25 scale-125 pointer-events-none" />
+                              <Image src={cat.image} alt={cat.name} fill className="object-contain p-0.5" />
+                            </>
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-slate-600 font-mono text-[10px]">
                               CAT

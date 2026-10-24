@@ -50,20 +50,39 @@ export default function ProductCard({
 
   return (
     <div className="glass-card rounded-2xl overflow-hidden flex flex-col group relative border border-white/10 hover:border-cyan-400/50 transition-all duration-300 gpu-layer will-change-transform">
-      {/* Image Banner - Clicking navigates to product details */}
+      {/* Image Showcase - Auto-fits image ratio cleanly without cut off */}
       <Link
         href={`/products/${slug}`}
-        className="relative h-48 w-full overflow-hidden bg-slate-900 block cursor-pointer"
+        className="relative aspect-[4/3] w-full overflow-hidden bg-[#060a17] flex items-center justify-center cursor-pointer block border-b border-white/5"
       >
-        <Image
-          src={primaryImage}
-          alt={title}
-          fill
-          className="object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
-          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-          loading="lazy"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0a0f24] via-transparent to-transparent opacity-90 pointer-events-none" />
+        {/* Ambient Blurred Aura (fills letterbox space with native image tones) */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none select-none">
+          <Image
+            src={primaryImage}
+            alt=""
+            fill
+            className="object-cover blur-xl opacity-30 scale-125"
+            unoptimized={primaryImage.startsWith("data:")}
+            loading="lazy"
+          />
+          <div className="absolute inset-0 bg-[#060a17]/20" />
+        </div>
+
+        {/* Foreground Product Image (Preserves natural aspect ratio, never cut off) */}
+        <div className="relative w-full h-full p-2.5 sm:p-3 flex items-center justify-center">
+          <Image
+            src={primaryImage}
+            alt={title}
+            fill
+            className="object-contain p-2 group-hover:scale-105 transition-transform duration-500 ease-out drop-shadow-lg select-none"
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+            loading="lazy"
+            unoptimized={primaryImage.startsWith("data:")}
+          />
+        </div>
+
+        {/* Subtle Bottom Vignette */}
+        <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-[#0a0f24]/80 to-transparent pointer-events-none" />
 
         {/* Badges on image */}
         <div className="absolute top-3 left-3 flex flex-wrap gap-1.5 z-10 pointer-events-none">

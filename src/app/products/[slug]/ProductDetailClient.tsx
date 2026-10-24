@@ -16,6 +16,8 @@ import {
   Minus,
   Plus,
   Check,
+  Maximize2,
+  X,
 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 
@@ -26,9 +28,26 @@ export default function ProductDetailClient({ product }: { product: any }) {
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState<"overview" | "activation" | "specs">("overview");
   const [justAdded, setJustAdded] = useState(false);
+  const [imageRatio, setImageRatio] = useState<number | null>(null);
+  const [isZoomOpen, setIsZoomOpen] = useState(false);
 
   const images = product.images.length > 0 ? product.images : [{ url: "/images/premikeys-logo.png", altText: product.title }];
   const currentImage = images[activeImageIndex] || images[0];
+
+  const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    if (img.naturalWidth && img.naturalHeight) {
+      const ratio = img.naturalWidth / img.naturalHeight;
+      // Balance between 0.65 (vertical software box art) and 2.2 (ultra-wide banner)
+      const clampedRatio = Math.max(0.65, Math.min(2.2, ratio));
+      setImageRatio(clampedRatio);
+    }
+  };
+
+  const handleSelectImage = (idx: number) => {
+    setActiveImageIndex(idx);
+    setImageRatio(null); // allow re-measuring natural ratio for the selected image
+  };
 
   const isOutOfStock = product.availability === "OUT_OF_STOCK";
 
@@ -77,20 +96,40 @@ export default function ProductDetailClient({ product }: { product: any }) {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
         {/* LEFT: Image Gallery */}
         <div className="lg:col-span-6 space-y-4">
-          {/* Main Preview with hardware acceleration */}
-          <div className="relative aspect-[4/3] w-full rounded-3xl overflow-hidden bg-slate-900 border border-white/10 shadow-2xl gpu-layer">
+          {/* Main Preview with dynamic auto-adjusting aspect ratio & ambient lighting */}
+          <div
+            className="relative w-full rounded-3xl overflow-hidden bg-[#070b19] border border-white/10 shadow-2xl gpu-layer flex items-center justify-center transition-[aspect-ratio] duration-300 min-h-[300px] max-h-[560px]"
+            style={{
+              aspectRatio: imageRatio ? `${imageRatio}` : "4/3",
+            }}
+          >
+            {/* Ambient Blurred Aura (fills letterbox space with native image tones) */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none select-none">
+              <Image
+                src={currentImage.url}
+                alt=""
+                fill
+                className="object-cover blur-2xl opacity-35 scale-110"
+                unoptimized={currentImage.url.startsWith("data:")}
+                priority
+              />
+              <div className="absolute inset-0 bg-[#070b19]/35" />
+            </div>
+
+            {/* Sharp Foreground Image - Contained & Automatically Proportioned */}
             <Image
               src={currentImage.url}
               alt={currentImage.altText || product.title}
               fill
               priority
               sizes="(max-width: 1024px) 100vw, 50vw"
-              className="object-cover transition-all duration-300 ease-out"
+              onLoad={handleImageLoad}
+              className="object-contain p-4 sm:p-6 transition-all duration-300 ease-out drop-shadow-2xl select-none"
+              unoptimized={currentImage.url.startsWith("data:")}
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
 
             {/* Floating Badges */}
-            <div className="absolute top-4 left-4 flex flex-wrap gap-2 z-10">
+            <div className="absolute top-4 left-4 flex flex-wrap gap-2 z-10 pointer-events-none">
               {product.discountPercent > 0 && (
                 <span className="badge-discount text-xs px-3 py-1 rounded-lg uppercase font-black shadow-lg">
                   SAVE {product.discountPercent}%
@@ -102,27 +141,46 @@ export default function ProductDetailClient({ product }: { product: any }) {
                 </span>
               )}
             </div>
+
+            {/* Full-view Zoom Button */}
+            <button
+              type="button"
+              onClick={() => setIsZoomOpen(true)}
+              className="absolute top-4 right-4 p-2.5 rounded-xl bg-black/60 hover:bg-black/80 text-white hover:text-cyan-400 border border-white/20 backdrop-blur-md transition-all z-10 shadow-lg cursor-pointer"
+              title="View Full Resolution Image"
+            >
+              <Maximize2 className="w-4 h-4" />
+            </button>
           </div>
 
-          {/* Thumbnails */}
+          {/* Thumbnails - Uncropped with Ambient Letterboxing */}
           {images.length > 1 && (
             <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none">
               {images.map((img: any, idx: number) => (
                 <button
                   key={img.id || idx}
-                  onClick={() => setActiveImageIndex(idx)}
-                  className={`relative w-20 h-20 rounded-xl overflow-hidden shrink-0 border-2 transition-all duration-200 active:scale-95 ${
+                  onClick={() => handleSelectImage(idx)}
+                  className={`relative w-20 h-20 rounded-xl overflow-hidden shrink-0 border-2 transition-all duration-200 active:scale-95 bg-[#070b19] flex items-center justify-center p-1 ${
                     activeImageIndex === idx
                       ? "border-cyan-400 shadow-[0_0_15px_rgba(0,240,255,0.4)]"
                       : "border-white/10 opacity-70 hover:opacity-100"
                   }`}
+                  title={img.altText || `View image ${idx + 1}`}
                 >
+                  <Image
+                    src={img.url}
+                    alt=""
+                    fill
+                    className="object-cover blur-sm opacity-25 scale-125 pointer-events-none"
+                    unoptimized={img.url.startsWith("data:")}
+                  />
                   <Image
                     src={img.url}
                     alt={img.altText || "Thumbnail"}
                     fill
                     sizes="80px"
-                    className="object-cover"
+                    className="object-contain p-1"
+                    unoptimized={img.url.startsWith("data:")}
                   />
                 </button>
               ))}
@@ -410,6 +468,42 @@ export default function ProductDetailClient({ product }: { product: any }) {
           </button>
         </div>
       </div>
+
+      {/* Full-Screen Image Lightbox Modal */}
+      {isZoomOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8 bg-black/90 backdrop-blur-md animate-fadeIn"
+          onClick={() => setIsZoomOpen(false)}
+        >
+          <div
+            className="relative max-w-5xl max-h-[90vh] w-full flex flex-col items-center justify-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setIsZoomOpen(false)}
+              className="absolute -top-12 right-0 sm:top-2 sm:right-2 p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/20 transition-all z-20 cursor-pointer"
+              title="Close Preview"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="relative w-full h-[75vh] flex items-center justify-center p-2">
+              <img
+                src={currentImage.url}
+                alt={currentImage.altText || product.title}
+                className="max-w-full max-h-[75vh] object-contain rounded-2xl shadow-2xl select-none"
+              />
+            </div>
+
+            <div className="flex items-center justify-between w-full max-w-md px-4 mt-2 text-xs text-slate-300">
+              <span className="font-semibold truncate mr-2">{product.title}</span>
+              <span className="text-cyan-400 font-mono shrink-0">
+                {activeImageIndex + 1} / {images.length}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

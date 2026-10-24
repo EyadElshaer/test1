@@ -138,18 +138,24 @@ export default function CartDrawer() {
                   key={item.productId}
                   className="p-3.5 rounded-2xl bg-slate-900/80 border border-white/5 flex gap-3.5 relative group hover:border-cyan-500/20 transition-all"
                 >
-                  {/* Thumbnail */}
+                  {/* Thumbnail - Contained without cropping */}
                   <Link
                     href={`/products/${item.slug}`}
                     onClick={() => setIsCartOpen(false)}
-                    className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-slate-950 border border-white/10 shrink-0 hover:border-cyan-400/50 transition-colors block"
+                    className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-slate-950 border border-white/10 shrink-0 hover:border-cyan-400/50 transition-colors flex items-center justify-center p-1"
                   >
+                    <Image
+                      src={item.image}
+                      alt=""
+                      fill
+                      className="object-cover blur-sm opacity-25 scale-125 pointer-events-none"
+                    />
                     <Image
                       src={item.image}
                       alt={item.title}
                       fill
                       sizes="80px"
-                      className="object-cover group-hover:scale-105 transition-transform duration-300"
+                      className="object-contain p-1 group-hover:scale-105 transition-transform duration-300"
                     />
                   </Link>
 

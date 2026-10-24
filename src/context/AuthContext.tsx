@@ -52,6 +52,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refreshUser();
   }, []);
 
+  const syncLocalCartToServer = () => {
+    try {
+      const localCart = localStorage.getItem("premikeys_cart_v1");
+      if (localCart) {
+        const parsed = JSON.parse(localCart);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          fetch("/api/user/cart", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ items: parsed }),
+          }).catch(() => {});
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+  };
+
   const login = async (identifier: string, password: string) => {
     try {
       const res = await fetch("/api/auth/login", {
@@ -64,6 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: false, error: data.error || "Login failed" };
       }
       setUser(data.user);
+      syncLocalCartToServer();
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err?.message || "Network error. Please try again." };
@@ -88,6 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: false, error: data.error || "Registration failed" };
       }
       setUser(data.user);
+      syncLocalCartToServer();
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err?.message || "Network error. Please try again." };

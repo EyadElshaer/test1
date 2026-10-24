@@ -18,7 +18,7 @@ export async function GET(
       });
 
       if (dbFile && dbFile.data) {
-        return new NextResponse(dbFile.data, {
+        return new NextResponse(new Uint8Array(dbFile.data), {
           headers: {
             "Content-Type": dbFile.mimeType || "image/jpeg",
             "Cache-Control": "public, max-age=31536000, immutable",
@@ -44,7 +44,7 @@ export async function GET(
           ? "image/gif"
           : "image/jpeg";
 
-      return new NextResponse(fileBuffer, {
+      return new NextResponse(new Uint8Array(fileBuffer), {
         headers: {
           "Content-Type": contentType,
           "Cache-Control": "public, max-age=31536000, immutable",

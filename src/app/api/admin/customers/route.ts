@@ -25,10 +25,14 @@ export async function GET(req: Request) {
       where: whereClause,
       orderBy: { createdAt: "desc" },
       include: {
+        sessions: {
+          select: { id: true, createdAt: true, expiresAt: true },
+        },
         orders: {
           orderBy: { createdAt: "desc" },
           include: {
             items: true,
+            refundRequests: true,
           },
         },
       },
@@ -83,24 +87,81 @@ export async function GET(req: Request) {
         }
       }
 
+      // Parse active/abandoned cart data
+      let cartItems: any[] = [];
+      let cartSubtotal = 0;
+      let cartItemsCount = 0;
+      const rawCartData = (u as any).cartData;
+      if (rawCartData) {
+        try {
+          const parsed = JSON.parse(rawCartData);
+          if (Array.isArray(parsed)) {
+            cartItems = parsed;
+            cartItemsCount = cartItems.reduce((acc: number, it: any) => acc + (it.quantity || 1), 0);
+            cartSubtotal = cartItems.reduce((acc: number, it: any) => acc + ((it.salePrice ?? it.originalPrice ?? 0) * (it.quantity || 1)), 0);
+          }
+        } catch (e) {
+          cartItems = [];
+        }
+      }
+
+      const activeSessionsCount = u.sessions.filter((s) => s.expiresAt > new Date()).length;
+      const allRefunds = u.orders.flatMap((o) => o.refundRequests || []);
+      const pendingOrdersCount = u.orders.filter((o) => o.status === "PENDING" || o.paymentStatus === "AWAITING_VERIFICATION").length;
+
       return {
         id: u.id,
         name: u.name,
         email: u.email,
         phone: u.phone,
         createdAt: u.createdAt,
+        updatedAt: u.updatedAt,
         totalOrdersCount: u.orders.length,
         totalSpent,
+        pendingOrdersCount,
+        activeSessionsCount,
+        cart: {
+          items: cartItems,
+          itemsCount: cartItemsCount,
+          subtotal: cartSubtotal,
+          updatedAt: (u as any).cartUpdatedAt || null,
+          hasItems: cartItems.length > 0,
+        },
         orders: u.orders.map((o) => ({
           id: o.id,
           orderNumber: o.orderNumber,
           createdAt: o.createdAt,
           status: o.status,
+          paymentStatus: o.paymentStatus,
           totalAmount: o.totalAmount,
           currency: o.currency,
           paymentMethodName: o.paymentMethodName,
+          paymentReference: o.paymentReference,
+          paymentScreenshotUrl: o.paymentScreenshotUrl,
+          customerNotes: o.customerNotes,
           licenseKeyNote: o.adminCustomerNote,
           itemsCount: o.items.reduce((acc, i) => acc + i.quantity, 0),
+          items: o.items.map((it) => ({
+            id: it.id,
+            productId: it.productId,
+            productTitle: it.productTitle,
+            productSlug: it.productSlug,
+            productImage: it.productImage,
+            quantity: it.quantity,
+            salePrice: it.salePrice,
+            lineTotal: it.lineTotal,
+          })),
+          refunds: o.refundRequests || [],
+        })),
+        refunds: allRefunds.map((r) => ({
+          id: r.id,
+          refundNumber: r.refundNumber,
+          orderId: r.orderId,
+          requestedAmount: r.requestedAmount,
+          reason: r.reason,
+          explanation: r.explanation,
+          status: r.status,
+          createdAt: r.createdAt,
         })),
         everythingBought: Array.from(boughtMap.values()),
       };

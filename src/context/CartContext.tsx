@@ -51,12 +51,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Load from localStorage on mount
+  // Load from localStorage on mount and sync with database cart if signed in
   useEffect(() => {
+    let localItems: CartItem[] = [];
     try {
       const savedItems = localStorage.getItem(CART_STORAGE_KEY);
       if (savedItems) {
-        setItems(JSON.parse(savedItems));
+        localItems = JSON.parse(savedItems);
+        setItems(localItems);
       }
       const savedPromo = localStorage.getItem(PROMO_STORAGE_KEY);
       if (savedPromo) {
@@ -67,9 +69,29 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoaded(true);
     }
+
+    // Check if user is logged in and sync database cart
+    fetch("/api/user/cart")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.authenticated) {
+          if (localItems.length === 0 && Array.isArray(data.cart) && data.cart.length > 0) {
+            setItems(data.cart);
+            localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(data.cart));
+          } else if (localItems.length > 0) {
+            // Push client items to server so admin sees the active cart
+            fetch("/api/user/cart", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ items: localItems }),
+            }).catch(() => {});
+          }
+        }
+      })
+      .catch(() => {});
   }, []);
 
-  // Save to localStorage on change
+  // Save to localStorage on change and sync to server
   useEffect(() => {
     if (!isLoaded) return;
     try {
@@ -77,6 +99,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {
       console.error("Failed to save cart to storage", e);
     }
+
+    // Debounce save to database cart for customer account
+    const timer = setTimeout(() => {
+      fetch("/api/user/cart", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items }),
+      }).catch(() => {});
+    }, 500);
+
+    return () => clearTimeout(timer);
   }, [items, isLoaded]);
 
   useEffect(() => {
@@ -142,6 +175,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {
       // ignore
     }
+    fetch("/api/user/cart", { method: "DELETE" }).catch(() => {});
   };
 
   const applyPromo = async (code: string) => {

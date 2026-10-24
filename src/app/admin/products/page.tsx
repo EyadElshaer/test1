@@ -410,12 +410,18 @@ export default function AdminProductsPage() {
                     {/* Title + Thumbnail */}
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-3">
-                        <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-slate-900 border border-white/10 shrink-0">
+                        <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-slate-950 border border-white/10 shrink-0 flex items-center justify-center p-0.5">
+                          <Image
+                            src={prod.images?.[0]?.url || "/images/premikeys-logo.png"}
+                            alt=""
+                            fill
+                            className="object-cover blur-xs opacity-25 scale-125 pointer-events-none"
+                          />
                           <Image
                             src={prod.images?.[0]?.url || "/images/premikeys-logo.png"}
                             alt={prod.title}
                             fill
-                            className="object-cover"
+                            className="object-contain p-0.5"
                           />
                         </div>
                         <div>
@@ -820,9 +826,10 @@ export default function AdminProductsPage() {
                     {images.map((img, idx) => (
                       <div
                         key={idx}
-                        className="relative w-20 h-20 rounded-xl overflow-hidden border border-white/20 bg-slate-900 group"
+                        className="relative w-20 h-20 rounded-xl overflow-hidden border border-white/20 bg-slate-950 group flex items-center justify-center p-1"
                       >
-                        <Image src={img} alt="Product image" fill className="object-cover" />
+                        <Image src={img} alt="" fill className="object-cover blur-sm opacity-25 scale-125 pointer-events-none" />
+                        <Image src={img} alt="Product image" fill className="object-contain p-1" />
                         {idx === 0 && (
                           <span className="absolute top-1 left-1 bg-blue-600 text-[9px] font-bold px-1 rounded text-white">
                             Primary
