@@ -99,7 +99,15 @@ export default function AdminLoginPage() {
       return;
     }
 
-    if (requiresCaptcha && !recaptchaToken) {
+    let finalToken = recaptchaToken;
+    if (!finalToken && recaptchaRef.current) {
+      finalToken = recaptchaRef.current.getResponse();
+      if (finalToken) {
+        setRecaptchaToken(finalToken);
+      }
+    }
+
+    if (requiresCaptcha && !finalToken) {
       setErrorMessage("Please complete the reCAPTCHA 'I'm not a robot' verification checkbox.");
       return;
     }
@@ -113,7 +121,7 @@ export default function AdminLoginPage() {
         body: JSON.stringify({
           username,
           password,
-          recaptchaToken: recaptchaToken || undefined,
+          recaptchaToken: finalToken || undefined,
         }),
       });
 

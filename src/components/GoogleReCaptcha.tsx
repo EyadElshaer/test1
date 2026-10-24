@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState, useImperativeHandle, forwardRef } f
 
 export interface GoogleReCaptchaRef {
   reset: () => void;
+  getResponse: () => string;
 }
 
 interface GoogleReCaptchaProps {
@@ -21,6 +22,13 @@ export const GoogleReCaptcha = forwardRef<GoogleReCaptchaRef, GoogleReCaptchaPro
     const widgetIdRef = useRef<number | null>(null);
     const [isRendered, setIsRendered] = useState(false);
 
+    // Keep callback refs up to date to prevent stale closures or unmount bugs
+    const onVerifyRef = useRef(onVerify);
+    onVerifyRef.current = onVerify;
+
+    const onExpireRef = useRef(onExpire);
+    onExpireRef.current = onExpire;
+
     const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY?.trim() || DEFAULT_SITE_KEY;
 
     useImperativeHandle(ref, () => ({
@@ -37,13 +45,29 @@ export const GoogleReCaptcha = forwardRef<GoogleReCaptchaRef, GoogleReCaptchaPro
           }
         }
       },
+      getResponse: () => {
+        if (typeof window !== "undefined") {
+          if ((window as any).grecaptcha && widgetIdRef.current !== null) {
+            try {
+              const res = (window as any).grecaptcha.getResponse(widgetIdRef.current);
+              if (res) return res;
+            } catch (e) {}
+          }
+          // Fallback check directly in DOM textarea created by Google
+          const textarea = containerRef.current?.querySelector<HTMLTextAreaElement>(
+            'textarea[name="g-recaptcha-response"]'
+          );
+          if (textarea && textarea.value) {
+            return textarea.value;
+          }
+        }
+        return "";
+      },
     }));
 
     useEffect(() => {
-      let isMounted = true;
-
       const renderWidget = () => {
-        if (!isMounted || !containerRef.current) return;
+        if (!containerRef.current) return;
         const grecaptcha = (window as any).grecaptcha;
 
         if (!grecaptcha || typeof grecaptcha.render !== "function") return;
@@ -58,16 +82,21 @@ export const GoogleReCaptcha = forwardRef<GoogleReCaptchaRef, GoogleReCaptchaPro
             sitekey: siteKey,
             theme: "dark",
             callback: (token: string) => {
-              if (isMounted) onVerify(token);
+              // Call through stable ref
+              if (onVerifyRef.current) {
+                onVerifyRef.current(token);
+              }
             },
             "expired-callback": () => {
-              if (isMounted && onExpire) onExpire();
+              if (onExpireRef.current) {
+                onExpireRef.current();
+              }
             },
           });
           widgetIdRef.current = id;
-          if (isMounted) setIsRendered(true);
+          setIsRendered(true);
         } catch (err) {
-          // Ignore React 18/19 duplicate mount attempts in dev
+          // Ignore duplicate mount in dev
         }
       };
 
@@ -95,11 +124,7 @@ export const GoogleReCaptcha = forwardRef<GoogleReCaptchaRef, GoogleReCaptchaPro
           document.head.appendChild(script);
         }
       }
-
-      return () => {
-        isMounted = false;
-      };
-    }, [siteKey, onVerify, onExpire]);
+    }, [siteKey]);
 
     return (
       <div className={`flex flex-col items-center justify-center my-3 ${className}`}>

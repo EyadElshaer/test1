@@ -200,14 +200,22 @@ function AuthForm() {
         router.push(redirectUrl);
       }, 700);
     } else {
-      if (requiresCaptcha && !recaptchaToken) {
+      let finalToken = recaptchaToken;
+      if (!finalToken && recaptchaRef.current) {
+        finalToken = recaptchaRef.current.getResponse();
+        if (finalToken) {
+          setRecaptchaToken(finalToken);
+        }
+      }
+
+      if (requiresCaptcha && !finalToken) {
         setErrorMessage("Please check the 'I'm not a robot' reCAPTCHA box to continue.");
         return;
       }
 
       setIsLoading(true);
 
-      const res = await login(finalIdentifier, password, recaptchaToken || undefined);
+      const res = await login(finalIdentifier, password, finalToken || undefined);
 
       if (!res.success) {
         recaptchaRef.current?.reset();
