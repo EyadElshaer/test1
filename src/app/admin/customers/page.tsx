@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -108,7 +108,7 @@ export default function AdminCustomersPage() {
       }
       setSessionFeedback(data.message);
       setTimeout(() => setSessionFeedback(null), 3000);
-      await fetchCustomers(search);
+      await fetchCustomers(false);
     } catch (err: any) {
       alert(err.message || "Failed to revoke session.");
     } finally {
@@ -116,11 +116,10 @@ export default function AdminCustomersPage() {
     }
   };
 
-  const fetchCustomers = async (query = "") => {
-    setLoading(true);
+  const fetchCustomers = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     try {
-      const url = query ? `/api/admin/customers?search=${encodeURIComponent(query)}` : "/api/admin/customers";
-      const res = await fetch(url);
+      const res = await fetch("/api/admin/customers");
       const data = await res.json();
       if (data.success) {
         setCustomers(data.customers || []);
@@ -133,17 +132,16 @@ export default function AdminCustomersPage() {
     } catch (err) {
       console.error("Failed to load customers:", err);
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchCustomers();
+    fetchCustomers(true);
   }, []);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    fetchCustomers(search);
   };
 
   const handleCopy = (text: string, id: string) => {
@@ -215,7 +213,7 @@ export default function AdminCustomersPage() {
       if (selectedCustomer?.id === customerToDelete.id) {
         setSelectedCustomer(null);
       }
-      fetchCustomers(search);
+      fetchCustomers(false);
     } catch (err: any) {
       alert(err.message || "Failed to delete customer.");
     } finally {
@@ -223,11 +221,26 @@ export default function AdminCustomersPage() {
     }
   };
 
-  const totalRegistered = customers.length;
-  const totalRevenue = customers.reduce((sum, c) => sum + (c.totalSpent || 0), 0);
-  const totalOrdersPlaced = customers.reduce((sum, c) => sum + (c.totalOrdersCount || 0), 0);
-  const customersWithAbandonedCart = customers.filter((c) => c.cart?.hasItems);
-  const totalAbandonedValue = customersWithAbandonedCart.reduce((sum, c) => sum + (c.cart?.subtotal || 0), 0);
+  const { totalRegistered, totalRevenue, totalOrdersPlaced, customersWithAbandonedCart, totalAbandonedValue } = useMemo(() => {
+    const totalRegistered = customers.length;
+    const totalRevenue = customers.reduce((sum, c) => sum + (c.totalSpent || 0), 0);
+    const totalOrdersPlaced = customers.reduce((sum, c) => sum + (c.totalOrdersCount || 0), 0);
+    const customersWithAbandonedCart = customers.filter((c) => c.cart?.hasItems);
+    const totalAbandonedValue = customersWithAbandonedCart.reduce((sum, c) => sum + (c.cart?.subtotal || 0), 0);
+    return { totalRegistered, totalRevenue, totalOrdersPlaced, customersWithAbandonedCart, totalAbandonedValue };
+  }, [customers]);
+
+  const filteredCustomers = useMemo(() => {
+    if (!search.trim()) return customers;
+    const q = search.trim().toLowerCase();
+    return customers.filter(
+      (c) =>
+        c.name?.toLowerCase().includes(q) ||
+        c.email?.toLowerCase().includes(q) ||
+        c.phone?.includes(q) ||
+        c.id?.toLowerCase().includes(q)
+    );
+  }, [customers, search]);
 
   return (
     <div className="space-y-8">
@@ -307,28 +320,42 @@ export default function AdminCustomersPage() {
 
       {/* Search Toolbar */}
       <div className="glass-card rounded-2xl p-4 border border-white/10 flex flex-col sm:flex-row gap-3 justify-between items-center">
-        <form onSubmit={handleSearchSubmit} className="flex gap-2 w-full sm:w-96">
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search by name, email, or phone..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full glass-input pl-9 pr-3 py-2 rounded-xl text-xs"
-            />
-          </div>
-          <button
-            type="submit"
-            className="px-4 py-2 rounded-xl text-xs font-semibold btn-secondary"
-          >
-            Search
-          </button>
-        </form>
+        <div className="relative flex-1 w-full sm:w-96">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            placeholder="Search by name, email, or phone (instant)..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full glass-input pl-9 pr-8 py-2 rounded-xl text-xs"
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs p-1"
+              title="Clear search"
+            >
+              ✕
+            </button>
+          )}
+        </div>
 
-        <span className="text-xs text-slate-400">
-          Showing <strong className="text-cyan-400 font-mono">{customers.length}</strong> customer accounts
-        </span>
+        <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+          <span className="text-xs text-slate-400">
+            Showing <strong className="text-cyan-400 font-mono">{filteredCustomers.length}</strong> of{" "}
+            <span className="font-mono">{customers.length}</span> customer accounts
+          </span>
+
+          <button
+            type="button"
+            onClick={() => fetchCustomers(true)}
+            className="px-3 py-1.5 rounded-xl text-xs font-semibold btn-secondary flex items-center gap-1.5 shrink-0"
+            title="Refresh accounts data"
+          >
+            <span>Refresh</span>
+          </button>
+        </div>
       </div>
 
       {/* Customer List / Table */}
@@ -336,13 +363,22 @@ export default function AdminCustomersPage() {
         <div className="py-20 text-center text-slate-400 text-xs font-mono">
           Loading customer accounts and account data...
         </div>
-      ) : customers.length === 0 ? (
+      ) : filteredCustomers.length === 0 ? (
         <div className="glass-card rounded-3xl p-12 text-center border border-white/10 space-y-3">
           <Users className="w-10 h-10 text-slate-500 mx-auto" />
           <h3 className="text-base font-bold text-white">No Customers Found</h3>
           <p className="text-xs text-slate-400">
             {search ? "No customer accounts match your search query." : "No customers have registered yet."}
           </p>
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              className="mt-2 px-3 py-1.5 rounded-xl text-xs font-semibold btn-secondary"
+            >
+              Clear Search
+            </button>
+          )}
         </div>
       ) : (
         <div className="glass-card rounded-3xl border border-white/10 overflow-hidden shadow-2xl">
@@ -359,7 +395,7 @@ export default function AdminCustomersPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {customers.map((c) => {
+                {filteredCustomers.map((c) => {
                   const hasCartItems = c.cart?.hasItems;
                   const cartCount = c.cart?.itemsCount || 0;
                   const cartSubtotal = c.cart?.subtotal || 0;
@@ -385,8 +421,8 @@ export default function AdminCustomersPage() {
                                 ID: {c.id.substring(0, 8)}...
                               </span>
                               {c.activeSessionsCount > 0 && (
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.9)]" />
                                   {c.activeSessionsCount} active
                                 </span>
                               )}
@@ -460,7 +496,7 @@ export default function AdminCustomersPage() {
                       <td className="py-4 px-4">
                         {hasCartItems ? (
                           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 font-mono text-[11px]">
-                            <ShoppingCart className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                            <ShoppingCart className="w-3.5 h-3.5 text-amber-400" />
                             <span>
                               <strong>{cartCount}</strong> {cartCount === 1 ? "item" : "items"} ({cartSubtotal.toLocaleString()} EGP)
                             </span>
@@ -990,8 +1026,8 @@ export default function AdminCustomersPage() {
                               <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
                                 {sess.browser || "Browser"}
                               </span>
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.9)]" />
                                 Active
                               </span>
                             </div>

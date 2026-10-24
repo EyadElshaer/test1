@@ -21,15 +21,26 @@ export async function GET(req: Request) {
       ];
     }
 
+    const now = new Date();
     const users = await prisma.user.findMany({
       where: whereClause,
       orderBy: { createdAt: "desc" },
-      include: {
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        cartData: true,
+        cartUpdatedAt: true,
+        createdAt: true,
+        updatedAt: true,
         sessions: {
+          where: { expiresAt: { gt: now } },
+          orderBy: { lastActiveAt: "desc" },
+          take: 8,
           select: {
             id: true,
             ipAddress: true,
-            userAgent: true,
             device: true,
             os: true,
             browser: true,
@@ -42,9 +53,45 @@ export async function GET(req: Request) {
         },
         orders: {
           orderBy: { createdAt: "desc" },
-          include: {
-            items: true,
-            refundRequests: true,
+          select: {
+            id: true,
+            orderNumber: true,
+            createdAt: true,
+            status: true,
+            paymentStatus: true,
+            totalAmount: true,
+            currency: true,
+            paymentMethodName: true,
+            paymentReference: true,
+            customerNotes: true,
+            paymentScreenshotUrl: true,
+            countryCode: true,
+            adminCustomerNote: true,
+            items: {
+              select: {
+                id: true,
+                productId: true,
+                productTitle: true,
+                productSlug: true,
+                productImage: true,
+                quantity: true,
+                salePrice: true,
+                originalPrice: true,
+                lineTotal: true,
+              },
+            },
+            refundRequests: {
+              select: {
+                id: true,
+                refundNumber: true,
+                orderId: true,
+                requestedAmount: true,
+                reason: true,
+                explanation: true,
+                status: true,
+                createdAt: true,
+              },
+            },
           },
         },
       },
