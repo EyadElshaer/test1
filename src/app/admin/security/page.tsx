@@ -138,7 +138,7 @@ export default function SecurityCenterPage() {
           </div>
           <div className="text-xl font-black text-white">10 Attempts Max</div>
           <p className="text-xs text-slate-400 leading-relaxed">
-            Locked for 15 minutes after 10 failed passwords. Interactive cryptographic CAPTCHA required after 3 failed attempts.
+            Locked for 15 minutes after 10 failed passwords. Google reCAPTCHA v3 invisible automated risk scoring and tarpit anti-timing delay active.
           </p>
         </div>
 
@@ -151,7 +151,7 @@ export default function SecurityCenterPage() {
           </div>
           <div className="text-xl font-black text-white">5 Attempts Max</div>
           <p className="text-xs text-slate-400 leading-relaxed">
-            Locked for 30 minutes after 5 failed admin logins. CAPTCHA triggered after 2 failed attempts. All security events logged to audit ledger.
+            Locked for 30 minutes after 5 failed admin logins. Google reCAPTCHA v3 risk scoring enforced. All security events logged to audit ledger.
           </p>
         </div>
 

@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
 import { createAdminSession, logAdminAudit } from "@/lib/auth";
 import { sanitizeString } from "@/lib/sanitizer";
-import { generateCaptcha, verifyCaptcha } from "@/lib/captcha";
+import { verifyGoogleRecaptcha } from "@/lib/recaptcha";
 import {
   getClientIp,
   checkLoginSecurity,
@@ -16,13 +16,13 @@ export async function POST(req: Request) {
   try {
     const ip = getClientIp(req);
     const body = await req.json();
-    const { username, password, captchaToken, captchaAnswer } = body;
+    const { username, password, recaptchaToken } = body;
 
     const cleanUsername = sanitizeString(username, 50);
 
     // 1. Initial IP & Account Lockout Check
-    const initialSecurity = checkLoginSecurity(ip, cleanUsername || undefined, "admin");
-    if (initialSecurity.isLocked) {
+    const securityStatus = checkLoginSecurity(ip, cleanUsername || undefined, "admin");
+    if (securityStatus.isLocked) {
       await logAdminAudit(
         null,
         "ADMIN_LOGIN_BLOCKED",
@@ -32,50 +32,37 @@ export async function POST(req: Request) {
 
       return NextResponse.json(
         {
-          error: initialSecurity.message,
+          error: securityStatus.message,
           isLocked: true,
-          retryAfterSeconds: initialSecurity.retryAfterSeconds,
+          retryAfterSeconds: securityStatus.retryAfterSeconds,
           remainingAttempts: 0,
         },
         { status: 429 }
       );
     }
 
-    // 2. Validate basic input fields
+    // 2. Validate input fields
     if (!cleanUsername || !password) {
       return NextResponse.json({ error: "Username and password are required." }, { status: 400 });
     }
 
-    // 3. CAPTCHA verification if required
-    if (initialSecurity.requiresCaptcha) {
-      if (!captchaToken || !captchaAnswer) {
-        const freshCaptcha = generateCaptcha();
-        return NextResponse.json(
-          {
-            error: "Security challenge required. Please solve the puzzle below to continue.",
-            requiresCaptcha: true,
-            captchaToken: freshCaptcha.token,
-            captchaSvg: freshCaptcha.svgDataUrl,
-            remainingAttempts: initialSecurity.remainingAttempts,
-          },
-          { status: 403 }
-        );
-      }
+    // 3. Official Google reCAPTCHA v3 Verification
+    const recaptchaCheck = await verifyGoogleRecaptcha(recaptchaToken, "admin_login");
+    if (!recaptchaCheck.success) {
+      await logAdminAudit(
+        null,
+        "ADMIN_RECAPTCHA_FAILED",
+        `Google reCAPTCHA flagged request as high risk (Score: ${recaptchaCheck.score ?? "N/A"})`,
+        ip
+      );
 
-      const captchaCheck = verifyCaptcha(captchaToken, captchaAnswer);
-      if (!captchaCheck.valid) {
-        const freshCaptcha = generateCaptcha();
-        return NextResponse.json(
-          {
-            error: captchaCheck.error || "Incorrect verification code.",
-            requiresCaptcha: true,
-            captchaToken: freshCaptcha.token,
-            captchaSvg: freshCaptcha.svgDataUrl,
-            remainingAttempts: initialSecurity.remainingAttempts,
-          },
-          { status: 400 }
-        );
-      }
+      return NextResponse.json(
+        {
+          error: recaptchaCheck.error || "Security verification failed. Access denied by Google reCAPTCHA.",
+          recaptchaFailed: true,
+        },
+        { status: 403 }
+      );
     }
 
     // 4. Find Admin in Database
@@ -87,21 +74,13 @@ export async function POST(req: Request) {
       const failResult = await recordFailedLogin(ip, cleanUsername, "admin");
       await logAdminAudit(null, "LOGIN_FAILED", `Failed admin login: user "${cleanUsername}" not found`, ip);
 
-      let freshCaptcha: any = null;
-      if (failResult.requiresCaptcha) {
-        freshCaptcha = generateCaptcha();
-      }
-
       const status = failResult.isLocked ? 429 : 401;
       return NextResponse.json(
         {
           error: failResult.isLocked ? failResult.message : "Invalid username or password.",
           isLocked: failResult.isLocked,
-          requiresCaptcha: failResult.requiresCaptcha,
           remainingAttempts: failResult.remainingAttempts,
           retryAfterSeconds: failResult.retryAfterSeconds,
-          captchaToken: freshCaptcha?.token,
-          captchaSvg: freshCaptcha?.svgDataUrl,
         },
         { status }
       );
@@ -111,28 +90,19 @@ export async function POST(req: Request) {
     const isMatch = await bcrypt.compare(password, admin.passwordHash);
 
     if (!isMatch) {
-      // Artificial tarpit delay against automated password guessing
-      const failCount = 5 - initialSecurity.remainingAttempts;
+      const failCount = 5 - securityStatus.remainingAttempts;
       await applyTarpitDelay(failCount);
 
       const failResult = await recordFailedLogin(ip, cleanUsername, "admin");
       await logAdminAudit(admin.id, "LOGIN_FAILED", `Incorrect password for admin user "${cleanUsername}"`, ip);
-
-      let freshCaptcha: any = null;
-      if (failResult.requiresCaptcha) {
-        freshCaptcha = generateCaptcha();
-      }
 
       const status = failResult.isLocked ? 429 : 401;
       return NextResponse.json(
         {
           error: failResult.message,
           isLocked: failResult.isLocked,
-          requiresCaptcha: failResult.requiresCaptcha,
           remainingAttempts: failResult.remainingAttempts,
           retryAfterSeconds: failResult.retryAfterSeconds,
-          captchaToken: freshCaptcha?.token,
-          captchaSvg: freshCaptcha?.svgDataUrl,
         },
         { status }
       );

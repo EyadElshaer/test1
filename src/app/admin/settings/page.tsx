@@ -633,7 +633,74 @@ export default function AdminSettingsPage() {
           </div>
         </div>
 
-        {/* 5. External Integrations Guide & Credentials Checklist */}
+        {/* 5. Google reCAPTCHA v3 Bot Protection */}
+        <div className="glass-card rounded-3xl p-6 sm:p-8 border border-white/10 space-y-4">
+          <div className="flex items-center justify-between border-b border-white/10 pb-3">
+            <h3 className="font-bold text-white text-base flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-cyan-400" />
+              <span>Official Google reCAPTCHA v3 Protection</span>
+            </h3>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={settings.recaptcha_enabled !== "false"}
+                onChange={(e) => handleChange("recaptcha_enabled", e.target.checked ? "true" : "false")}
+                className="rounded border-slate-700 bg-slate-900 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-xs font-semibold text-slate-300">Enabled</span>
+            </label>
+          </div>
+
+          <p className="text-xs text-slate-400 leading-relaxed">
+            Google reCAPTCHA v3 provides invisible, non-intrusive bot defense for both Customer and Admin login portals without requiring checkboxes or puzzles. You can also configure keys in <code className="text-cyan-300">.env</code>.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-semibold text-slate-300 block mb-1">
+                Google reCAPTCHA v3 Site Key (Client)
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. 6Ld..."
+                value={settings.recaptcha_site_key || ""}
+                onChange={(e) => handleChange("recaptcha_site_key", e.target.value)}
+                className="w-full glass-input px-3.5 py-2.5 rounded-xl text-xs font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-slate-300 block mb-1">
+                Google reCAPTCHA v3 Secret Key (Server)
+              </label>
+              <input
+                type="password"
+                placeholder="e.g. 6Ld..."
+                value={settings.recaptcha_secret_key || ""}
+                onChange={(e) => handleChange("recaptcha_secret_key", e.target.value)}
+                className="w-full glass-input px-3.5 py-2.5 rounded-xl text-xs font-mono"
+              />
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 text-[11px] text-slate-400 flex items-start gap-2">
+            <Info className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
+            <span>
+              To generate your free keys, visit{" "}
+              <a
+                href="https://www.google.com/recaptcha/admin/create"
+                target="_blank"
+                rel="noreferrer"
+                className="text-cyan-400 underline hover:text-cyan-300 inline-flex items-center gap-0.5"
+              >
+                Google reCAPTCHA Console <ExternalLink className="w-3 h-3 inline" />
+              </a>
+              , select <strong>reCAPTCHA v3</strong>, and add your domains (e.g. <code className="text-slate-300 font-mono">localhost</code> and your production domain).
+            </span>
+          </div>
+        </div>
+
+        {/* 6. External Integrations Guide & Credentials Checklist */}
         <div className="p-6 rounded-3xl bg-blue-950/30 border border-blue-500/30 space-y-4 text-xs">
           <div className="flex items-center gap-2 text-cyan-300 font-bold text-sm">
             <ShieldCheck className="w-4 h-4" />

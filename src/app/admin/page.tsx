@@ -8,25 +8,21 @@ import {
   User,
   AlertCircle,
   ShieldCheck,
-  RotateCw,
   ShieldAlert,
   Clock,
-  KeyRound,
 } from "lucide-react";
+import { useRecaptcha } from "@/lib/useRecaptcha";
 
 export default function AdminLoginPage() {
   const router = useRouter();
+  const { executeRecaptcha } = useRecaptcha();
+
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  // Security & Bot Defense state
-  const [requiresCaptcha, setRequiresCaptcha] = useState(false);
-  const [captchaToken, setCaptchaToken] = useState("");
-  const [captchaSvg, setCaptchaSvg] = useState("");
-  const [captchaAnswer, setCaptchaAnswer] = useState("");
-  const [captchaLoading, setCaptchaLoading] = useState(false);
+  // Security & IP Lockout state
   const [isLocked, setIsLocked] = useState(false);
   const [lockoutRemainingSeconds, setLockoutRemainingSeconds] = useState(0);
   const [remainingAttempts, setRemainingAttempts] = useState<number | null>(null);
@@ -61,23 +57,6 @@ export default function AdminLoginPage() {
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const fetchNewCaptcha = async () => {
-    setCaptchaLoading(true);
-    try {
-      const res = await fetch("/api/auth/captcha?scope=admin");
-      const data = await res.json();
-      if (data.success) {
-        setCaptchaToken(data.captchaToken);
-        setCaptchaSvg(data.captchaSvg);
-        setCaptchaAnswer("");
-      }
-    } catch (err) {
-      console.error("Failed to load admin captcha:", err);
-    } finally {
-      setCaptchaLoading(false);
-    }
-  };
-
   // Check if already authenticated
   useEffect(() => {
     fetch("/api/admin/me")
@@ -99,22 +78,19 @@ export default function AdminLoginPage() {
       return;
     }
 
-    if (requiresCaptcha && !captchaAnswer.trim()) {
-      setErrorMessage("Please enter the security verification code.");
-      return;
-    }
-
     setIsLoading(true);
 
     try {
+      // Execute invisible Google reCAPTCHA v3
+      const recaptchaToken = await executeRecaptcha("admin_login");
+
       const res = await fetch("/api/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           username,
           password,
-          captchaToken: requiresCaptcha ? captchaToken : undefined,
-          captchaAnswer: requiresCaptcha ? captchaAnswer.trim() : undefined,
+          recaptchaToken: recaptchaToken || undefined,
         }),
       });
 
@@ -130,17 +106,6 @@ export default function AdminLoginPage() {
 
         if (data.remainingAttempts !== undefined) {
           setRemainingAttempts(data.remainingAttempts);
-        }
-
-        if (data.requiresCaptcha) {
-          setRequiresCaptcha(true);
-          if (data.captchaToken && data.captchaSvg) {
-            setCaptchaToken(data.captchaToken);
-            setCaptchaSvg(data.captchaSvg);
-            setCaptchaAnswer("");
-          } else {
-            fetchNewCaptcha();
-          }
         }
 
         return;
@@ -259,58 +224,6 @@ export default function AdminLoginPage() {
             </div>
           </div>
 
-          {/* CAPTCHA Challenge for Admin */}
-          {requiresCaptcha && (
-            <div className="p-4 rounded-2xl bg-cyan-950/30 border border-cyan-500/30 space-y-3">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4 text-cyan-400" />
-                  <span>Security Challenge</span>
-                </label>
-                <button
-                  type="button"
-                  onClick={fetchNewCaptcha}
-                  disabled={captchaLoading}
-                  className="text-[11px] text-cyan-400 hover:text-cyan-200 transition-colors flex items-center gap-1"
-                  title="Refresh Code"
-                >
-                  <RotateCw className={`w-3.5 h-3.5 ${captchaLoading ? "animate-spin" : ""}`} />
-                  <span>Refresh Code</span>
-                </button>
-              </div>
-
-              <div className="flex flex-col sm:flex-row items-center gap-3">
-                <div className="relative rounded-xl overflow-hidden border border-white/15 bg-black/40 shadow-inner flex items-center justify-center p-1">
-                  {captchaSvg ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={captchaSvg}
-                      alt="Security challenge"
-                      className="h-12 w-auto select-none"
-                    />
-                  ) : (
-                    <div className="h-12 w-44 flex items-center justify-center text-[10px] text-slate-400 font-mono">
-                      Loading code...
-                    </div>
-                  )}
-                </div>
-
-                <input
-                  type="text"
-                  required
-                  maxLength={6}
-                  autoComplete="off"
-                  autoCorrect="off"
-                  autoCapitalize="characters"
-                  placeholder="5 characters"
-                  value={captchaAnswer}
-                  onChange={(e) => setCaptchaAnswer(e.target.value.toUpperCase())}
-                  className="flex-1 w-full glass-input px-3.5 py-3 rounded-xl text-center text-sm font-mono tracking-widest uppercase font-bold text-cyan-200"
-                />
-              </div>
-            </div>
-          )}
-
           <button
             type="submit"
             disabled={isLoading || isLocked || !username || !password}
@@ -322,7 +235,7 @@ export default function AdminLoginPage() {
                 <span>Locked Out ({formatLockoutTimer(lockoutRemainingSeconds)})</span>
               </>
             ) : isLoading ? (
-              <span>Authenticating...</span>
+              <span>Authenticating with reCAPTCHA...</span>
             ) : (
               <>
                 <ShieldCheck className="w-4 h-4" />
@@ -332,8 +245,31 @@ export default function AdminLoginPage() {
           </button>
         </form>
 
-        <div className="p-3.5 rounded-2xl bg-white/[0.02] border border-white/5 text-[11px] text-slate-500 text-center leading-relaxed">
-          Authorized personnel only. Protected by 256-bit encryption, strict IP lockout rate limiting, and real-time security auditing.
+        <div className="p-3.5 rounded-2xl bg-white/[0.02] border border-white/5 space-y-1.5 text-center leading-relaxed">
+          <p className="text-[11px] text-slate-400 font-semibold">
+            Protected by Google reCAPTCHA v3 & PremiKeys Anti-Brute Force Defense
+          </p>
+          <p className="text-[10px] text-slate-500">
+            This portal is protected by reCAPTCHA and the Google{" "}
+            <a
+              href="https://policies.google.com/privacy"
+              target="_blank"
+              rel="noreferrer"
+              className="text-slate-400 hover:text-cyan-400 underline underline-offset-2"
+            >
+              Privacy Policy
+            </a>{" "}
+            and{" "}
+            <a
+              href="https://policies.google.com/terms"
+              target="_blank"
+              rel="noreferrer"
+              className="text-slate-400 hover:text-cyan-400 underline underline-offset-2"
+            >
+              Terms of Service
+            </a>{" "}
+            apply.
+          </p>
         </div>
       </div>
     </div>

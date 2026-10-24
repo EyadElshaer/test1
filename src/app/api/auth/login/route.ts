@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
 import { createUserSession, normalizePhone, isEmail } from "@/lib/userAuth";
 import { sanitizeString } from "@/lib/sanitizer";
-import { generateCaptcha, verifyCaptcha } from "@/lib/captcha";
+import { verifyGoogleRecaptcha } from "@/lib/recaptcha";
 import {
   getClientIp,
   checkLoginSecurity,
@@ -16,25 +16,25 @@ export async function POST(req: Request) {
   try {
     const ip = getClientIp(req);
     const body = await req.json();
-    const { identifier, password, captchaToken, captchaAnswer } = body;
+    const { identifier, password, recaptchaToken } = body;
 
     const trimmed = sanitizeString(identifier, 100);
 
-    // 1. Initial IP & Account Lockout Check
-    const initialSecurity = checkLoginSecurity(ip, trimmed || undefined, "customer");
-    if (initialSecurity.isLocked) {
+    // 1. Check IP & Account Lockout Status
+    const securityStatus = checkLoginSecurity(ip, trimmed || undefined, "customer");
+    if (securityStatus.isLocked) {
       return NextResponse.json(
         {
-          error: initialSecurity.message,
+          error: securityStatus.message,
           isLocked: true,
-          retryAfterSeconds: initialSecurity.retryAfterSeconds,
+          retryAfterSeconds: securityStatus.retryAfterSeconds,
           remainingAttempts: 0,
         },
         { status: 429 }
       );
     }
 
-    // 2. Validate basic input fields
+    // 2. Validate input fields
     if (!trimmed) {
       return NextResponse.json(
         { error: "Please enter your email address or phone number." },
@@ -49,36 +49,16 @@ export async function POST(req: Request) {
       );
     }
 
-    // 3. CAPTCHA verification if required
-    if (initialSecurity.requiresCaptcha) {
-      if (!captchaToken || !captchaAnswer) {
-        const freshCaptcha = generateCaptcha();
-        return NextResponse.json(
-          {
-            error: "Security verification required. Please enter the characters shown below.",
-            requiresCaptcha: true,
-            captchaToken: freshCaptcha.token,
-            captchaSvg: freshCaptcha.svgDataUrl,
-            remainingAttempts: initialSecurity.remainingAttempts,
-          },
-          { status: 403 }
-        );
-      }
-
-      const captchaCheck = verifyCaptcha(captchaToken, captchaAnswer);
-      if (!captchaCheck.valid) {
-        const freshCaptcha = generateCaptcha();
-        return NextResponse.json(
-          {
-            error: captchaCheck.error || "Incorrect verification code. Please try again.",
-            requiresCaptcha: true,
-            captchaToken: freshCaptcha.token,
-            captchaSvg: freshCaptcha.svgDataUrl,
-            remainingAttempts: initialSecurity.remainingAttempts,
-          },
-          { status: 400 }
-        );
-      }
+    // 3. Official Google reCAPTCHA v3 Risk Scoring Verification
+    const recaptchaCheck = await verifyGoogleRecaptcha(recaptchaToken, "customer_login");
+    if (!recaptchaCheck.success) {
+      return NextResponse.json(
+        {
+          error: recaptchaCheck.error || "Google reCAPTCHA verification failed. Access denied.",
+          recaptchaFailed: true,
+        },
+        { status: 403 }
+      );
     }
 
     // 4. Look up user account
@@ -97,55 +77,41 @@ export async function POST(req: Request) {
     }
 
     if (!user) {
-      // Record failed attempt against this IP to stop blind enumeration
+      // Record failed attempt to stop blind credential stuffing
       const failResult = await recordFailedLogin(ip, trimmed, "customer");
-      let freshCaptcha: any = null;
-      if (failResult.requiresCaptcha) {
-        freshCaptcha = generateCaptcha();
-      }
-
       const status = failResult.isLocked ? 429 : 401;
+
       return NextResponse.json(
         {
           error: failResult.isLocked
             ? failResult.message
             : "No account found with this email or phone number.",
           isLocked: failResult.isLocked,
-          requiresCaptcha: failResult.requiresCaptcha,
           remainingAttempts: failResult.remainingAttempts,
           retryAfterSeconds: failResult.retryAfterSeconds,
-          captchaToken: freshCaptcha?.token,
-          captchaSvg: freshCaptcha?.svgDataUrl,
         },
         { status }
       );
     }
 
-    // 5. Verify Password with bcrypt
+    // 5. Verify Password
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
 
     if (!isPasswordValid) {
-      // Artificial tarpit delay if repeated failures to defeat automated password cracking
-      const failCount = 10 - initialSecurity.remainingAttempts;
+      // Tarpit delay against brute-force dictionary attacks
+      const failCount = 10 - securityStatus.remainingAttempts;
       await applyTarpitDelay(failCount);
 
-      // Record failed login attempt
+      // Record failed login strike
       const failResult = await recordFailedLogin(ip, trimmed, "customer");
-      let freshCaptcha: any = null;
-      if (failResult.requiresCaptcha) {
-        freshCaptcha = generateCaptcha();
-      }
-
       const status = failResult.isLocked ? 429 : 401;
+
       return NextResponse.json(
         {
           error: failResult.message,
           isLocked: failResult.isLocked,
-          requiresCaptcha: failResult.requiresCaptcha,
           remainingAttempts: failResult.remainingAttempts,
           retryAfterSeconds: failResult.retryAfterSeconds,
-          captchaToken: freshCaptcha?.token,
-          captchaSvg: freshCaptcha?.svgDataUrl,
         },
         { status }
       );

@@ -15,12 +15,12 @@ import {
   ShieldCheck,
   AlertCircle,
   CheckCircle2,
-  RotateCw,
   ShieldAlert,
   Clock,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { COUNTRY_CODES, CountryCode } from "@/lib/countryCodes";
+import { useRecaptcha } from "@/lib/useRecaptcha";
 
 function AuthForm() {
   const router = useRouter();
@@ -29,6 +29,7 @@ function AuthForm() {
   const initialTab = searchParams.get("tab") === "register" ? "register" : "login";
 
   const { login, register, user } = useAuth();
+  const { executeRecaptcha } = useRecaptcha();
 
   const [activeTab, setActiveTab] = useState<"login" | "register">(initialTab);
   const [identifierType, setIdentifierType] = useState<"phone" | "email">("phone");
@@ -46,12 +47,7 @@ function AuthForm() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  // Security & Bot Defense state
-  const [requiresCaptcha, setRequiresCaptcha] = useState(false);
-  const [captchaToken, setCaptchaToken] = useState("");
-  const [captchaSvg, setCaptchaSvg] = useState("");
-  const [captchaAnswer, setCaptchaAnswer] = useState("");
-  const [captchaLoading, setCaptchaLoading] = useState(false);
+  // Security & IP Lockout state
   const [isLocked, setIsLocked] = useState(false);
   const [lockoutRemainingSeconds, setLockoutRemainingSeconds] = useState(0);
   const [remainingAttempts, setRemainingAttempts] = useState<number | null>(null);
@@ -90,24 +86,6 @@ function AuthForm() {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-  };
-
-  // Fetch a new CAPTCHA challenge
-  const fetchNewCaptcha = async () => {
-    setCaptchaLoading(true);
-    try {
-      const res = await fetch("/api/auth/captcha?scope=customer");
-      const data = await res.json();
-      if (data.success) {
-        setCaptchaToken(data.captchaToken);
-        setCaptchaSvg(data.captchaSvg);
-        setCaptchaAnswer("");
-      }
-    } catch (err) {
-      console.error("Failed to load captcha:", err);
-    } finally {
-      setCaptchaLoading(false);
-    }
   };
 
   // Filter countries
@@ -201,18 +179,12 @@ function AuthForm() {
         router.push(redirectUrl);
       }, 700);
     } else {
-      if (requiresCaptcha && !captchaAnswer.trim()) {
-        setErrorMessage("Please enter the security verification code.");
-        return;
-      }
-
       setIsLoading(true);
-      const res = await login(
-        finalIdentifier,
-        password,
-        requiresCaptcha ? captchaToken : undefined,
-        requiresCaptcha ? captchaAnswer.trim() : undefined
-      );
+
+      // Execute Google reCAPTCHA v3 invisibly
+      const recaptchaToken = await executeRecaptcha("customer_login");
+
+      const res = await login(finalIdentifier, password, recaptchaToken || undefined);
 
       if (!res.success) {
         setErrorMessage(res.error || "Login failed. Please check your credentials.");
@@ -223,21 +195,9 @@ function AuthForm() {
           setLockoutRemainingSeconds(res.retryAfterSeconds);
         }
 
-        // Update remaining attempts if provided
+        // Update remaining attempts
         if (res.remainingAttempts !== undefined) {
           setRemainingAttempts(res.remainingAttempts);
-        }
-
-        // Check if CAPTCHA is now required
-        if (res.requiresCaptcha) {
-          setRequiresCaptcha(true);
-          if (res.captchaToken && res.captchaSvg) {
-            setCaptchaToken(res.captchaToken);
-            setCaptchaSvg(res.captchaSvg);
-            setCaptchaAnswer("");
-          } else {
-            fetchNewCaptcha();
-          }
         }
 
         setIsLoading(false);
@@ -319,7 +279,7 @@ function AuthForm() {
                 <span>Security Lockout: IP Restricted</span>
               </div>
               <p className="text-[11px] leading-relaxed text-rose-300/90">
-                10 incorrect password attempts detected. To safeguard accounts against unauthorized access, logins from your IP have been temporarily halted.
+                10 incorrect password attempts detected. To safeguard accounts against unauthorized access, logins from your IP have been temporarily restricted.
               </p>
               <div className="flex items-center gap-2 pt-1 font-mono text-xs font-semibold text-rose-200">
                 <Clock className="w-4 h-4 text-rose-400" />
@@ -531,63 +491,6 @@ function AuthForm() {
               </div>
             )}
 
-            {/* Interactive Bot Defense / CAPTCHA Challenge */}
-            {requiresCaptcha && activeTab === "login" && (
-              <div className="p-4 rounded-2xl bg-cyan-950/30 border border-cyan-500/30 space-y-3">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
-                    <ShieldCheck className="w-4 h-4 text-cyan-400" />
-                    <span>Security Verification</span>
-                  </label>
-                  <button
-                    type="button"
-                    onClick={fetchNewCaptcha}
-                    disabled={captchaLoading}
-                    className="text-[11px] text-cyan-400 hover:text-cyan-200 transition-colors flex items-center gap-1"
-                    title="Refresh Security Code"
-                  >
-                    <RotateCw className={`w-3.5 h-3.5 ${captchaLoading ? "animate-spin" : ""}`} />
-                    <span>Refresh Code</span>
-                  </button>
-                </div>
-
-                <div className="flex flex-col sm:flex-row items-center gap-3">
-                  {/* SVG CAPTCHA Challenge Image */}
-                  <div className="relative rounded-xl overflow-hidden border border-white/15 bg-black/40 shadow-inner flex items-center justify-center p-1">
-                    {captchaSvg ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={captchaSvg}
-                        alt="Security challenge code"
-                        className="h-12 w-auto select-none"
-                      />
-                    ) : (
-                      <div className="h-12 w-44 flex items-center justify-center text-[10px] text-slate-400 font-mono">
-                        Loading security code...
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Input for answer */}
-                  <input
-                    type="text"
-                    required
-                    maxLength={6}
-                    autoComplete="off"
-                    autoCorrect="off"
-                    autoCapitalize="characters"
-                    placeholder="Enter 5 characters"
-                    value={captchaAnswer}
-                    onChange={(e) => setCaptchaAnswer(e.target.value.toUpperCase())}
-                    className="flex-1 w-full glass-input px-3.5 py-3 rounded-xl text-center text-sm font-mono tracking-widest uppercase font-bold text-cyan-200"
-                  />
-                </div>
-                <p className="text-[10px] text-slate-400">
-                  Multiple failed attempts detected. Solve this puzzle to prove you are human.
-                </p>
-              </div>
-            )}
-
             {/* Submit Button */}
             <button
               type="submit"
@@ -603,7 +506,7 @@ function AuthForm() {
                 <>
                   <span>
                     {isLoading
-                      ? "Verifying..."
+                      ? "Verifying with Google reCAPTCHA..."
                       : activeTab === "login"
                       ? "Sign In to Account"
                       : "Create My Account"}
@@ -614,10 +517,33 @@ function AuthForm() {
             </button>
           </form>
 
-          {/* Privacy & Security reassurance */}
-          <div className="mt-6 pt-5 border-t border-white/10 flex items-center justify-center gap-2 text-[11px] text-slate-400">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>Protected by PremiKeys Anti-Brute Force Defense</span>
+          {/* Privacy & Google reCAPTCHA reassurance */}
+          <div className="mt-6 pt-5 border-t border-white/10 space-y-2 text-center">
+            <div className="flex items-center justify-center gap-2 text-[11px] text-slate-400">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <span>Protected by Google reCAPTCHA & PremiKeys Anti-Brute Force</span>
+            </div>
+            <p className="text-[10px] text-slate-500 leading-relaxed">
+              This site is protected by reCAPTCHA and the Google{" "}
+              <a
+                href="https://policies.google.com/privacy"
+                target="_blank"
+                rel="noreferrer"
+                className="text-slate-400 hover:text-cyan-400 underline underline-offset-2"
+              >
+                Privacy Policy
+              </a>{" "}
+              and{" "}
+              <a
+                href="https://policies.google.com/terms"
+                target="_blank"
+                rel="noreferrer"
+                className="text-slate-400 hover:text-cyan-400 underline underline-offset-2"
+              >
+                Terms of Service
+              </a>{" "}
+              apply.
+            </p>
           </div>
         </div>
 

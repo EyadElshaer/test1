@@ -13,12 +13,10 @@ export interface CustomerUser {
 export interface AuthLoginResponse {
   success: boolean;
   error?: string;
-  requiresCaptcha?: boolean;
   isLocked?: boolean;
   remainingAttempts?: number;
   retryAfterSeconds?: number;
-  captchaToken?: string;
-  captchaSvg?: string;
+  recaptchaFailed?: boolean;
 }
 
 interface AuthContextType {
@@ -27,8 +25,7 @@ interface AuthContextType {
   login: (
     identifier: string,
     password: string,
-    captchaToken?: string,
-    captchaAnswer?: string
+    recaptchaToken?: string
   ) => Promise<AuthLoginResponse>;
   register: (data: {
     name: string;
@@ -89,8 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (
     identifier: string,
     password: string,
-    captchaToken?: string,
-    captchaAnswer?: string
+    recaptchaToken?: string
   ): Promise<AuthLoginResponse> => {
     try {
       const res = await fetch("/api/auth/login", {
@@ -99,8 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({
           identifier,
           password,
-          captchaToken,
-          captchaAnswer,
+          recaptchaToken,
         }),
       });
       const data = await res.json();
@@ -109,12 +104,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return {
           success: false,
           error: data.error || "Login failed",
-          requiresCaptcha: data.requiresCaptcha,
           isLocked: data.isLocked,
           remainingAttempts: data.remainingAttempts,
           retryAfterSeconds: data.retryAfterSeconds,
-          captchaToken: data.captchaToken,
-          captchaSvg: data.captchaSvg,
+          recaptchaFailed: data.recaptchaFailed,
         };
       }
 
