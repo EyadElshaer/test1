@@ -104,8 +104,8 @@ export async function POST(req: Request) {
       }
     }
 
-    // Create persistent session cookie (stays logged in)
-    await createUserSession(newUser.id);
+    // Create persistent session cookie (stays logged in) with device/location meta
+    await createUserSession(newUser.id, req.headers);
 
     return NextResponse.json({
       success: true,

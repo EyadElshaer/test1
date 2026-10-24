@@ -31,6 +31,14 @@ import {
   AlertTriangle,
   RotateCcw,
   MessageCircle,
+  Laptop,
+  Smartphone,
+  Tablet,
+  Globe,
+  MapPin,
+  LogOut,
+  Monitor,
+  Wifi,
 } from "lucide-react";
 
 export default function AdminCustomersPage() {
@@ -51,6 +59,62 @@ export default function AdminCustomersPage() {
   // Customer Deletion Modal
   const [customerToDelete, setCustomerToDelete] = useState<any | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Session Revocation State
+  const [isRevokingSession, setIsRevokingSession] = useState<string | null>(null);
+  const [sessionFeedback, setSessionFeedback] = useState<string | null>(null);
+
+  const getCountryFlag = (country?: string) => {
+    if (!country) return "🌐";
+    const c = country.toLowerCase();
+    if (c.includes("egypt") || c === "eg") return "🇪🇬";
+    if (c.includes("saudi") || c === "sa") return "🇸🇦";
+    if (c.includes("emirates") || c === "ae") return "🇦🇪";
+    if (c.includes("united states") || c === "us") return "🇺🇸";
+    if (c.includes("united kingdom") || c === "gb" || c === "uk") return "🇬🇧";
+    if (c.includes("germany") || c === "de") return "🇩🇪";
+    if (c.includes("france") || c === "fr") return "🇫🇷";
+    if (c.includes("canada") || c === "ca") return "🇨🇦";
+    if (c.includes("turkey") || c === "tr") return "🇹🇷";
+    if (c.includes("kuwait") || c === "kw") return "🇰🇼";
+    if (c.includes("qatar") || c === "qa") return "🇶🇦";
+    return "🌐";
+  };
+
+  const getDeviceIcon = (device?: string) => {
+    const d = (device || "").toLowerCase();
+    if (d.includes("mobile") || d.includes("phone")) return <Smartphone className="w-4 h-4 text-emerald-400" />;
+    if (d.includes("tablet") || d.includes("ipad")) return <Tablet className="w-4 h-4 text-emerald-400" />;
+    return <Laptop className="w-4 h-4 text-emerald-400" />;
+  };
+
+  const handleRevokeSession = async (customerId: string, sessionId?: string, terminateAll?: boolean) => {
+    if (terminateAll) {
+      if (!confirm("Are you sure you want to terminate all active sessions for this customer? They will be immediately logged out on all devices.")) {
+        return;
+      }
+    }
+    setIsRevokingSession(sessionId || "all");
+    setSessionFeedback(null);
+    try {
+      const res = await fetch(`/api/admin/customers/${customerId}/sessions`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId, terminateAll }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to terminate session.");
+      }
+      setSessionFeedback(data.message);
+      setTimeout(() => setSessionFeedback(null), 3000);
+      await fetchCustomers(search);
+    } catch (err: any) {
+      alert(err.message || "Failed to revoke session.");
+    } finally {
+      setIsRevokingSession(null);
+    }
+  };
 
   const fetchCustomers = async (query = "") => {
     setLoading(true);
@@ -316,9 +380,17 @@ export default function AdminCustomersPage() {
                             <span className="font-bold text-white block group-hover:text-cyan-300 transition-colors text-sm">
                               {c.name}
                             </span>
-                            <span className="text-[10px] text-slate-400 font-mono">
-                              ID: {c.id.substring(0, 8)}...
-                            </span>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-[10px] text-slate-400 font-mono">
+                                ID: {c.id.substring(0, 8)}...
+                              </span>
+                              {c.activeSessionsCount > 0 && (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                  {c.activeSessionsCount} active
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </td>
@@ -853,7 +925,134 @@ export default function AdminCustomersPage() {
               </div>
 
               {/* ================================================================= */}
-              {/* 2. EVERYTHING BOUGHT & DISPATCHED KEYS */}
+              {/* 2. ACTIVE SESSIONS & CONNECTED DEVICES */}
+              {/* ================================================================= */}
+              <div className="p-5 rounded-2xl bg-gradient-to-b from-emerald-500/[0.04] to-transparent border border-emerald-500/25 space-y-3.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-300">
+                      <Monitor className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                        <span>Active Sessions & Connected Devices</span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                          {selectedCustomer.sessions?.length ?? selectedCustomer.activeSessionsCount ?? 0} active
+                        </span>
+                      </h3>
+                      <p className="text-[10px] text-slate-400 font-mono mt-0.5">
+                        Identifies device type, OS, browser, IP address, and geographic location
+                      </p>
+                    </div>
+                  </div>
+
+                  {selectedCustomer.sessions && selectedCustomer.sessions.length > 0 && (
+                    <button
+                      type="button"
+                      disabled={isRevokingSession !== null}
+                      onClick={() => handleRevokeSession(selectedCustomer.id, undefined, true)}
+                      className="px-3 py-1.5 rounded-xl text-[11px] font-semibold bg-rose-500/10 text-rose-300 border border-rose-500/25 hover:bg-rose-500/20 transition-all flex items-center gap-1.5 self-start sm:self-auto disabled:opacity-50"
+                    >
+                      <LogOut className="w-3 h-3" />
+                      <span>{isRevokingSession === "all" ? "Terminating..." : "Terminate All Sessions"}</span>
+                    </button>
+                  )}
+                </div>
+
+                {sessionFeedback && (
+                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    <span>{sessionFeedback}</span>
+                  </div>
+                )}
+
+                {!selectedCustomer.sessions || selectedCustomer.sessions.length === 0 ? (
+                  <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 text-center text-xs text-slate-400">
+                    🔒 Customer has no active signed-in sessions right now.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {selectedCustomer.sessions.map((sess: any) => (
+                      <div
+                        key={sess.id}
+                        className="p-3.5 rounded-xl bg-black/40 border border-white/10 hover:border-emerald-500/30 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                      >
+                        {/* Device & OS details */}
+                        <div className="flex items-start sm:items-center gap-3">
+                          <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-white shrink-0 mt-0.5 sm:mt-0">
+                            {getDeviceIcon(sess.device)}
+                          </div>
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-bold text-white">
+                                {sess.device || "Desktop"} • {sess.os || "Unknown OS"}
+                              </span>
+                              <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
+                                {sess.browser || "Browser"}
+                              </span>
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                Active
+                              </span>
+                            </div>
+
+                            {/* Location and IP */}
+                            <div className="flex items-center gap-2.5 text-[11px] text-slate-300 flex-wrap font-mono pt-0.5">
+                              <span className="inline-flex items-center gap-1 text-slate-200">
+                                <span className="text-sm">{getCountryFlag(sess.country)}</span>
+                                <strong>{sess.city ? `${sess.city}, ` : ""}{sess.country || "Unknown Location"}</strong>
+                              </span>
+                              <span className="text-slate-600">•</span>
+                              <span className="inline-flex items-center gap-1 text-slate-400">
+                                <MapPin className="w-3 h-3 text-cyan-400" />
+                                <span>IP: {sess.ipAddress || "Unknown"}</span>
+                                {sess.ipAddress && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopy(sess.ipAddress, `ip_${sess.id}`)}
+                                    className="text-slate-500 hover:text-white ml-0.5"
+                                    title="Copy IP Address"
+                                  >
+                                    {copiedText === `ip_${sess.id}` ? (
+                                      <Check className="w-2.5 h-2.5 text-emerald-400" />
+                                    ) : (
+                                      <Copy className="w-2.5 h-2.5" />
+                                    )}
+                                  </button>
+                                )}
+                              </span>
+                            </div>
+
+                            {/* Timing */}
+                            <div className="text-[10px] text-slate-400 font-mono flex items-center gap-2 flex-wrap pt-0.5">
+                              <span>Signed in: {new Date(sess.createdAt).toLocaleDateString()} {new Date(sess.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                              <span className="text-slate-600">•</span>
+                              <span>Last active: {new Date(sess.lastActiveAt).toLocaleString()}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Revoke single session button */}
+                        <div className="self-end sm:self-center shrink-0">
+                          <button
+                            type="button"
+                            disabled={isRevokingSession !== null}
+                            onClick={() => handleRevokeSession(selectedCustomer.id, sess.id, false)}
+                            className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-rose-500/10 text-rose-300 border border-rose-500/20 hover:bg-rose-500/20 transition-all flex items-center gap-1.5 disabled:opacity-50"
+                            title="Revoke and force sign out this session"
+                          >
+                            <LogOut className="w-3 h-3" />
+                            <span>{isRevokingSession === sess.id ? "Revoking..." : "Revoke"}</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* ================================================================= */}
+              {/* 3. EVERYTHING BOUGHT & DISPATCHED KEYS */}
               {/* ================================================================= */}
               <div className="space-y-3">
                 <div className="flex items-center gap-2">

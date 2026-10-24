@@ -25,12 +25,20 @@ model Admin {
 }
 
 model AdminSession {
-  id        String   @id @default(cuid())
-  adminId   String
-  token     String   @unique
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-  admin     Admin    @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  id           String   @id @default(cuid())
+  adminId      String
+  token        String   @unique
+  ipAddress    String?
+  userAgent    String?
+  device       String?  // Desktop, Mobile, Tablet
+  os           String?  // Windows, macOS, Linux, iOS, Android
+  browser      String?  // Chrome, Safari, Edge, Firefox, etc.
+  country      String?  // Country code or name
+  city         String?  // City name
+  lastActiveAt DateTime @default(now())
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  admin        Admin    @relation(fields: [adminId], references: [id], onDelete: Cascade)
 
   @@index([adminId])
 }
@@ -65,12 +73,20 @@ model User {
 }
 
 model UserSession {
-  id        String   @id @default(cuid())
-  userId    String
-  token     String   @unique
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id           String   @id @default(cuid())
+  userId       String
+  token        String   @unique
+  ipAddress    String?
+  userAgent    String?
+  device       String?  // Desktop, Mobile, Tablet
+  os           String?  // Windows, macOS, Linux, iOS, Android
+  browser      String?  // Chrome, Safari, Edge, Firefox, etc.
+  country      String?  // Country code or name
+  city         String?  // City name
+  lastActiveAt DateTime @default(now())
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }

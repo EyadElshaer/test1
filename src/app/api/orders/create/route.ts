@@ -201,7 +201,7 @@ export async function POST(req: Request) {
           orderUserId = user.id;
           const isMatch = await bcrypt.compare(password, user.passwordHash);
           if (isMatch) {
-            await createUserSession(user.id);
+            await createUserSession(user.id, req.headers);
           }
         } else {
           const passwordHash = await bcrypt.hash(password, 10);
@@ -214,7 +214,7 @@ export async function POST(req: Request) {
             },
           });
           orderUserId = user.id;
-          await createUserSession(user.id);
+          await createUserSession(user.id, req.headers);
         }
       } catch (authErr) {
         console.warn("Auto-signup note:", authErr);
