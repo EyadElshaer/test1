@@ -5,9 +5,21 @@ import { generateUniqueOrderNumber } from "@/lib/orderNumber";
 import { normalizePhoneNumber } from "@/lib/countryCodes";
 import { getUserSession, createUserSession } from "@/lib/userAuth";
 import { sendTelegramOrderAlert } from "@/lib/telegram";
+import { sanitizeString } from "@/lib/sanitizer";
+import { getClientIp } from "@/lib/security";
+import { checkRateLimit } from "@/lib/rateLimit";
 
 export async function POST(req: Request) {
   try {
+    const ip = getClientIp(req);
+    const rateCheck = checkRateLimit(`order_create_${ip}`, 15, 10 * 60 * 1000);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: `Too many order creation requests. Please wait ${rateCheck.retryAfterSec} seconds before trying again.` },
+        { status: 429 }
+      );
+    }
+
     const body = await req.json();
     const {
       customerName,
@@ -25,14 +37,19 @@ export async function POST(req: Request) {
       password,
     } = body;
 
+    const cleanCustomerName = sanitizeString(customerName, 80);
+    const cleanCustomerEmail = sanitizeString(customerEmail, 100).toLowerCase();
+    const cleanCustomerNotes = customerNotes ? sanitizeString(customerNotes, 500) : null;
+    const cleanPaymentRef = paymentReference ? sanitizeString(paymentReference, 100) : null;
+
     // 1. Validate Customer Information
-    if (!customerName || typeof customerName !== "string" || customerName.trim().length < 2) {
+    if (!cleanCustomerName || cleanCustomerName.length < 2) {
       return NextResponse.json({ error: "Please enter your full name." }, { status: 400 });
     }
     if (!customerPhone || typeof customerPhone !== "string" || customerPhone.trim().length < 6) {
       return NextResponse.json({ error: "Please enter a valid phone number." }, { status: 400 });
     }
-    if (!customerEmail || typeof customerEmail !== "string" || !customerEmail.includes("@")) {
+    if (!cleanCustomerEmail || !cleanCustomerEmail.includes("@")) {
       return NextResponse.json({ error: "Please enter a valid email address." }, { status: 400 });
     }
 
@@ -207,7 +224,7 @@ export async function POST(req: Request) {
           const passwordHash = await bcrypt.hash(password, 10);
           user = await prisma.user.create({
             data: {
-              name: customerName.trim(),
+              name: cleanCustomerName,
               email: cleanEmail,
               phone: normalizedPhone,
               passwordHash,
@@ -228,15 +245,15 @@ export async function POST(req: Request) {
         data: {
           orderNumber,
           userId: orderUserId,
-          customerName: customerName.trim(),
+          customerName: cleanCustomerName,
           customerPhone: normalizedPhone,
           countryCode: countryCode || "EG",
-          customerEmail: customerEmail.trim().toLowerCase(),
+          customerEmail: cleanCustomerEmail,
           status: "PENDING",
           paymentStatus: "AWAITING_VERIFICATION",
           paymentMethodId: paymentMethod.id,
           paymentMethodName: paymentMethod.name,
-          paymentReference: paymentReference?.trim() || null,
+          paymentReference: cleanPaymentRef,
           paymentScreenshotUrl: paymentScreenshotUrl || null,
           subtotal: serverSubtotal,
           discountAmount: promoDiscountAmount,
@@ -244,7 +261,7 @@ export async function POST(req: Request) {
           promoCodeCode: appliedPromoRecord?.code || null,
           totalAmount: finalTotal,
           currency: paymentMethod.currency || "EGP",
-          customerNotes: customerNotes?.trim() || null,
+          customerNotes: cleanCustomerNotes,
           items: {
             create: orderItemsSnapshot.map((item) => ({
               productId: item.productId,

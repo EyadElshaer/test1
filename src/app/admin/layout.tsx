@@ -24,6 +24,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Users,
+  ShieldAlert,
 } from "lucide-react";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -153,6 +154,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: "Promo Codes", href: "/admin/promo-codes", icon: Tag, permissionKey: "promo-codes" },
     { name: "FAQ Management", href: "/admin/faq", icon: HelpCircle, permissionKey: "faq" },
     { name: "Admin Staff", href: "/admin/staff", icon: ShieldCheck, permissionKey: "staff" },
+    { name: "Security Center", href: "/admin/security", icon: ShieldAlert, permissionKey: "security" },
     { name: "Store Settings", href: "/admin/settings", icon: Settings, permissionKey: "settings" },
   ];
 

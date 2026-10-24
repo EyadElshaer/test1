@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { checkRateLimit } from "@/lib/rateLimit";
+import { getClientIp } from "@/lib/security";
+import { sanitizeString } from "@/lib/sanitizer";
 
 export async function POST(req: Request) {
   try {
-    const ip = req.headers.get("x-forwarded-for") || "unknown";
+    const ip = getClientIp(req);
     const rateCheck = checkRateLimit(`lookup_${ip}`, 15, 60 * 1000);
     if (!rateCheck.allowed) {
       return NextResponse.json(
@@ -21,7 +23,7 @@ export async function POST(req: Request) {
 
     // 1. Order Number Lookup
     if (orderNumber && typeof orderNumber === "string") {
-      const cleanOrderNumber = orderNumber.trim().toUpperCase();
+      const cleanOrderNumber = sanitizeString(orderNumber, 30).toUpperCase();
       const order = await prisma.order.findUnique({
         where: { orderNumber: cleanOrderNumber },
         include: {

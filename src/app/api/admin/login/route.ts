@@ -2,39 +2,144 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
 import { createAdminSession, logAdminAudit } from "@/lib/auth";
-import { checkRateLimit } from "@/lib/rateLimit";
+import { sanitizeString } from "@/lib/sanitizer";
+import { generateCaptcha, verifyCaptcha } from "@/lib/captcha";
+import {
+  getClientIp,
+  checkLoginSecurity,
+  recordFailedLogin,
+  recordSuccessfulLogin,
+  applyTarpitDelay,
+} from "@/lib/security";
 
 export async function POST(req: Request) {
   try {
-    const ip = req.headers.get("x-forwarded-for") || "unknown";
-    const rateCheck = checkRateLimit(`admin_login_${ip}`, 6, 60 * 1000); // 6 attempts per minute
-    if (!rateCheck.allowed) {
+    const ip = getClientIp(req);
+    const body = await req.json();
+    const { username, password, captchaToken, captchaAnswer } = body;
+
+    const cleanUsername = sanitizeString(username, 50);
+
+    // 1. Initial IP & Account Lockout Check
+    const initialSecurity = checkLoginSecurity(ip, cleanUsername || undefined, "admin");
+    if (initialSecurity.isLocked) {
+      await logAdminAudit(
+        null,
+        "ADMIN_LOGIN_BLOCKED",
+        `Blocked attempt from restricted IP: ${ip} (Target: ${cleanUsername})`,
+        ip
+      );
+
       return NextResponse.json(
-        { error: `Too many login attempts. Please wait ${rateCheck.retryAfterSec} seconds before trying again.` },
+        {
+          error: initialSecurity.message,
+          isLocked: true,
+          retryAfterSeconds: initialSecurity.retryAfterSeconds,
+          remainingAttempts: 0,
+        },
         { status: 429 }
       );
     }
 
-    const { username, password } = await req.json();
-
-    if (!username || !password) {
+    // 2. Validate basic input fields
+    if (!cleanUsername || !password) {
       return NextResponse.json({ error: "Username and password are required." }, { status: 400 });
     }
 
+    // 3. CAPTCHA verification if required
+    if (initialSecurity.requiresCaptcha) {
+      if (!captchaToken || !captchaAnswer) {
+        const freshCaptcha = generateCaptcha();
+        return NextResponse.json(
+          {
+            error: "Security challenge required. Please solve the puzzle below to continue.",
+            requiresCaptcha: true,
+            captchaToken: freshCaptcha.token,
+            captchaSvg: freshCaptcha.svgDataUrl,
+            remainingAttempts: initialSecurity.remainingAttempts,
+          },
+          { status: 403 }
+        );
+      }
+
+      const captchaCheck = verifyCaptcha(captchaToken, captchaAnswer);
+      if (!captchaCheck.valid) {
+        const freshCaptcha = generateCaptcha();
+        return NextResponse.json(
+          {
+            error: captchaCheck.error || "Incorrect verification code.",
+            requiresCaptcha: true,
+            captchaToken: freshCaptcha.token,
+            captchaSvg: freshCaptcha.svgDataUrl,
+            remainingAttempts: initialSecurity.remainingAttempts,
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    // 4. Find Admin in Database
     const admin = await prisma.admin.findUnique({
-      where: { username: username.trim() },
+      where: { username: cleanUsername },
     });
 
     if (!admin) {
-      await logAdminAudit(null, "LOGIN_FAILED", `Failed login attempt for username: ${username}`, ip);
-      return NextResponse.json({ error: "Invalid username or password." }, { status: 401 });
+      const failResult = await recordFailedLogin(ip, cleanUsername, "admin");
+      await logAdminAudit(null, "LOGIN_FAILED", `Failed admin login: user "${cleanUsername}" not found`, ip);
+
+      let freshCaptcha: any = null;
+      if (failResult.requiresCaptcha) {
+        freshCaptcha = generateCaptcha();
+      }
+
+      const status = failResult.isLocked ? 429 : 401;
+      return NextResponse.json(
+        {
+          error: failResult.isLocked ? failResult.message : "Invalid username or password.",
+          isLocked: failResult.isLocked,
+          requiresCaptcha: failResult.requiresCaptcha,
+          remainingAttempts: failResult.remainingAttempts,
+          retryAfterSeconds: failResult.retryAfterSeconds,
+          captchaToken: freshCaptcha?.token,
+          captchaSvg: freshCaptcha?.svgDataUrl,
+        },
+        { status }
+      );
     }
 
+    // 5. Verify Password
     const isMatch = await bcrypt.compare(password, admin.passwordHash);
+
     if (!isMatch) {
-      await logAdminAudit(admin.id, "LOGIN_FAILED", "Incorrect password", ip);
-      return NextResponse.json({ error: "Invalid username or password." }, { status: 401 });
+      // Artificial tarpit delay against automated password guessing
+      const failCount = 5 - initialSecurity.remainingAttempts;
+      await applyTarpitDelay(failCount);
+
+      const failResult = await recordFailedLogin(ip, cleanUsername, "admin");
+      await logAdminAudit(admin.id, "LOGIN_FAILED", `Incorrect password for admin user "${cleanUsername}"`, ip);
+
+      let freshCaptcha: any = null;
+      if (failResult.requiresCaptcha) {
+        freshCaptcha = generateCaptcha();
+      }
+
+      const status = failResult.isLocked ? 429 : 401;
+      return NextResponse.json(
+        {
+          error: failResult.message,
+          isLocked: failResult.isLocked,
+          requiresCaptcha: failResult.requiresCaptcha,
+          remainingAttempts: failResult.remainingAttempts,
+          retryAfterSeconds: failResult.retryAfterSeconds,
+          captchaToken: freshCaptcha?.token,
+          captchaSvg: freshCaptcha?.svgDataUrl,
+        },
+        { status }
+      );
     }
+
+    // 6. Successful Authentication -> Clear security strikes
+    recordSuccessfulLogin(ip, cleanUsername, "admin");
 
     // Create session & set HttpOnly cookie
     await createAdminSession(admin.id, ip);

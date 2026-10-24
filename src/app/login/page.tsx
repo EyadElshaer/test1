@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, Suspense } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -15,7 +15,9 @@ import {
   ShieldCheck,
   AlertCircle,
   CheckCircle2,
-  Sparkles,
+  RotateCw,
+  ShieldAlert,
+  Clock,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { COUNTRY_CODES, CountryCode } from "@/lib/countryCodes";
@@ -44,10 +46,69 @@ function AuthForm() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
+  // Security & Bot Defense state
+  const [requiresCaptcha, setRequiresCaptcha] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaSvg, setCaptchaSvg] = useState("");
+  const [captchaAnswer, setCaptchaAnswer] = useState("");
+  const [captchaLoading, setCaptchaLoading] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
+  const [lockoutRemainingSeconds, setLockoutRemainingSeconds] = useState(0);
+  const [remainingAttempts, setRemainingAttempts] = useState<number | null>(null);
+
   // Status
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+
+  // Lockout countdown timer
+  useEffect(() => {
+    if (lockoutRemainingSeconds <= 0) {
+      if (isLocked) {
+        setIsLocked(false);
+        setErrorMessage("");
+      }
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setLockoutRemainingSeconds((prev) => {
+        if (prev <= 1) {
+          setIsLocked(false);
+          setErrorMessage("");
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [lockoutRemainingSeconds, isLocked]);
+
+  // Format lockout timer as MM:SS
+  const formatLockoutTimer = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  // Fetch a new CAPTCHA challenge
+  const fetchNewCaptcha = async () => {
+    setCaptchaLoading(true);
+    try {
+      const res = await fetch("/api/auth/captcha?scope=customer");
+      const data = await res.json();
+      if (data.success) {
+        setCaptchaToken(data.captchaToken);
+        setCaptchaSvg(data.captchaSvg);
+        setCaptchaAnswer("");
+      }
+    } catch (err) {
+      console.error("Failed to load captcha:", err);
+    } finally {
+      setCaptchaLoading(false);
+    }
+  };
 
   // Filter countries
   const filteredCountries = COUNTRY_CODES.filter(
@@ -59,7 +120,6 @@ function AuthForm() {
   // Handle phone input with automatic leading zero(s) removal
   const handlePhoneChange = (val: string) => {
     let raw = val.trim();
-    // If customer pasted full international format e.g. +20..., detect country
     if (raw.startsWith("+")) {
       const match = COUNTRY_CODES.find((c) => raw.startsWith(c.dialCode));
       if (match) {
@@ -67,15 +127,13 @@ function AuthForm() {
         raw = raw.slice(match.dialCode.length);
       }
     }
-    // Remove all non-digits
     let digits = raw.replace(/\D/g, "");
-    // Auto-delete leading zeros (e.g. 012... -> 12...)
     digits = digits.replace(/^0+/, "");
     setPhoneInput(digits);
   };
 
   // If already logged in, redirect
-  React.useEffect(() => {
+  useEffect(() => {
     if (user) {
       router.replace(redirectUrl);
     }
@@ -85,6 +143,11 @@ function AuthForm() {
     e.preventDefault();
     setErrorMessage("");
     setSuccessMessage("");
+
+    if (isLocked) {
+      setErrorMessage(`IP temporarily restricted. Please wait ${formatLockoutTimer(lockoutRemainingSeconds)}.`);
+      return;
+    }
 
     const finalIdentifier =
       identifierType === "phone"
@@ -138,11 +201,45 @@ function AuthForm() {
         router.push(redirectUrl);
       }, 700);
     } else {
+      if (requiresCaptcha && !captchaAnswer.trim()) {
+        setErrorMessage("Please enter the security verification code.");
+        return;
+      }
+
       setIsLoading(true);
-      const res = await login(finalIdentifier, password);
+      const res = await login(
+        finalIdentifier,
+        password,
+        requiresCaptcha ? captchaToken : undefined,
+        requiresCaptcha ? captchaAnswer.trim() : undefined
+      );
 
       if (!res.success) {
         setErrorMessage(res.error || "Login failed. Please check your credentials.");
+
+        // Check if locked out
+        if (res.isLocked && res.retryAfterSeconds) {
+          setIsLocked(true);
+          setLockoutRemainingSeconds(res.retryAfterSeconds);
+        }
+
+        // Update remaining attempts if provided
+        if (res.remainingAttempts !== undefined) {
+          setRemainingAttempts(res.remainingAttempts);
+        }
+
+        // Check if CAPTCHA is now required
+        if (res.requiresCaptcha) {
+          setRequiresCaptcha(true);
+          if (res.captchaToken && res.captchaSvg) {
+            setCaptchaToken(res.captchaToken);
+            setCaptchaSvg(res.captchaSvg);
+            setCaptchaAnswer("");
+          } else {
+            fetchNewCaptcha();
+          }
+        }
+
         setIsLoading(false);
         return;
       }
@@ -214,7 +311,34 @@ function AuthForm() {
 
         {/* Auth Card */}
         <div className="glass-card rounded-3xl p-6 sm:p-8 border border-white/10 bg-[#070d1d]/90 shadow-2xl relative">
-          {errorMessage && (
+          {/* Lockout Warning Banner */}
+          {isLocked && (
+            <div className="mb-5 p-4 rounded-2xl bg-rose-500/15 border border-rose-500/40 text-rose-300 space-y-2">
+              <div className="flex items-center gap-2.5 font-bold text-xs text-rose-200">
+                <ShieldAlert className="w-5 h-5 text-rose-400 shrink-0" />
+                <span>Security Lockout: IP Restricted</span>
+              </div>
+              <p className="text-[11px] leading-relaxed text-rose-300/90">
+                10 incorrect password attempts detected. To safeguard accounts against unauthorized access, logins from your IP have been temporarily halted.
+              </p>
+              <div className="flex items-center gap-2 pt-1 font-mono text-xs font-semibold text-rose-200">
+                <Clock className="w-4 h-4 text-rose-400" />
+                <span>Lockout expires in: {formatLockoutTimer(lockoutRemainingSeconds)}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Remaining Attempts Warning */}
+          {!isLocked && remainingAttempts !== null && remainingAttempts <= 5 && remainingAttempts > 0 && activeTab === "login" && (
+            <div className="mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2 font-medium">
+              <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>
+                {remainingAttempts} attempt{remainingAttempts === 1 ? "" : "s"} remaining before your IP is restricted for 15 minutes.
+              </span>
+            </div>
+          )}
+
+          {errorMessage && !isLocked && (
             <div className="mb-5 p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{errorMessage}</span>
@@ -407,21 +531,93 @@ function AuthForm() {
               </div>
             )}
 
+            {/* Interactive Bot Defense / CAPTCHA Challenge */}
+            {requiresCaptcha && activeTab === "login" && (
+              <div className="p-4 rounded-2xl bg-cyan-950/30 border border-cyan-500/30 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-cyan-400" />
+                    <span>Security Verification</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={fetchNewCaptcha}
+                    disabled={captchaLoading}
+                    className="text-[11px] text-cyan-400 hover:text-cyan-200 transition-colors flex items-center gap-1"
+                    title="Refresh Security Code"
+                  >
+                    <RotateCw className={`w-3.5 h-3.5 ${captchaLoading ? "animate-spin" : ""}`} />
+                    <span>Refresh Code</span>
+                  </button>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center gap-3">
+                  {/* SVG CAPTCHA Challenge Image */}
+                  <div className="relative rounded-xl overflow-hidden border border-white/15 bg-black/40 shadow-inner flex items-center justify-center p-1">
+                    {captchaSvg ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={captchaSvg}
+                        alt="Security challenge code"
+                        className="h-12 w-auto select-none"
+                      />
+                    ) : (
+                      <div className="h-12 w-44 flex items-center justify-center text-[10px] text-slate-400 font-mono">
+                        Loading security code...
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Input for answer */}
+                  <input
+                    type="text"
+                    required
+                    maxLength={6}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="characters"
+                    placeholder="Enter 5 characters"
+                    value={captchaAnswer}
+                    onChange={(e) => setCaptchaAnswer(e.target.value.toUpperCase())}
+                    className="flex-1 w-full glass-input px-3.5 py-3 rounded-xl text-center text-sm font-mono tracking-widest uppercase font-bold text-cyan-200"
+                  />
+                </div>
+                <p className="text-[10px] text-slate-400">
+                  Multiple failed attempts detected. Solve this puzzle to prove you are human.
+                </p>
+              </div>
+            )}
+
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || isLocked}
               className="w-full mt-2 py-3 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-98"
             >
-              <span>{isLoading ? "Please wait..." : activeTab === "login" ? "Sign In to Account" : "Create My Account"}</span>
-              <ArrowRight className="w-4 h-4" />
+              {isLocked ? (
+                <>
+                  <Lock className="w-4 h-4" />
+                  <span>IP Restricted ({formatLockoutTimer(lockoutRemainingSeconds)})</span>
+                </>
+              ) : (
+                <>
+                  <span>
+                    {isLoading
+                      ? "Verifying..."
+                      : activeTab === "login"
+                      ? "Sign In to Account"
+                      : "Create My Account"}
+                  </span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
             </button>
           </form>
 
           {/* Privacy & Security reassurance */}
           <div className="mt-6 pt-5 border-t border-white/10 flex items-center justify-center gap-2 text-[11px] text-slate-400">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>Secure 256-bit encrypted authentication</span>
+            <span>Protected by PremiKeys Anti-Brute Force Defense</span>
           </div>
         </div>
 

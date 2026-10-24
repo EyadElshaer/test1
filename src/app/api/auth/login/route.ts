@@ -2,12 +2,40 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
 import { createUserSession, normalizePhone, isEmail } from "@/lib/userAuth";
+import { sanitizeString } from "@/lib/sanitizer";
+import { generateCaptcha, verifyCaptcha } from "@/lib/captcha";
+import {
+  getClientIp,
+  checkLoginSecurity,
+  recordFailedLogin,
+  recordSuccessfulLogin,
+  applyTarpitDelay,
+} from "@/lib/security";
 
 export async function POST(req: Request) {
   try {
-    const { identifier, password } = await req.json();
+    const ip = getClientIp(req);
+    const body = await req.json();
+    const { identifier, password, captchaToken, captchaAnswer } = body;
 
-    if (!identifier || !identifier.trim()) {
+    const trimmed = sanitizeString(identifier, 100);
+
+    // 1. Initial IP & Account Lockout Check
+    const initialSecurity = checkLoginSecurity(ip, trimmed || undefined, "customer");
+    if (initialSecurity.isLocked) {
+      return NextResponse.json(
+        {
+          error: initialSecurity.message,
+          isLocked: true,
+          retryAfterSeconds: initialSecurity.retryAfterSeconds,
+          remainingAttempts: 0,
+        },
+        { status: 429 }
+      );
+    }
+
+    // 2. Validate basic input fields
+    if (!trimmed) {
       return NextResponse.json(
         { error: "Please enter your email address or phone number." },
         { status: 400 }
@@ -15,19 +43,52 @@ export async function POST(req: Request) {
     }
 
     if (!password) {
-      return NextResponse.json({ error: "Please enter your password." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Please enter your password." },
+        { status: 400 }
+      );
     }
 
-    const trimmed = identifier.trim();
-    let user: any = null;
+    // 3. CAPTCHA verification if required
+    if (initialSecurity.requiresCaptcha) {
+      if (!captchaToken || !captchaAnswer) {
+        const freshCaptcha = generateCaptcha();
+        return NextResponse.json(
+          {
+            error: "Security verification required. Please enter the characters shown below.",
+            requiresCaptcha: true,
+            captchaToken: freshCaptcha.token,
+            captchaSvg: freshCaptcha.svgDataUrl,
+            remainingAttempts: initialSecurity.remainingAttempts,
+          },
+          { status: 403 }
+        );
+      }
 
+      const captchaCheck = verifyCaptcha(captchaToken, captchaAnswer);
+      if (!captchaCheck.valid) {
+        const freshCaptcha = generateCaptcha();
+        return NextResponse.json(
+          {
+            error: captchaCheck.error || "Incorrect verification code. Please try again.",
+            requiresCaptcha: true,
+            captchaToken: freshCaptcha.token,
+            captchaSvg: freshCaptcha.svgDataUrl,
+            remainingAttempts: initialSecurity.remainingAttempts,
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    // 4. Look up user account
+    let user: any = null;
     if (isEmail(trimmed)) {
       user = await prisma.user.findUnique({
         where: { email: trimmed.toLowerCase() },
       });
     } else {
       const normalized = normalizePhone(trimmed);
-      // Search by normalized phone or exact string
       user = await prisma.user.findFirst({
         where: {
           OR: [{ phone: normalized }, { phone: trimmed }],
@@ -36,22 +97,64 @@ export async function POST(req: Request) {
     }
 
     if (!user) {
+      // Record failed attempt against this IP to stop blind enumeration
+      const failResult = await recordFailedLogin(ip, trimmed, "customer");
+      let freshCaptcha: any = null;
+      if (failResult.requiresCaptcha) {
+        freshCaptcha = generateCaptcha();
+      }
+
+      const status = failResult.isLocked ? 429 : 401;
       return NextResponse.json(
-        { error: "No account found with this email or phone number." },
-        { status: 401 }
+        {
+          error: failResult.isLocked
+            ? failResult.message
+            : "No account found with this email or phone number.",
+          isLocked: failResult.isLocked,
+          requiresCaptcha: failResult.requiresCaptcha,
+          remainingAttempts: failResult.remainingAttempts,
+          retryAfterSeconds: failResult.retryAfterSeconds,
+          captchaToken: freshCaptcha?.token,
+          captchaSvg: freshCaptcha?.svgDataUrl,
+        },
+        { status }
       );
     }
 
-    // Verify password
+    // 5. Verify Password with bcrypt
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+
     if (!isPasswordValid) {
+      // Artificial tarpit delay if repeated failures to defeat automated password cracking
+      const failCount = 10 - initialSecurity.remainingAttempts;
+      await applyTarpitDelay(failCount);
+
+      // Record failed login attempt
+      const failResult = await recordFailedLogin(ip, trimmed, "customer");
+      let freshCaptcha: any = null;
+      if (failResult.requiresCaptcha) {
+        freshCaptcha = generateCaptcha();
+      }
+
+      const status = failResult.isLocked ? 429 : 401;
       return NextResponse.json(
-        { error: "Incorrect password. Please try again." },
-        { status: 401 }
+        {
+          error: failResult.message,
+          isLocked: failResult.isLocked,
+          requiresCaptcha: failResult.requiresCaptcha,
+          remainingAttempts: failResult.remainingAttempts,
+          retryAfterSeconds: failResult.retryAfterSeconds,
+          captchaToken: freshCaptcha?.token,
+          captchaSvg: freshCaptcha?.svgDataUrl,
+        },
+        { status }
       );
     }
 
-    // Link any unassigned past orders matching phone or email to this user
+    // 6. Login Success -> Reset failure records immediately
+    recordSuccessfulLogin(ip, trimmed, "customer");
+
+    // 7. Backlink past guest orders if any
     const orConditions: any[] = [];
     if (user.email) orConditions.push({ customerEmail: user.email });
     if (user.phone) orConditions.push({ customerPhone: user.phone });
@@ -72,7 +175,7 @@ export async function POST(req: Request) {
       }
     }
 
-    // Create persistent session cookie (stays logged in) with device/location meta
+    // 8. Create user session cookie
     await createUserSession(user.id, req.headers);
 
     return NextResponse.json({

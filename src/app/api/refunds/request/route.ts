@@ -2,17 +2,33 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { generateUniqueRefundNumber } from "@/lib/orderNumber";
 import { sendTelegramRefundAlert } from "@/lib/telegram";
+import { sanitizeString } from "@/lib/sanitizer";
+import { getClientIp } from "@/lib/security";
+import { checkRateLimit } from "@/lib/rateLimit";
 
 export async function POST(req: Request) {
   try {
+    const ip = getClientIp(req);
+    const rateCheck = checkRateLimit(`refund_req_${ip}`, 5, 15 * 60 * 1000);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: `Too many refund requests. Please try again in ${rateCheck.retryAfterSec} seconds.` },
+        { status: 429 }
+      );
+    }
+
     const { orderNumber, reason, explanation, requestedAmount } = await req.json();
 
-    if (!orderNumber || !reason || !explanation) {
+    const cleanOrderNumber = sanitizeString(orderNumber, 30).toUpperCase();
+    const cleanReason = sanitizeString(reason, 100);
+    const cleanExplanation = sanitizeString(explanation, 1000);
+
+    if (!cleanOrderNumber || !cleanReason || !cleanExplanation) {
       return NextResponse.json({ error: "Please provide order number, reason, and an explanation." }, { status: 400 });
     }
 
     const order = await prisma.order.findUnique({
-      where: { orderNumber: orderNumber.trim().toUpperCase() },
+      where: { orderNumber: cleanOrderNumber },
       include: { refundRequests: true },
     });
 
@@ -50,8 +66,8 @@ export async function POST(req: Request) {
           customerName: order.customerName,
           customerPhone: order.customerPhone,
           customerEmail: order.customerEmail,
-          reason: reason.trim(),
-          explanation: explanation.trim(),
+          reason: cleanReason,
+          explanation: cleanExplanation,
           requestedAmount: refundAmount,
           status: "PENDING",
           statusHistory: {
@@ -59,7 +75,7 @@ export async function POST(req: Request) {
               fromStatus: "NONE",
               toStatus: "PENDING",
               changedBy: "CUSTOMER",
-              notes: `Refund requested by customer: ${reason}`,
+              notes: `Refund requested by customer: ${cleanReason}`,
             },
           },
         },
@@ -75,7 +91,7 @@ export async function POST(req: Request) {
               fromStatus: order.status,
               toStatus: "REFUND_REQUESTED",
               changedBy: "CUSTOMER",
-              notes: `Refund requested (${refundNumber}): ${reason.trim()} - ${explanation.trim()}`,
+              notes: `Refund requested (${refundNumber}): ${cleanReason} - ${cleanExplanation}`,
             },
           },
         },

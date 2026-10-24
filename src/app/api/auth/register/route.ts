@@ -2,28 +2,55 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
 import { createUserSession, normalizePhone, isEmail } from "@/lib/userAuth";
+import { sanitizeString } from "@/lib/sanitizer";
+import { getClientIp } from "@/lib/security";
+import { checkRateLimit } from "@/lib/rateLimit";
 
 export async function POST(req: Request) {
   try {
-    const { name, identifier, email, phone, password } = await req.json();
+    const ip = getClientIp(req);
 
-    if (!name || !name.trim()) {
-      return NextResponse.json({ error: "Please enter your name." }, { status: 400 });
+    // Rate limit: max 5 account registrations per 15 minutes per IP
+    const rateCheck = checkRateLimit(`register_${ip}`, 5, 15 * 60 * 1000);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        {
+          error: `Too many registration attempts. Please wait ${Math.ceil(
+            (rateCheck.retryAfterSec || 60) / 60
+          )} minutes before trying again.`,
+        },
+        { status: 429 }
+      );
     }
 
-    if (!password || password.length < 6) {
+    const body = await req.json();
+    const { name, identifier, email, phone, password } = body;
+
+    const cleanName = sanitizeString(name, 70);
+    if (!cleanName || cleanName.length < 2) {
+      return NextResponse.json({ error: "Please enter your full name (minimum 2 characters)." }, { status: 400 });
+    }
+
+    if (!password || typeof password !== "string" || password.length < 6) {
       return NextResponse.json(
         { error: "Password must be at least 6 characters long." },
         { status: 400 }
       );
     }
 
-    // Determine email and phone from fields or generic identifier
-    let parsedEmail = email ? email.trim().toLowerCase() : null;
-    let parsedPhone = phone ? normalizePhone(phone) : null;
+    if (password.length > 128) {
+      return NextResponse.json(
+        { error: "Password exceeds maximum allowable length." },
+        { status: 400 }
+      );
+    }
 
-    if (identifier && identifier.trim()) {
-      const trimmed = identifier.trim();
+    // Determine email and phone from fields or generic identifier
+    let parsedEmail = email ? sanitizeString(email, 100).toLowerCase() : null;
+    let parsedPhone = phone ? normalizePhone(sanitizeString(phone, 30)) : null;
+
+    if (identifier && typeof identifier === "string" && identifier.trim()) {
+      const trimmed = sanitizeString(identifier, 100);
       if (isEmail(trimmed)) {
         parsedEmail = trimmed.toLowerCase();
       } else {
@@ -63,13 +90,13 @@ export async function POST(req: Request) {
       }
     }
 
-    // Hash password securely
+    // Hash password securely with bcrypt
     const passwordHash = await bcrypt.hash(password, 10);
 
     // Create the user
     const newUser = await prisma.user.create({
       data: {
-        name: name.trim(),
+        name: cleanName,
         email: parsedEmail,
         phone: parsedPhone,
         passwordHash,

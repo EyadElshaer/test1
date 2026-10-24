@@ -10,10 +10,26 @@ export interface CustomerUser {
   createdAt?: string;
 }
 
+export interface AuthLoginResponse {
+  success: boolean;
+  error?: string;
+  requiresCaptcha?: boolean;
+  isLocked?: boolean;
+  remainingAttempts?: number;
+  retryAfterSeconds?: number;
+  captchaToken?: string;
+  captchaSvg?: string;
+}
+
 interface AuthContextType {
   user: CustomerUser | null;
   loading: boolean;
-  login: (identifier: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  login: (
+    identifier: string,
+    password: string,
+    captchaToken?: string,
+    captchaAnswer?: string
+  ) => Promise<AuthLoginResponse>;
   register: (data: {
     name: string;
     identifier?: string;
@@ -70,17 +86,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const login = async (identifier: string, password: string) => {
+  const login = async (
+    identifier: string,
+    password: string,
+    captchaToken?: string,
+    captchaAnswer?: string
+  ): Promise<AuthLoginResponse> => {
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ identifier, password }),
+        body: JSON.stringify({
+          identifier,
+          password,
+          captchaToken,
+          captchaAnswer,
+        }),
       });
       const data = await res.json();
+
       if (!res.ok || !data.success) {
-        return { success: false, error: data.error || "Login failed" };
+        return {
+          success: false,
+          error: data.error || "Login failed",
+          requiresCaptcha: data.requiresCaptcha,
+          isLocked: data.isLocked,
+          remainingAttempts: data.remainingAttempts,
+          retryAfterSeconds: data.retryAfterSeconds,
+          captchaToken: data.captchaToken,
+          captchaSvg: data.captchaSvg,
+        };
       }
+
       setUser(data.user);
       syncLocalCartToServer();
       return { success: true };
