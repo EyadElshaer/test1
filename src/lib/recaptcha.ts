@@ -7,8 +7,8 @@ export interface RecaptchaVerifyResult {
 }
 
 // User's Google reCAPTCHA v2 production keys
-export const DEFAULT_SITE_KEY = "6LdgTv8tAAAAALYWflhFxomBQdEF7ofPsUq7N3pM";
-export const DEFAULT_SECRET_KEY = "6LdgTv8tAAAAACyhVDDfKoVgHsur9s9sqfs57P5D";
+export const DEFAULT_SITE_KEY = "6LdWVf8tAAAAABypkK7B_ChiPGK9jCvTpoZh1rZv";
+export const DEFAULT_SECRET_KEY = "6LdWVf8tAAAAADB75JvkoSjXPHahjTg8HvaSnFoj";
 
 export async function getRecaptchaConfig(): Promise<{ siteKey: string; enabled: boolean }> {
   let siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY?.trim() || DEFAULT_SITE_KEY;

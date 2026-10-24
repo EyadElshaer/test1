@@ -13,7 +13,7 @@ interface GoogleReCaptchaProps {
 }
 
 // User's Google reCAPTCHA v2 Site Key
-const DEFAULT_SITE_KEY = "6LdgTv8tAAAAALYWflhFxomBQdEF7ofPsUq7N3pM";
+const DEFAULT_SITE_KEY = "6LdWVf8tAAAAABypkK7B_ChiPGK9jCvTpoZh1rZv";
 
 export const GoogleReCaptcha = forwardRef<GoogleReCaptchaRef, GoogleReCaptchaProps>(
   function GoogleReCaptcha({ onVerify, onExpire, className = "" }, ref) {
