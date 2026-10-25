@@ -75,7 +75,7 @@ export function buildGoogleOAuthUrl(stateParam: string, req?: Request): string {
     client_id: clientId,
     redirect_uri: redirectUri,
     response_type: "code",
-    scope: "openid email profile https://www.googleapis.com/auth/user.phonenumbers.read",
+    scope: "openid email profile",
     access_type: "offline",
     prompt: "select_account",
     state: stateParam,

@@ -81,11 +81,9 @@ export async function GET(req: Request) {
     // 3. Exchange authorization code for tokens
     const tokens = await exchangeGoogleCode(code, req);
 
-    // 4. Retrieve verified user profile from Google & attempt phone number retrieval
-    const [profile, phoneNumber] = await Promise.all([
-      fetchGoogleUserInfo(tokens.access_token),
-      fetchGoogleUserPhoneNumber(tokens.access_token).catch(() => null),
-    ]);
+    // 4. Retrieve verified user profile from Google
+    const profile = await fetchGoogleUserInfo(tokens.access_token);
+    const phoneNumber = await fetchGoogleUserPhoneNumber(tokens.access_token).catch(() => null);
 
     // 5. Check if this is an ACCOUNT LINKING action initiated from customer profile
     if (isLinkAction && decodedState?.userId) {
