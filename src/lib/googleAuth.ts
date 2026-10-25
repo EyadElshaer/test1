@@ -23,19 +23,33 @@ export function getGoogleClientSecret(): string {
 }
 
 export function getSiteBaseUrl(req?: Request): string {
-  // If site URL is configured in environment, prefer it
-  if (process.env.NEXT_PUBLIC_SITE_URL) {
-    const raw = process.env.NEXT_PUBLIC_SITE_URL.trim();
-    return raw.replace(/\/+$/, "");
-  }
-
-  // Otherwise infer from request headers if available
+  // 1. If request is provided, inspect the incoming host header (dynamically works for premikeys.vercel.app, premikeys.com, etc.)
   if (req) {
-    const proto = req.headers.get("x-forwarded-proto") || "http";
     const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
     if (host) {
-      return `${proto}://${host}`;
+      const isLocal = host.startsWith("localhost") || host.startsWith("127.0.0.1");
+      const proto = isLocal
+        ? req.headers.get("x-forwarded-proto") || "http"
+        : "https";
+      return `${proto}://${host}`.replace(/\/+$/, "");
     }
+  }
+
+  // 2. Check Vercel deployment environment variables
+  if (process.env.NEXT_PUBLIC_SITE_URL && !process.env.NEXT_PUBLIC_SITE_URL.includes("localhost")) {
+    return process.env.NEXT_PUBLIC_SITE_URL.trim().replace(/\/+$/, "");
+  }
+
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL.replace(/\/+$/, "")}`;
+  }
+
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL.replace(/\/+$/, "")}`;
+  }
+
+  if (process.env.NEXT_PUBLIC_SITE_URL) {
+    return process.env.NEXT_PUBLIC_SITE_URL.trim().replace(/\/+$/, "");
   }
 
   return "http://localhost:3000";
