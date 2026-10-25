@@ -104,7 +104,7 @@ export default function CartPage() {
           <div className="glass-panel rounded-2xl overflow-hidden border border-white/10 divide-y divide-white/5">
             {items.map((item) => (
               <div
-                key={item.productId}
+                key={`${item.productId}_${item.configurationId || "default"}`}
                 className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group hover:bg-white/[0.01] transition-colors"
               >
                 {/* Product Thumbnail & Title */}
@@ -127,11 +127,18 @@ export default function CartPage() {
                     />
                   </Link>
                   <div>
-                    {item.platform && (
-                      <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider block">
-                        {item.platform}
-                      </span>
-                    )}
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      {item.platform && (
+                        <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider block">
+                          {item.platform}
+                        </span>
+                      )}
+                      {item.configurationName && (
+                        <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+                          {item.configurationName}
+                        </span>
+                      )}
+                    </div>
                     <Link
                       href={`/products/${item.slug}`}
                       className="font-bold text-sm sm:text-base text-white hover:text-cyan-300 transition-colors line-clamp-1"
@@ -153,7 +160,7 @@ export default function CartPage() {
                 <div className="flex items-center justify-between sm:justify-end gap-6 pt-3 sm:pt-0 border-t sm:border-t-0 border-white/5">
                   <div className="flex items-center border border-white/10 rounded-xl bg-black/40 overflow-hidden">
                     <button
-                      onClick={() => updateQuantity(item.productId, item.quantity - 1)}
+                      onClick={() => updateQuantity(item.productId, item.quantity - 1, item.configurationId)}
                       className="p-1.5 text-slate-400 hover:text-white transition-colors"
                     >
                       <Minus className="w-3.5 h-3.5" />
@@ -162,7 +169,7 @@ export default function CartPage() {
                       {item.quantity}
                     </span>
                     <button
-                      onClick={() => updateQuantity(item.productId, item.quantity + 1)}
+                      onClick={() => updateQuantity(item.productId, item.quantity + 1, item.configurationId)}
                       className="p-1.5 text-slate-400 hover:text-white transition-colors"
                     >
                       <Plus className="w-3.5 h-3.5" />
@@ -176,7 +183,7 @@ export default function CartPage() {
                   </div>
 
                   <button
-                    onClick={() => removeItem(item.productId)}
+                    onClick={() => removeItem(item.productId, item.configurationId)}
                     className="p-1.5 text-slate-500 hover:text-red-400 transition-colors"
                     title="Remove item"
                   >

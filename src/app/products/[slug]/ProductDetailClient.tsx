@@ -20,6 +20,7 @@ import {
   X,
 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
+import { extractConfigurations, ProductConfiguration } from "@/lib/configurations";
 
 export default function ProductDetailClient({ product }: { product: any }) {
   const router = useRouter();
@@ -30,6 +31,21 @@ export default function ProductDetailClient({ product }: { product: any }) {
   const [justAdded, setJustAdded] = useState(false);
   const [imageRatio, setImageRatio] = useState<number | null>(null);
   const [isZoomOpen, setIsZoomOpen] = useState(false);
+
+  // Configurations
+  const configs: ProductConfiguration[] = extractConfigurations(product);
+  const hasConfigs = configs.length > 0;
+  const [selectedConfigIdx, setSelectedConfigIdx] = useState(0);
+  const activeConfig = hasConfigs ? configs[selectedConfigIdx] || configs[0] : null;
+
+  const activeSalePrice = activeConfig ? activeConfig.salePrice : product.salePrice;
+  const activeOriginalPrice = activeConfig ? activeConfig.originalPrice : product.originalPrice;
+  const activeDiscountPercent = activeConfig ? activeConfig.discountPercent : product.discountPercent;
+
+  const isConfigOutOfStock =
+    activeConfig?.isAvailable === false ||
+    (activeConfig?.stockQuantity !== undefined && activeConfig.stockQuantity <= 0);
+  const isOutOfStock = isConfigOutOfStock || product.availability === "OUT_OF_STOCK";
 
   const images = product.images.length > 0 ? product.images : [{ url: "/images/premikeys-logo.png", altText: product.title }];
   const currentImage = images[activeImageIndex] || images[0];
@@ -49,8 +65,6 @@ export default function ProductDetailClient({ product }: { product: any }) {
     setImageRatio(null); // allow re-measuring natural ratio for the selected image
   };
 
-  const isOutOfStock = product.availability === "OUT_OF_STOCK";
-
   const handleAddToCart = () => {
     if (isOutOfStock) return;
     addItem(
@@ -59,11 +73,13 @@ export default function ProductDetailClient({ product }: { product: any }) {
         title: product.title,
         slug: product.slug,
         image: currentImage.url,
-        originalPrice: product.originalPrice,
-        salePrice: product.salePrice,
-        discountPercent: product.discountPercent,
+        originalPrice: activeOriginalPrice,
+        salePrice: activeSalePrice,
+        discountPercent: activeDiscountPercent,
         platform: product.platform || undefined,
         productType: product.productType || undefined,
+        configurationId: activeConfig?.id,
+        configurationName: activeConfig ? activeConfig.name : undefined,
       },
       quantity
     );
@@ -80,11 +96,13 @@ export default function ProductDetailClient({ product }: { product: any }) {
         title: product.title,
         slug: product.slug,
         image: currentImage.url,
-        originalPrice: product.originalPrice,
-        salePrice: product.salePrice,
-        discountPercent: product.discountPercent,
+        originalPrice: activeOriginalPrice,
+        salePrice: activeSalePrice,
+        discountPercent: activeDiscountPercent,
         platform: product.platform || undefined,
         productType: product.productType || undefined,
+        configurationId: activeConfig?.id,
+        configurationName: activeConfig ? activeConfig.name : undefined,
       },
       quantity
     );
@@ -246,6 +264,58 @@ export default function ProductDetailClient({ product }: { product: any }) {
             )}
           </div>
 
+          {/* Configuration Selector */}
+          {hasConfigs && (
+            <div className="glass-card rounded-2xl p-5 border border-white/10 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-cyan-400">
+                  Select Configuration / Edition
+                </span>
+                {activeConfig && (
+                  <span className="text-xs text-slate-400">
+                    Selected: <strong className="text-white">{activeConfig.name}</strong>
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {configs.map((cfg, idx) => {
+                  const isSelected = selectedConfigIdx === idx;
+                  return (
+                    <button
+                      key={cfg.id || idx}
+                      type="button"
+                      onClick={() => setSelectedConfigIdx(idx)}
+                      className={`p-3 rounded-xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between ${
+                        isSelected
+                          ? "bg-cyan-500/15 border-cyan-400 shadow-[0_0_20px_rgba(0,240,255,0.2)] scale-[1.01]"
+                          : "bg-white/[0.02] border-white/10 hover:border-white/20 hover:bg-white/[0.05]"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-bold text-xs sm:text-sm text-white">{cfg.name}</span>
+                        {cfg.discountPercent > 0 && (
+                          <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                            -{cfg.discountPercent}%
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-baseline gap-2 mt-2">
+                        <span className="text-sm sm:text-base font-black text-cyan-300">
+                          {cfg.salePrice.toLocaleString()} EGP
+                        </span>
+                        {cfg.discountPercent > 0 && (
+                          <span className="text-xs text-slate-500 line-through">
+                            {cfg.originalPrice.toLocaleString()} EGP
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Pricing Card */}
           <div className="glass-card rounded-2xl p-5 sm:p-6 border border-white/10 space-y-4">
             <div className="flex items-baseline justify-between">
@@ -253,11 +323,11 @@ export default function ProductDetailClient({ product }: { product: any }) {
                 <div className="text-xs text-slate-400 font-medium">Digital Product Price</div>
                 <div className="flex items-baseline gap-3 mt-1">
                   <span className="text-3xl sm:text-4xl font-black text-white tracking-tight">
-                    {product.salePrice.toLocaleString()} <span className="text-base text-cyan-400 font-bold">EGP</span>
+                    {activeSalePrice.toLocaleString()} <span className="text-base text-cyan-400 font-bold">EGP</span>
                   </span>
-                  {product.discountPercent > 0 && (
+                  {activeDiscountPercent > 0 && (
                     <span className="text-base text-slate-500 line-through">
-                      {product.originalPrice.toLocaleString()} EGP
+                      {activeOriginalPrice.toLocaleString()} EGP
                     </span>
                   )}
                 </div>

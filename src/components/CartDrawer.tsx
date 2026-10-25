@@ -135,7 +135,7 @@ export default function CartDrawer() {
             ) : (
               items.map((item) => (
                 <div
-                  key={item.productId}
+                  key={`${item.productId}_${item.configurationId || "default"}`}
                   className="p-3.5 rounded-2xl bg-slate-900/80 border border-white/5 flex gap-3.5 relative group hover:border-cyan-500/20 transition-all"
                 >
                   {/* Thumbnail - Contained without cropping */}
@@ -170,14 +170,21 @@ export default function CartDrawer() {
                         >
                           {item.title}
                         </Link>
-                        {item.platform && (
-                          <span className="text-[10px] text-cyan-400 font-semibold block mt-0.5">
-                            {item.platform}
-                          </span>
-                        )}
+                        <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                          {item.platform && (
+                            <span className="text-[10px] text-cyan-400 font-semibold block">
+                              {item.platform}
+                            </span>
+                          )}
+                          {item.configurationName && (
+                            <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+                              {item.configurationName}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <button
-                        onClick={() => removeItem(item.productId)}
+                        onClick={() => removeItem(item.productId, item.configurationId)}
                         className="text-slate-500 hover:text-red-400 p-1 transition-colors"
                         title="Remove item"
                       >
@@ -195,7 +202,7 @@ export default function CartDrawer() {
                       {/* Quantity Controls */}
                       <div className="flex items-center gap-1 bg-black/40 border border-white/10 rounded-lg p-0.5">
                         <button
-                          onClick={() => updateQuantity(item.productId, item.quantity - 1)}
+                          onClick={() => updateQuantity(item.productId, item.quantity - 1, item.configurationId)}
                           className="w-6 h-6 flex items-center justify-center text-slate-400 hover:text-white rounded hover:bg-white/10 transition-colors"
                         >
                           <Minus className="w-3 h-3" />
@@ -204,7 +211,7 @@ export default function CartDrawer() {
                           {item.quantity}
                         </span>
                         <button
-                          onClick={() => updateQuantity(item.productId, item.quantity + 1)}
+                          onClick={() => updateQuantity(item.productId, item.quantity + 1, item.configurationId)}
                           className="w-6 h-6 flex items-center justify-center text-slate-400 hover:text-white rounded hover:bg-white/10 transition-colors"
                         >
                           <Plus className="w-3 h-3" />

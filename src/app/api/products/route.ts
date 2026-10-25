@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { extractConfigurations } from "@/lib/configurations";
 
 export async function GET(req: Request) {
   try {
@@ -111,9 +112,14 @@ export async function GET(req: Request) {
       prisma.product.count({ where }),
     ]);
 
+    const mappedProducts = products.map((prod: any) => ({
+      ...prod,
+      configurations: extractConfigurations(prod),
+    }));
+
     return NextResponse.json({
       success: true,
-      products,
+      products: mappedProducts,
       pagination: {
         total,
         page,

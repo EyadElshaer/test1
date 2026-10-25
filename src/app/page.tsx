@@ -32,6 +32,7 @@ export default async function HomePage() {
     include: {
       category: { select: { name: true, slug: true } },
       images: { orderBy: { displayOrder: "asc" } },
+      attributeValues: true,
     },
   });
 
@@ -180,6 +181,7 @@ export default async function HomePage() {
                 availability={product.availability}
                 category={product.category}
                 images={product.images}
+                attributeValues={product.attributeValues}
               />
             ))}
           </div>
@@ -224,6 +226,7 @@ export default async function HomePage() {
                 availability={product.availability}
                 category={product.category}
                 images={product.images}
+                attributeValues={product.attributeValues}
               />
             ))}
           </div>

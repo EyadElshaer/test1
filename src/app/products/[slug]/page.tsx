@@ -57,6 +57,7 @@ export default async function ProductDetailPage({
     include: {
       category: { select: { name: true, slug: true } },
       images: { orderBy: { displayOrder: "asc" } },
+      attributeValues: true,
     },
   });
 
@@ -110,6 +111,7 @@ export default async function ProductDetailPage({
                 availability={item.availability}
                 category={item.category}
                 images={item.images}
+                attributeValues={item.attributeValues}
               />
             ))}
           </div>

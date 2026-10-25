@@ -13,6 +13,7 @@ import { sendTelegramOrderAlert } from "@/lib/telegram";
 import { sanitizeString } from "@/lib/sanitizer";
 import { getClientIp } from "@/lib/security";
 import { checkRateLimit } from "@/lib/rateLimit";
+import { extractConfigurations } from "@/lib/configurations";
 
 export async function POST(req: Request) {
   try {
@@ -102,6 +103,7 @@ export async function POST(req: Request) {
       },
       include: {
         images: { orderBy: { displayOrder: "asc" }, take: 1 },
+        attributeValues: true,
       },
     });
 
@@ -138,20 +140,36 @@ export async function POST(req: Request) {
       }
 
       const qty = Math.max(1, parseInt(item.quantity) || 1);
-      const lineTotal = dbProd.salePrice * qty;
+
+      // Check for matching configuration
+      const prodConfigs = extractConfigurations(dbProd);
+      let matchedConfig = null;
+      if (item.configurationId) {
+        matchedConfig = prodConfigs.find((c) => c.id === item.configurationId);
+      }
+      if (!matchedConfig && item.configurationName) {
+        matchedConfig = prodConfigs.find((c) => c.name.toLowerCase() === item.configurationName.toLowerCase());
+      }
+
+      const effectiveSalePrice = matchedConfig ? matchedConfig.salePrice : dbProd.salePrice;
+      const effectiveOriginalPrice = matchedConfig ? matchedConfig.originalPrice : dbProd.originalPrice;
+      const effectiveDiscount = matchedConfig ? matchedConfig.discountPercent : dbProd.discountPercent;
+      const effectiveTitle = matchedConfig ? `${dbProd.title} (${matchedConfig.name})` : dbProd.title;
+
+      const lineTotal = effectiveSalePrice * qty;
       serverSubtotal += lineTotal;
 
       const primaryImg = dbProd.images[0]?.url || null;
 
       orderItemsSnapshot.push({
         productId: dbProd.id,
-        productTitle: dbProd.title,
+        productTitle: effectiveTitle,
         productSlug: dbProd.slug,
         productImage: primaryImg,
         quantity: qty,
-        originalPrice: dbProd.originalPrice,
-        salePrice: dbProd.salePrice,
-        discountPercent: dbProd.discountPercent,
+        originalPrice: effectiveOriginalPrice,
+        salePrice: effectiveSalePrice,
+        discountPercent: effectiveDiscount,
         lineTotal,
       });
     }

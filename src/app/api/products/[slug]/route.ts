@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { extractConfigurations } from "@/lib/configurations";
 
 export async function GET(
   req: Request,
@@ -38,7 +39,10 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
-      product,
+      product: {
+        ...product,
+        configurations: extractConfigurations(product),
+      },
       relatedProducts,
     });
   } catch (error) {

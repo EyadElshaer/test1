@@ -240,6 +240,8 @@ export default function CheckoutPage() {
         items: items.map((i) => ({
           productId: i.productId,
           quantity: i.quantity,
+          configurationId: i.configurationId || null,
+          configurationName: i.configurationName || null,
         })),
       };
 
@@ -641,7 +643,7 @@ export default function CheckoutPage() {
               {/* Items List */}
               <div className="space-y-3 max-h-60 overflow-y-auto pr-1 divide-y divide-white/5">
                 {items.map((item) => (
-                  <div key={item.productId} className="pt-3 first:pt-0 flex items-center justify-between text-xs">
+                  <div key={`${item.productId}_${item.configurationId || "default"}`} className="pt-3 first:pt-0 flex items-center justify-between text-xs">
                     <div className="flex items-center gap-3 min-w-0 pr-2">
                       <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-slate-950 shrink-0 border border-white/10 flex items-center justify-center p-0.5">
                         <Image
@@ -659,7 +661,14 @@ export default function CheckoutPage() {
                       </div>
                       <div className="min-w-0">
                         <span className="font-semibold text-white line-clamp-1">{item.title}</span>
-                        <span className="text-slate-400 text-[11px]">Qty: {item.quantity}</span>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-slate-400 text-[11px]">Qty: {item.quantity}</span>
+                          {item.configurationName && (
+                            <span className="text-[10px] text-cyan-300 font-semibold px-1.5 py-0.5 rounded bg-cyan-500/15 border border-cyan-500/30">
+                              {item.configurationName}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                     <div className="font-mono font-bold text-white shrink-0">

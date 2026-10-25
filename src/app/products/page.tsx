@@ -438,6 +438,8 @@ function ProductsCatalogContent() {
                   availability={product.availability}
                   category={product.category}
                   images={product.images}
+                  attributeValues={product.attributeValues}
+                  configurations={product.configurations}
                 />
               ))}
             </div>

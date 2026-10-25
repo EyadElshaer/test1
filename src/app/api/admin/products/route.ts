@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAdminSession, logAdminAudit } from "@/lib/auth";
+import { extractConfigurations } from "@/lib/configurations";
 
 export async function GET(req: Request) {
   try {
@@ -46,7 +47,12 @@ export async function GET(req: Request) {
       },
     });
 
-    return NextResponse.json({ success: true, products });
+    const mappedProducts = products.map((prod: any) => ({
+      ...prod,
+      configurations: extractConfigurations(prod),
+    }));
+
+    return NextResponse.json({ success: true, products: mappedProducts });
   } catch (error) {
     console.error("Failed to fetch products:", error);
     return NextResponse.json({ error: "Failed to load products." }, { status: 500 });
@@ -79,6 +85,7 @@ export async function POST(req: Request) {
       isPublished,
       images,
       attributes,
+      configurations,
     } = body;
 
     if (!title || !description || !categoryId) {
@@ -158,7 +165,7 @@ export async function POST(req: Request) {
 
       if (Array.isArray(attributes) && attributes.length > 0) {
         for (const attr of attributes) {
-          if (attr.attributeKey && attr.value) {
+          if (attr.attributeKey && attr.value && attr.attributeKey !== "configurations") {
             await tx.productAttributeValue.create({
               data: {
                 productId: product.id,
@@ -168,6 +175,16 @@ export async function POST(req: Request) {
             });
           }
         }
+      }
+
+      if (Array.isArray(configurations) && configurations.length > 0) {
+        await tx.productAttributeValue.create({
+          data: {
+            productId: product.id,
+            attributeKey: "configurations",
+            value: JSON.stringify(configurations),
+          },
+        });
       }
 
       return product;

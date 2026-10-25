@@ -13,6 +13,8 @@ export interface CartItem {
   platform?: string;
   productType?: string;
   quantity: number;
+  configurationId?: string;
+  configurationName?: string;
 }
 
 export interface AppliedPromo {
@@ -31,8 +33,8 @@ interface CartContextType {
   total: number;
   appliedPromo: AppliedPromo | null;
   addItem: (item: Omit<CartItem, "quantity">, quantity?: number) => void;
-  removeItem: (productId: string) => void;
-  updateQuantity: (productId: string, quantity: number) => void;
+  removeItem: (productId: string, configurationId?: string) => void;
+  updateQuantity: (productId: string, quantity: number, configurationId?: string) => void;
   clearCart: () => void;
   applyPromo: (code: string) => Promise<{ success: boolean; message: string; discount?: number }>;
   removePromo: () => void;
@@ -141,10 +143,15 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const addItem = (item: Omit<CartItem, "quantity">, quantity = 1) => {
     setItems((prev) => {
-      const existing = prev.find((i) => i.productId === item.productId);
+      const configKey = item.configurationId || "";
+      const existing = prev.find(
+        (i) => i.productId === item.productId && (i.configurationId || "") === configKey
+      );
       if (existing) {
         return prev.map((i) =>
-          i.productId === item.productId ? { ...i, quantity: i.quantity + quantity } : i
+          i.productId === item.productId && (i.configurationId || "") === configKey
+            ? { ...i, quantity: i.quantity + quantity }
+            : i
         );
       }
       return [...prev, { ...item, quantity }];
@@ -152,17 +159,28 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setIsCartOpen(true);
   };
 
-  const removeItem = (productId: string) => {
-    setItems((prev) => prev.filter((i) => i.productId !== productId));
+  const removeItem = (productId: string, configurationId?: string) => {
+    setItems((prev) =>
+      prev.filter((i) => {
+        if (i.productId !== productId) return true;
+        if (configurationId !== undefined && (i.configurationId || "") !== (configurationId || "")) return true;
+        return false;
+      })
+    );
   };
 
-  const updateQuantity = (productId: string, quantity: number) => {
+  const updateQuantity = (productId: string, quantity: number, configurationId?: string) => {
     if (quantity <= 0) {
-      removeItem(productId);
+      removeItem(productId, configurationId);
       return;
     }
     setItems((prev) =>
-      prev.map((i) => (i.productId === productId ? { ...i, quantity } : i))
+      prev.map((i) => {
+        const matches =
+          i.productId === productId &&
+          (configurationId === undefined || (i.configurationId || "") === (configurationId || ""));
+        return matches ? { ...i, quantity } : i;
+      })
     );
   };
 

@@ -18,8 +18,10 @@ import {
   X,
   Sparkles,
   Tag,
+  Layers,
 } from "lucide-react";
 import { compressImageForUpload } from "@/lib/imageCompression";
+import { extractConfigurations, ProductConfiguration, calculateDiscount } from "@/lib/configurations";
 
 
 export default function AdminProductsPage() {
@@ -61,11 +63,50 @@ export default function AdminProductsPage() {
   // Sale Price on-demand toggle
   const [hasSale, setHasSale] = useState(false);
 
+  // Configurations State
+  const [configurations, setConfigurations] = useState<ProductConfiguration[]>([]);
+  const [hasConfigurations, setHasConfigurations] = useState(false);
+
   // Live Auto-calculated Discount Percentage
   const origNum = Number(originalPrice) || 0;
   const saleNum = hasSale ? Number(salePrice) || 0 : origNum;
   const calculatedDiscount =
     hasSale && origNum > 0 && saleNum < origNum ? Math.round(((origNum - saleNum) / origNum) * 100) : 0;
+
+  const handleAddConfiguration = () => {
+    const defaultOrig = origNum > 0 ? origNum : 500;
+    const defaultSale = hasSale && saleNum > 0 ? saleNum : defaultOrig;
+    setConfigurations((prev) => [
+      ...prev,
+      {
+        id: `cfg_${Date.now()}_${prev.length + 1}`,
+        name: "",
+        originalPrice: defaultOrig,
+        salePrice: defaultSale,
+        discountPercent: calculateDiscount(defaultOrig, defaultSale),
+        stockQuantity: 999,
+        isAvailable: true,
+      },
+    ]);
+  };
+
+  const handleUpdateConfiguration = (index: number, field: keyof ProductConfiguration, value: any) => {
+    setConfigurations((prev) => {
+      const updated = [...prev];
+      const current = { ...updated[index], [field]: value };
+      if (field === "originalPrice" || field === "salePrice") {
+        const orig = field === "originalPrice" ? Number(value) || 0 : current.originalPrice;
+        const sale = field === "salePrice" ? Number(value) || 0 : current.salePrice;
+        current.discountPercent = calculateDiscount(orig, sale);
+      }
+      updated[index] = current;
+      return updated;
+    });
+  };
+
+  const handleRemoveConfiguration = (index: number) => {
+    setConfigurations((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -119,6 +160,8 @@ export default function AdminProductsPage() {
     setIsFeatured(false);
     setIsPublished(true);
     setImages([]);
+    setConfigurations([]);
+    setHasConfigurations(false);
     setFormError("");
     setFormSuccess("");
     setIsModalOpen(true);
@@ -144,6 +187,18 @@ export default function AdminProductsPage() {
     setIsFeatured(p.isFeatured);
     setIsPublished(p.isPublished);
     setImages(p.images?.map((img: any) => img.url) || []);
+
+    const pConfigs = p.configurations && p.configurations.length > 0
+      ? p.configurations
+      : extractConfigurations(p);
+    if (pConfigs && pConfigs.length > 0) {
+      setConfigurations(pConfigs);
+      setHasConfigurations(true);
+    } else {
+      setConfigurations([]);
+      setHasConfigurations(false);
+    }
+
     setFormError("");
     setFormSuccess("");
     setIsModalOpen(true);
@@ -169,6 +224,23 @@ export default function AdminProductsPage() {
     setIsFeatured(false);
     setIsPublished(false); // Default duplicated product to unreleased
     setImages(p.images?.map((img: any) => img.url) || []);
+
+    const pConfigs = p.configurations && p.configurations.length > 0
+      ? p.configurations
+      : extractConfigurations(p);
+    if (pConfigs && pConfigs.length > 0) {
+      setConfigurations(
+        pConfigs.map((c: any, idx: number) => ({
+          ...c,
+          id: `cfg_${Date.now()}_${idx}`,
+        }))
+      );
+      setHasConfigurations(true);
+    } else {
+      setConfigurations([]);
+      setHasConfigurations(false);
+    }
+
     setFormError("");
     setFormSuccess("");
     setIsModalOpen(true);
@@ -260,6 +332,20 @@ export default function AdminProductsPage() {
       finalSalePrice = saleNum;
     }
 
+    if (hasConfigurations && configurations.length > 0) {
+      for (let i = 0; i < configurations.length; i++) {
+        const cfg = configurations[i];
+        if (!cfg.name.trim()) {
+          setFormError(`Configuration #${i + 1} must have a title/name.`);
+          return;
+        }
+        if (Number(cfg.originalPrice) <= 0) {
+          setFormError(`Configuration "${cfg.name}" must have a regular price greater than 0.`);
+          return;
+        }
+      }
+    }
+
     setIsSaving(true);
     const payload = {
       title: title.trim(),
@@ -278,6 +364,7 @@ export default function AdminProductsPage() {
       isFeatured,
       isPublished,
       images,
+      configurations: hasConfigurations ? configurations : [],
     };
 
     try {
@@ -426,7 +513,14 @@ export default function AdminProductsPage() {
                         </div>
                         <div>
                           <span className="font-bold text-white block line-clamp-1">{prod.title}</span>
-                          <span className="text-[10px] text-slate-400 font-mono">/{prod.slug}</span>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="text-[10px] text-slate-400 font-mono">/{prod.slug}</span>
+                            {prod.configurations && prod.configurations.length > 0 && (
+                              <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+                                {prod.configurations.length} Options
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -742,6 +836,153 @@ export default function AdminProductsPage() {
                     className="w-full glass-input px-3.5 py-2 rounded-xl text-xs font-mono"
                   />
                 </div>
+              </div>
+
+              {/* Configurations / Variants Section */}
+              <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/10 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-white/5">
+                  <div className="flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-cyan-400" />
+                    <div>
+                      <span className="text-xs font-bold text-white uppercase tracking-wider block">
+                        Product Configurations & Options
+                      </span>
+                      <span className="text-[11px] text-slate-400">
+                        Allow customers to choose specific options (e.g. 1 PC, 3 PCs, 1 Year, Lifetime) on the products page.
+                      </span>
+                    </div>
+                  </div>
+
+                  <label className="flex items-center gap-2 cursor-pointer select-none bg-white/[0.03] hover:bg-white/[0.06] border border-white/10 px-3 py-1.5 rounded-xl transition-colors shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={hasConfigurations}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setHasConfigurations(checked);
+                        if (checked && configurations.length === 0) {
+                          handleAddConfiguration();
+                        }
+                      }}
+                      className="w-4 h-4 rounded text-blue-600 focus:ring-0 bg-slate-900 border-white/20 cursor-pointer"
+                    />
+                    <span className="text-xs font-semibold text-cyan-300">
+                      Enable Configurations
+                    </span>
+                  </label>
+                </div>
+
+                {hasConfigurations && (
+                  <div className="space-y-3 pt-1">
+                    {configurations.map((cfg, idx) => (
+                      <div
+                        key={cfg.id || idx}
+                        className="p-3.5 rounded-xl bg-slate-900/60 border border-white/10 space-y-3 relative group/cfg"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-cyan-400 font-mono">
+                            Option #{idx + 1}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveConfiguration(idx)}
+                            className="p-1 rounded-lg text-slate-500 hover:text-red-400 hover:bg-white/5 transition-colors"
+                            title="Remove this configuration"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                          <div className="sm:col-span-2">
+                            <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                              Option Name / Title <span className="text-rose-400">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              required={hasConfigurations}
+                              placeholder="e.g. 1 PC Retail License or 1 Year"
+                              value={cfg.name}
+                              onChange={(e) => handleUpdateConfiguration(idx, "name", e.target.value)}
+                              className="w-full glass-input px-3 py-1.5 rounded-lg text-xs"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                              Regular Price (EGP) <span className="text-rose-400">*</span>
+                            </label>
+                            <input
+                              type="number"
+                              required={hasConfigurations}
+                              placeholder="500"
+                              value={cfg.originalPrice || ""}
+                              onChange={(e) =>
+                                handleUpdateConfiguration(idx, "originalPrice", Number(e.target.value))
+                              }
+                              className="w-full glass-input px-3 py-1.5 rounded-lg text-xs font-mono"
+                            />
+                          </div>
+
+                          <div>
+                            <div className="flex justify-between items-center mb-1">
+                              <label className="text-[11px] font-semibold text-cyan-300 block">
+                                Sale Price (EGP)
+                              </label>
+                              {cfg.discountPercent > 0 && (
+                                <span className="text-[10px] font-bold text-emerald-400">
+                                  -{cfg.discountPercent}%
+                                </span>
+                              )}
+                            </div>
+                            <input
+                              type="number"
+                              placeholder="380"
+                              value={cfg.salePrice || ""}
+                              onChange={(e) =>
+                                handleUpdateConfiguration(idx, "salePrice", Number(e.target.value))
+                              }
+                              className="w-full glass-input px-3 py-1.5 rounded-lg text-xs font-mono border-cyan-500/40"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-2 border-t border-white/5 text-xs text-slate-400">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={cfg.isAvailable !== false}
+                              onChange={(e) => handleUpdateConfiguration(idx, "isAvailable", e.target.checked)}
+                              className="rounded bg-slate-950 text-blue-600 cursor-pointer"
+                            />
+                            <span className="text-[11px]">Available / In Stock</span>
+                          </label>
+
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px]">Stock:</span>
+                            <input
+                              type="number"
+                              value={cfg.stockQuantity !== undefined ? cfg.stockQuantity : 999}
+                              onChange={(e) =>
+                                handleUpdateConfiguration(idx, "stockQuantity", Number(e.target.value))
+                              }
+                              className="w-20 glass-input px-2 py-1 rounded text-xs font-mono"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                    <button
+                      type="button"
+                      onClick={handleAddConfiguration}
+                      className="w-full py-2.5 px-3 rounded-xl border border-dashed border-cyan-500/40 hover:border-cyan-400 bg-cyan-500/5 hover:bg-cyan-500/10 text-cyan-300 text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Add Another Configuration</span>
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Short & Detailed Description */}

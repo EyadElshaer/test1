@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAdminSession, logAdminAudit } from "@/lib/auth";
+import { extractConfigurations } from "@/lib/configurations";
 
 export async function GET(
   req: Request,
@@ -26,7 +27,13 @@ export async function GET(
       return NextResponse.json({ error: "Product not found." }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true, product });
+    return NextResponse.json({
+      success: true,
+      product: {
+        ...product,
+        configurations: extractConfigurations(product),
+      },
+    });
   } catch (error) {
     console.error("Failed to load product:", error);
     return NextResponse.json({ error: "Failed to load product." }, { status: 500 });
@@ -65,6 +72,7 @@ export async function PUT(
       displayOrder,
       images,
       attributes,
+      configurations,
     } = body;
 
     const orig = Number(originalPrice);
@@ -129,9 +137,14 @@ export async function PUT(
       }
 
       if (Array.isArray(attributes)) {
-        await tx.productAttributeValue.deleteMany({ where: { productId: id } });
+        await tx.productAttributeValue.deleteMany({
+          where: {
+            productId: id,
+            attributeKey: { not: "configurations" },
+          },
+        });
         for (const attr of attributes) {
-          if (attr.attributeKey && attr.value) {
+          if (attr.attributeKey && attr.value && attr.attributeKey !== "configurations") {
             await tx.productAttributeValue.create({
               data: {
                 productId: id,
@@ -140,6 +153,21 @@ export async function PUT(
               },
             });
           }
+        }
+      }
+
+      if (configurations !== undefined) {
+        await tx.productAttributeValue.deleteMany({
+          where: { productId: id, attributeKey: "configurations" },
+        });
+        if (Array.isArray(configurations) && configurations.length > 0) {
+          await tx.productAttributeValue.create({
+            data: {
+              productId: id,
+              attributeKey: "configurations",
+              value: JSON.stringify(configurations),
+            },
+          });
         }
       }
 
