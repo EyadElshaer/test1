@@ -130,9 +130,18 @@ export default function Header() {
                       className="flex items-center gap-2 px-3 py-2 rounded-xl bg-blue-600/10 border border-blue-500/30 hover:border-cyan-400/60 hover:bg-blue-600/20 text-slate-200 hover:text-white transition-all shadow-inner group text-xs font-semibold"
                       aria-label="Open Account Menu"
                     >
-                      <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-blue-600 to-cyan-400 flex items-center justify-center text-white font-bold text-[11px] uppercase shadow-sm">
-                        {user.name ? user.name.charAt(0) : "U"}
-                      </div>
+                      {user.avatar ? (
+                        <img
+                          src={user.avatar}
+                          alt={user.name || "User"}
+                          className="w-6 h-6 rounded-lg object-cover border border-white/20 shadow-sm shrink-0"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-blue-600 to-cyan-400 flex items-center justify-center text-white font-bold text-[11px] uppercase shadow-sm">
+                          {user.name ? user.name.charAt(0) : "U"}
+                        </div>
+                      )}
                       <span className="max-w-[110px] truncate text-cyan-200 group-hover:text-white">
                         {user.name.split(" ")[0]}
                       </span>
@@ -147,11 +156,25 @@ export default function Header() {
                     {accountMenuOpen && (
                       <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-[#070d1d]/95 backdrop-blur-xl border border-white/15 shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 duration-150 space-y-1">
                         {/* User Identity Header */}
-                        <div className="px-3 py-2.5 border-b border-white/10 mb-1">
-                          <p className="text-xs font-bold text-white truncate">{user.name}</p>
-                          <p className="text-[11px] text-slate-400 truncate font-mono mt-0.5">
-                            {user.email || user.phone}
-                          </p>
+                        <div className="px-3 py-2.5 border-b border-white/10 mb-1 flex items-center gap-2.5">
+                          {user.avatar ? (
+                            <img
+                              src={user.avatar}
+                              alt={user.name || "User"}
+                              className="w-8 h-8 rounded-xl object-cover border border-white/20 shadow-sm shrink-0"
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-400 flex items-center justify-center text-white font-bold text-xs uppercase shadow-sm shrink-0">
+                              {user.name ? user.name.charAt(0) : "U"}
+                            </div>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold text-white truncate">{user.name}</p>
+                            <p className="text-[11px] text-slate-400 truncate font-mono mt-0.5">
+                              {user.email || user.phone}
+                            </p>
+                          </div>
                         </div>
 
                         {/* Dropdown Links */}

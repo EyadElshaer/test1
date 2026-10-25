@@ -100,6 +100,15 @@ export async function POST(req: Request) {
     }
 
     // 5. Verify Password
+    if (!user.passwordHash) {
+      return NextResponse.json(
+        {
+          error: "This account was registered with Google. Please use 'Continue with Google' to sign in.",
+        },
+        { status: 400 }
+      );
+    }
+
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
 
     if (!isPasswordValid) {
@@ -157,6 +166,8 @@ export async function POST(req: Request) {
         name: user.name,
         email: user.email,
         phone: user.phone,
+        avatar: user.avatar,
+        authProvider: user.authProvider,
         createdAt: user.createdAt,
       },
       message: "Logged in successfully!",

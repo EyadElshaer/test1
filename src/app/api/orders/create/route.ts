@@ -216,8 +216,18 @@ export async function POST(req: Request) {
 
         if (user) {
           orderUserId = user.id;
-          const isMatch = await bcrypt.compare(password, user.passwordHash);
-          if (isMatch) {
+          if (user.passwordHash) {
+            const isMatch = await bcrypt.compare(password, user.passwordHash);
+            if (isMatch) {
+              await createUserSession(user.id, req.headers);
+            }
+          } else {
+            // User previously registered via Google; allow setting a password now
+            const newPasswordHash = await bcrypt.hash(password, 10);
+            await prisma.user.update({
+              where: { id: user.id },
+              data: { passwordHash: newPasswordHash },
+            });
             await createUserSession(user.id, req.headers);
           }
         } else {

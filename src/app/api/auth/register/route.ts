@@ -71,6 +71,12 @@ export async function POST(req: Request) {
         where: { email: parsedEmail },
       });
       if (existingByEmail) {
+        if (existingByEmail.authProvider === "google" && !existingByEmail.passwordHash) {
+          return NextResponse.json(
+            { error: "An account with this email was created using Google. Please sign in with 'Continue with Google'." },
+            { status: 400 }
+          );
+        }
         return NextResponse.json(
           { error: "An account with this email address already exists. Please log in." },
           { status: 400 }
@@ -100,12 +106,15 @@ export async function POST(req: Request) {
         email: parsedEmail,
         phone: parsedPhone,
         passwordHash,
+        authProvider: "local",
       },
       select: {
         id: true,
         name: true,
         email: true,
         phone: true,
+        avatar: true,
+        authProvider: true,
         createdAt: true,
       },
     });

@@ -21,12 +21,14 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { COUNTRY_CODES, CountryCode } from "@/lib/countryCodes";
 import { GoogleReCaptcha, GoogleReCaptchaRef } from "@/components/GoogleReCaptcha";
+import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 
 function AuthForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectUrl = searchParams.get("redirect") || "/account/orders";
   const initialTab = searchParams.get("tab") === "register" ? "register" : "login";
+  const authError = searchParams.get("error");
 
   const { login, register, user } = useAuth();
   const [recaptchaToken, setRecaptchaToken] = useState("");
@@ -77,6 +79,26 @@ function AuthForm() {
       })
       .catch(() => {});
   }, []);
+
+  // Handle Google OAuth query parameter errors
+  useEffect(() => {
+    if (authError) {
+      if (authError === "google_not_configured") {
+        setErrorMessage(
+          "Google Sign-In is not configured yet. Please add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to your .env file."
+        );
+      } else if (authError === "google_cancelled") {
+        setErrorMessage("Google Sign-In was cancelled.");
+      } else if (authError === "invalid_state") {
+        setErrorMessage("Sign-in session expired. Please click 'Continue with Google' again.");
+      } else {
+        setErrorMessage(
+          decodeURIComponent(authError).replace(/_/g, " ") ||
+            "Failed to sign in with Google. Please try again."
+        );
+      }
+    }
+  }, [authError]);
 
   // Lockout countdown timer
   useEffect(() => {
@@ -349,6 +371,25 @@ function AuthForm() {
               <span>{successMessage}</span>
             </div>
           )}
+
+          {/* Social Authentication: Google */}
+          <div className="mb-5 space-y-4">
+            <GoogleSignInButton
+              redirectUrl={redirectUrl}
+              text={activeTab === "login" ? "Continue with Google" : "Sign up with Google"}
+              disabled={isLocked}
+            />
+
+            {/* Visual Divider */}
+            <div className="relative flex items-center justify-center">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-white/10" />
+              </div>
+              <div className="relative px-3 bg-[#070d1d] text-[10px] uppercase font-bold tracking-wider text-slate-400">
+                <span>Or {activeTab === "login" ? "sign in" : "sign up"} with credentials</span>
+              </div>
+            </div>
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Name field (for Register only) */}

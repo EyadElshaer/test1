@@ -71,6 +71,8 @@ export async function getUserSession() {
             name: true,
             email: true,
             phone: true,
+            avatar: true,
+            authProvider: true,
             createdAt: true,
           },
         },

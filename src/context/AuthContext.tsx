@@ -7,6 +7,8 @@ export interface CustomerUser {
   name: string;
   email: string | null;
   phone: string | null;
+  avatar?: string | null;
+  authProvider?: string;
   createdAt?: string;
 }
 
@@ -35,6 +37,9 @@ interface AuthContextType {
     phone?: string;
     password: string;
   }) => Promise<{ success: boolean; error?: string }>;
+  loginWithGoogleCredential: (
+    credential: string
+  ) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -146,6 +151,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const loginWithGoogleCredential = async (
+    credential: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const res = await fetch("/api/auth/google", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ credential }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        return { success: false, error: data.error || "Google sign-in failed." };
+      }
+      setUser(data.user);
+      syncLocalCartToServer();
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || "Network error. Please try again." };
+    }
+  };
+
   const logout = async () => {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
@@ -158,7 +184,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        login,
+        register,
+        loginWithGoogleCredential,
+        logout,
+        refreshUser,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

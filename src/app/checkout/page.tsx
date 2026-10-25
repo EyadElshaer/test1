@@ -27,6 +27,7 @@ import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { COUNTRY_CODES, CountryCode } from "@/lib/countryCodes";
 import { compressImageForUpload } from "@/lib/imageCompression";
+import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -311,7 +312,7 @@ export default function CheckoutPage() {
               </div>
 
               {/* Logged in indicator */}
-              {user && (
+              {user ? (
                 <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-xs flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -322,6 +323,22 @@ export default function CheckoutPage() {
                   <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider bg-emerald-500/10 px-2 py-0.5 rounded">
                     Linked to Account
                   </span>
+                </div>
+              ) : (
+                <div className="p-3.5 rounded-2xl bg-gradient-to-r from-blue-600/10 via-cyan-500/10 to-transparent border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="text-xs">
+                    <p className="font-semibold text-white">Have a Google account?</p>
+                    <p className="text-[11px] text-slate-400">
+                      Sign in for instant checkout and automatic order tracking.
+                    </p>
+                  </div>
+                  <div className="sm:w-auto w-full">
+                    <GoogleSignInButton
+                      redirectUrl="/checkout"
+                      text="Sign in with Google"
+                      className="!py-2 !px-3 text-xs"
+                    />
+                  </div>
                 </div>
               )}
 

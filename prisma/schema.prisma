@@ -60,7 +60,10 @@ model User {
   name          String
   email         String?       @unique
   phone         String?       @unique
-  passwordHash  String
+  passwordHash  String?
+  googleId      String?       @unique
+  avatar        String?
+  authProvider  String        @default("local") // "local", "google"
   cartData      String?       // JSON string of active/abandoned cart items
   cartUpdatedAt DateTime?     // When the cart was last modified
   createdAt     DateTime      @default(now())
@@ -70,6 +73,7 @@ model User {
 
   @@index([email])
   @@index([phone])
+  @@index([googleId])
 }
 
 model UserSession {
