@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { normalizePhone } from "@/lib/userAuth";
 
 export interface GoogleProfile {
   sub: string;
@@ -74,7 +75,7 @@ export function buildGoogleOAuthUrl(stateParam: string, req?: Request): string {
     client_id: clientId,
     redirect_uri: redirectUri,
     response_type: "code",
-    scope: "openid email profile",
+    scope: "openid email profile https://www.googleapis.com/auth/user.phonenumbers.read",
     access_type: "offline",
     prompt: "select_account",
     state: stateParam,
@@ -174,13 +175,53 @@ export async function verifyGoogleCredential(credential: string): Promise<Google
 }
 
 /**
+ * Attempts to retrieve user's phone number from Google People API if accessible
+ */
+export async function fetchGoogleUserPhoneNumber(accessToken: string): Promise<string | null> {
+  try {
+    const res = await fetch(
+      "https://people.googleapis.com/v1/people/me?personFields=phoneNumbers",
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    if (!res.ok) {
+      return null;
+    }
+
+    const data = await res.json();
+    if (Array.isArray(data.phoneNumbers) && data.phoneNumbers.length > 0) {
+      // Find the primary or first valid phone number
+      const primaryPhone =
+        data.phoneNumbers.find((p: any) => p.metadata?.primary) ||
+        data.phoneNumbers[0];
+      const val = primaryPhone?.value || primaryPhone?.canonicalForm;
+      if (val && typeof val === "string") {
+        return val.trim();
+      }
+    }
+    return null;
+  } catch (err) {
+    // If People API is disabled or user profile has no public phone, fail gracefully
+    return null;
+  }
+}
+
+/**
  * Looks up existing user by googleId or email, or creates a new user, and backlinks past orders
  */
-export async function syncGoogleUser(profile: GoogleProfile) {
+export async function syncGoogleUser(
+  profile: GoogleProfile,
+  rawPhoneNumber?: string | null
+) {
   const cleanEmail = profile.email.trim().toLowerCase();
   const displayName = profile.name?.trim() || "Customer";
+  const cleanPhone = rawPhoneNumber ? normalizePhone(rawPhoneNumber) : null;
 
-  // 1. Search by Google sub ID
+  // 1. Search by Google sub ID or email
   let user = await prisma.user.findFirst({
     where: {
       OR: [{ googleId: profile.sub }, { email: cleanEmail }],
@@ -188,7 +229,7 @@ export async function syncGoogleUser(profile: GoogleProfile) {
   });
 
   if (user) {
-    // Update existing user with Google ID and avatar if needed
+    // Update existing user with Google ID, avatar, and phone if needed
     const updates: any = {};
     if (!user.googleId) {
       updates.googleId = profile.sub;
@@ -199,6 +240,15 @@ export async function syncGoogleUser(profile: GoogleProfile) {
     if (!user.name && displayName) {
       updates.name = displayName;
     }
+    // If user has no phone set and Google provided a phone number
+    if (!user.phone && cleanPhone) {
+      const phoneTaken = await prisma.user.findFirst({
+        where: { phone: cleanPhone, NOT: { id: user.id } },
+      });
+      if (!phoneTaken) {
+        updates.phone = cleanPhone;
+      }
+    }
 
     if (Object.keys(updates).length > 0) {
       user = await prisma.user.update({
@@ -207,11 +257,23 @@ export async function syncGoogleUser(profile: GoogleProfile) {
       });
     }
   } else {
+    // Check if phone number is already taken by another account before setting on new user
+    let phoneToSet: string | null = null;
+    if (cleanPhone) {
+      const phoneTaken = await prisma.user.findUnique({
+        where: { phone: cleanPhone },
+      });
+      if (!phoneTaken) {
+        phoneToSet = cleanPhone;
+      }
+    }
+
     // Create new customer account
     user = await prisma.user.create({
       data: {
         name: displayName,
         email: cleanEmail,
+        phone: phoneToSet,
         googleId: profile.sub,
         avatar: profile.picture || null,
         authProvider: "google",
@@ -220,12 +282,16 @@ export async function syncGoogleUser(profile: GoogleProfile) {
     });
   }
 
-  // 2. Automatically link any guest orders previously placed with this email
+  // 2. Automatically link any guest orders previously placed with this email or phone
   try {
+    const orderConditions: any[] = [{ customerEmail: cleanEmail }];
+    if (user.phone) {
+      orderConditions.push({ customerPhone: user.phone });
+    }
     await prisma.order.updateMany({
       where: {
         userId: null,
-        customerEmail: cleanEmail,
+        OR: orderConditions,
       },
       data: {
         userId: user.id,

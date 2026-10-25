@@ -7,25 +7,29 @@ import {
   verifyGoogleCredential,
   syncGoogleUser,
 } from "@/lib/googleAuth";
-import { createUserSession } from "@/lib/userAuth";
+import { createUserSession, getUserSession } from "@/lib/userAuth";
 
 export const dynamic = "force-dynamic";
 
 /**
- * GET: Starts the Google OAuth 2.0 redirect flow
+ * GET: Starts the Google OAuth 2.0 redirect flow (Login or Link Account)
  */
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const redirectTarget = searchParams.get("redirect") || "/account/orders";
+    const action = searchParams.get("action"); // "link" or standard login
 
     // 1. Check if Google OAuth credentials are set in environment
     if (!isGoogleAuthConfigured()) {
-      const errorUrl = new URL("/login", req.url);
+      const errorUrl = new URL(action === "link" ? "/account" : "/login", req.url);
       errorUrl.searchParams.set("error", "google_not_configured");
       if (redirectTarget) errorUrl.searchParams.set("redirect", redirectTarget);
       return NextResponse.redirect(errorUrl);
     }
+
+    // Check if user is currently logged in (for account linking)
+    const currentUser = await getUserSession();
 
     // 2. Generate cryptographically random state to protect against CSRF
     const randomState = crypto.randomBytes(24).toString("hex");
@@ -33,6 +37,8 @@ export async function GET(req: Request) {
       JSON.stringify({
         token: randomState,
         redirect: redirectTarget,
+        action: action === "link" ? "link" : "login",
+        userId: action === "link" && currentUser ? currentUser.id : undefined,
       })
     ).toString("base64url");
 
@@ -89,6 +95,9 @@ export async function POST(req: Request) {
         phone: user.phone,
         avatar: user.avatar,
         authProvider: user.authProvider,
+        googleId: user.googleId,
+        hasGoogle: Boolean(user.googleId),
+        hasPassword: Boolean(user.passwordHash),
         createdAt: user.createdAt,
       },
       message: "Logged in with Google successfully!",

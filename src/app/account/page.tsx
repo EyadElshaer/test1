@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   User,
   Mail,
@@ -14,19 +14,101 @@ import {
   ChevronRight,
   ExternalLink,
   ShoppingBag,
+  Copy,
+  Check,
+  Lock,
+  KeyRound,
+  AlertCircle,
+  CheckCircle2,
+  AlertTriangle,
+  Sparkles,
+  Link2,
+  Unlink,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
-export default function AccountProfilePage() {
+function AccountProfileContent() {
   const router = useRouter();
-  const { user, loading: authLoading, logout, refreshUser } = useAuth();
+  const searchParams = useSearchParams();
+  const { user, loading: authLoading, logout, refreshUser, unlinkGoogle } = useAuth();
 
+  // Profile Edit Modal State
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editName, setEditName] = useState("");
   const [editEmail, setEditEmail] = useState("");
+  const [editPhone, setEditPhone] = useState("");
   const [editError, setEditError] = useState("");
   const [editSuccess, setEditSuccess] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+
+  // Password Modal State
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPasswordText, setShowPasswordText] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordSuccess, setPasswordSuccess] = useState("");
+  const [isPasswordSaving, setIsPasswordSaving] = useState(false);
+
+  // Unlink Google State
+  const [isUnlinking, setIsUnlinking] = useState(false);
+  const [unlinkFeedback, setUnlinkFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Copy Feedback
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  // Query Params Feedback Alert
+  const [bannerAlert, setBannerAlert] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
+
+  useEffect(() => {
+    const successParam = searchParams.get("success");
+    const errorParam = searchParams.get("error");
+
+    if (successParam === "google_linked") {
+      setBannerAlert({
+        type: "success",
+        message: "Your Google account has been successfully linked to your PremiKeys profile! You can now use 1-click Google Sign-In anytime.",
+      });
+    } else if (errorParam === "google_already_linked") {
+      setBannerAlert({
+        type: "error",
+        message: "This Google account is already linked to another PremiKeys customer account. To use it, please log into that account.",
+      });
+    } else if (errorParam === "google_cancelled") {
+      setBannerAlert({
+        type: "info",
+        message: "Google account connection was cancelled.",
+      });
+    } else if (errorParam) {
+      setBannerAlert({
+        type: "error",
+        message: `Google authentication notice: ${decodeURIComponent(errorParam)}`,
+      });
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.replace("/login?redirect=/account");
+    }
+  }, [user, authLoading, router]);
+
+  const handleCopy = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedKey(id);
+    setTimeout(() => setCopiedKey(null), 2000);
+  };
+
+  const openEditModal = (focusField?: "phone" | "email" | "name") => {
+    if (!user) return;
+    setEditName(user.name || "");
+    setEditEmail(user.email || "");
+    setEditPhone(user.phone || "");
+    setEditError("");
+    setEditSuccess("");
+    setIsEditModalOpen(true);
+  };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,8 +121,9 @@ export default function AccountProfilePage() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: editName,
+          name: editName.trim(),
           email: editEmail.trim() || null,
+          phone: editPhone.trim() || null,
         }),
       });
 
@@ -49,7 +132,7 @@ export default function AccountProfilePage() {
         throw new Error(data.error || "Failed to update profile.");
       }
 
-      setEditSuccess("Profile updated successfully!");
+      setEditSuccess("Profile information saved successfully!");
       await refreshUser();
       setTimeout(() => {
         setIsEditModalOpen(false);
@@ -62,11 +145,88 @@ export default function AccountProfilePage() {
     }
   };
 
-  useEffect(() => {
-    if (!authLoading && !user) {
-      router.replace("/login?redirect=/account");
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError("");
+    setPasswordSuccess("");
+
+    if (!newPassword || newPassword.length < 6) {
+      setPasswordError("Password must be at least 6 characters long.");
+      return;
     }
-  }, [user, authLoading, router]);
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError("Passwords do not match. Please re-enter.");
+      return;
+    }
+
+    setIsPasswordSaving(true);
+    try {
+      const res = await fetch("/api/user/password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          currentPassword: user?.hasPassword ? currentPassword : undefined,
+          newPassword,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to update password.");
+      }
+
+      setPasswordSuccess(data.message || "Password updated successfully!");
+      await refreshUser();
+      setTimeout(() => {
+        setIsPasswordModalOpen(false);
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+        setPasswordSuccess("");
+      }, 1500);
+    } catch (err: any) {
+      setPasswordError(err.message || "Failed to update password.");
+    } finally {
+      setIsPasswordSaving(false);
+    }
+  };
+
+  const handleUnlinkGoogle = async () => {
+    if (!user?.hasPassword) {
+      setUnlinkFeedback({
+        type: "error",
+        text: "Please set a password for your account first so you don't lose access before unlinking Google.",
+      });
+      setIsPasswordModalOpen(true);
+      return;
+    }
+
+    if (!confirm("Are you sure you want to unlink your Google account? You will need to sign in with your email/phone and password.")) {
+      return;
+    }
+
+    setIsUnlinking(true);
+    setUnlinkFeedback(null);
+    try {
+      const res = await unlinkGoogle();
+      if (!res.success) {
+        throw new Error(res.error || "Failed to unlink Google account.");
+      }
+      setUnlinkFeedback({
+        type: "success",
+        text: "Google account successfully unlinked.",
+      });
+      setTimeout(() => setUnlinkFeedback(null), 4000);
+    } catch (err: any) {
+      setUnlinkFeedback({
+        type: "error",
+        text: err.message || "Failed to unlink Google account.",
+      });
+    } finally {
+      setIsUnlinking(false);
+    }
+  };
 
   if (authLoading || !user) {
     return (
@@ -76,19 +236,52 @@ export default function AccountProfilePage() {
     );
   }
 
+  const isGoogleLinked = Boolean(user.hasGoogle || user.googleId || user.authProvider === "google");
+
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8">
-      {/* Page Title */}
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8 animate-fadeIn">
+      {/* Banner Feedback Alert */}
+      {bannerAlert && (
+        <div
+          className={`p-4 rounded-2xl border text-xs flex items-center justify-between gap-3 shadow-lg ${
+            bannerAlert.type === "success"
+              ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
+              : bannerAlert.type === "error"
+              ? "bg-rose-500/10 border-rose-500/30 text-rose-300"
+              : "bg-blue-500/10 border-blue-500/30 text-cyan-300"
+          }`}
+        >
+          <div className="flex items-center gap-2.5">
+            {bannerAlert.type === "success" ? (
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+            ) : bannerAlert.type === "error" ? (
+              <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />
+            ) : (
+              <AlertCircle className="w-4 h-4 shrink-0 text-cyan-400" />
+            )}
+            <span>{bannerAlert.message}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setBannerAlert(null)}
+            className="text-slate-400 hover:text-white text-xs p-1"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Page Title & Sign Out */}
       <div className="border-b border-white/10 pb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <span className="text-[10px] font-mono uppercase tracking-widest text-cyan-400 font-bold bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-0.5 rounded-full">
             Customer Account
           </span>
           <h1 className="text-2xl sm:text-3xl font-black text-white mt-1">
-            Account Profile &amp; Preferences
+            Account Profile &amp; Security
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Manage your personal contact details, view purchases, and configure preferences.
+            Manage your personal contact info, linked social accounts, and login security credentials.
           </p>
         </div>
 
@@ -103,46 +296,65 @@ export default function AccountProfilePage() {
 
       {/* Profile Card */}
       <div className="glass-card rounded-3xl p-6 sm:p-8 border border-white/10 bg-[#070d1d]/80 space-y-6 shadow-2xl">
-        <div className="flex items-center gap-4">
-          {user.avatar ? (
-            <img
-              src={user.avatar}
-              alt={user.name}
-              className="w-16 h-16 rounded-2xl object-cover border border-white/20 shadow-lg shadow-blue-500/20"
-              referrerPolicy="no-referrer"
-            />
-          ) : (
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-cyan-400 flex items-center justify-center text-white text-2xl font-black shadow-lg shadow-blue-500/20 uppercase">
-              {user.name ? user.name.charAt(0) : "U"}
-            </div>
-          )}
-          <div>
-            <h2 className="text-lg font-bold text-white">{user.name}</h2>
-            <p className="text-xs text-slate-400 font-mono mt-0.5">
-              {user.email || user.phone}
-            </p>
-            <div className="flex items-center gap-2 mt-2">
-              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
-                <ShieldCheck className="w-3 h-3" />
-                Verified Customer
-              </span>
-              {user.authProvider === "google" && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-cyan-300 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-full">
-                  <svg className="w-3 h-3" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
-                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
-                  </svg>
-                  Google Account
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            {user.avatar ? (
+              <img
+                src={user.avatar}
+                alt={user.name}
+                className="w-16 h-16 rounded-2xl object-cover border border-white/20 shadow-lg shadow-blue-500/20"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-cyan-400 flex items-center justify-center text-white text-2xl font-black shadow-lg shadow-blue-500/20 uppercase">
+                {user.name ? user.name.charAt(0) : "U"}
+              </div>
+            )}
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-bold text-white">{user.name}</h2>
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                  <ShieldCheck className="w-3 h-3" />
+                  Verified
                 </span>
-              )}
+              </div>
+              <p className="text-xs text-slate-400 font-mono mt-0.5">
+                {user.email || user.phone || "Active Customer"}
+              </p>
+              <div className="flex items-center gap-2 mt-2">
+                {isGoogleLinked && (
+                  <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-cyan-300 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-full">
+                    <svg className="w-3 h-3" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
+                      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
+                    </svg>
+                    Google Connected
+                  </span>
+                )}
+                {user.hasPassword && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                    <Lock className="w-3 h-3" />
+                    Password Active
+                  </span>
+                )}
+              </div>
             </div>
           </div>
+
+          <button
+            type="button"
+            onClick={() => openEditModal()}
+            className="px-4 py-2 rounded-xl text-xs font-semibold btn-secondary flex items-center gap-1.5 self-start sm:self-center"
+          >
+            <span>Edit Profile Info</span>
+          </button>
         </div>
 
         {/* Info Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-white/10 text-xs">
+          {/* Full Name */}
           <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-1">
             <span className="text-slate-400 text-[10px] uppercase font-bold flex items-center gap-1.5">
               <User className="w-3.5 h-3.5 text-cyan-400" />
@@ -152,11 +364,7 @@ export default function AccountProfilePage() {
               <p className="font-semibold text-white text-sm">{user.name}</p>
               <button
                 type="button"
-                onClick={() => {
-                  setEditName(user.name);
-                  setEditEmail(user.email || "");
-                  setIsEditModalOpen(true);
-                }}
+                onClick={() => openEditModal("name")}
                 className="text-[11px] text-cyan-400 hover:text-cyan-300 font-semibold"
               >
                 Edit
@@ -164,51 +372,101 @@ export default function AccountProfilePage() {
             </div>
           </div>
 
+          {/* Email Address */}
           <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-1">
             <span className="text-slate-400 text-[10px] uppercase font-bold flex items-center gap-1.5">
               <Mail className="w-3.5 h-3.5 text-cyan-400" />
               <span>Email Address</span>
             </span>
             <div className="flex items-center justify-between">
-              <p className="font-semibold text-white text-sm font-mono">
-                {user.email || <span className="text-amber-400/80 italic font-sans">No email linked</span>}
+              <p className="font-semibold text-white text-sm font-mono truncate max-w-[220px]">
+                {user.email || <span className="text-amber-400/80 italic font-sans text-xs">No email linked</span>}
               </p>
               <button
                 type="button"
-                onClick={() => {
-                  setEditName(user.name);
-                  setEditEmail(user.email || "");
-                  setIsEditModalOpen(true);
-                }}
-                className="text-[11px] text-cyan-400 hover:text-cyan-300 font-semibold"
+                onClick={() => openEditModal("email")}
+                className="text-[11px] text-cyan-400 hover:text-cyan-300 font-semibold shrink-0"
               >
-                {user.email ? "Edit Email" : "+ Add Email"}
+                {user.email ? "Edit" : "+ Add Email"}
               </button>
             </div>
           </div>
 
-          <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-1">
-            <span className="text-slate-400 text-[10px] uppercase font-bold flex items-center gap-1.5">
-              <Phone className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Mobile Phone Number</span>
-            </span>
-            <p className="font-semibold text-white text-sm font-mono">
-              {user.phone || <span className="text-slate-500 italic">Not set</span>}
-            </p>
+          {/* Mobile Phone Number */}
+          <div className={`p-4 rounded-2xl border space-y-1 transition-all ${
+            user.phone
+              ? "bg-white/[0.02] border-white/5"
+              : "bg-amber-500/[0.05] border-amber-500/30"
+          }`}>
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400 text-[10px] uppercase font-bold flex items-center gap-1.5">
+                <Phone className={`w-3.5 h-3.5 ${user.phone ? "text-cyan-400" : "text-amber-400"}`} />
+                <span>Mobile Phone Number</span>
+              </span>
+              {!user.phone && (
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  Required for Order WhatsApp
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between pt-0.5">
+              {user.phone ? (
+                <div className="flex items-center gap-2">
+                  <p className="font-semibold text-white text-sm font-mono">{user.phone}</p>
+                  <button
+                    type="button"
+                    onClick={() => handleCopy(user.phone!, "phone_profile")}
+                    className="text-slate-400 hover:text-white transition-colors"
+                    title="Copy phone number"
+                  >
+                    {copiedKey === "phone_profile" ? (
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+                </div>
+              ) : (
+                <p className="text-amber-300 text-xs italic font-medium flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span>No phone number added yet</span>
+                </p>
+              )}
+
+              <button
+                type="button"
+                onClick={() => openEditModal("phone")}
+                className={`text-xs font-bold px-2.5 py-1 rounded-lg transition-all ${
+                  user.phone
+                    ? "text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10"
+                    : "bg-amber-500 text-black hover:bg-amber-400 shadow-md shadow-amber-500/20"
+                }`}
+              >
+                {user.phone ? "Edit Phone" : "+ Add Phone Number"}
+              </button>
+            </div>
           </div>
 
+          {/* Member Since */}
           <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-1">
             <span className="text-slate-400 text-[10px] uppercase font-bold flex items-center gap-1.5">
               <Calendar className="w-3.5 h-3.5 text-cyan-400" />
               <span>Member Since</span>
             </span>
             <p className="font-semibold text-white text-sm">
-              {user.createdAt ? new Date(user.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Recent"}
+              {user.createdAt
+                ? new Date(user.createdAt).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })
+                : "Recent"}
             </p>
           </div>
         </div>
 
-        {/* Quick Links Banner */}
+        {/* Quick Orders Link */}
         <div className="pt-2">
           <Link
             href="/account/orders"
@@ -220,10 +478,10 @@ export default function AccountProfilePage() {
               </div>
               <div>
                 <h3 className="text-xs font-bold text-white group-hover:text-cyan-200 transition-colors">
-                  View My Orders &amp; Purchased Keys
+                  View My Orders &amp; Purchased License Keys
                 </h3>
                 <p className="text-[11px] text-slate-300">
-                  Track delivery progress, review license keys, and request refunds.
+                  Track delivery progress, review activation keys, and request customer service.
                 </p>
               </div>
             </div>
@@ -232,14 +490,179 @@ export default function AccountProfilePage() {
         </div>
       </div>
 
-      {/* Edit Profile Modal */}
+      {/* ========================================================================= */}
+      {/* LINKED ACCOUNTS & SIGN-IN METHODS SECTION */}
+      {/* ========================================================================= */}
+      <div className="glass-card rounded-3xl p-6 sm:p-8 border border-white/10 bg-[#070d1d]/80 space-y-6 shadow-2xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <Link2 className="w-5 h-5 text-cyan-400" />
+              <h2 className="text-lg font-bold text-white">Linked Accounts &amp; Sign-In Methods</h2>
+            </div>
+            <p className="text-xs text-slate-400 mt-1">
+              Connect external identity providers for instant 1-click access and manage your credentials.
+            </p>
+          </div>
+        </div>
+
+        {unlinkFeedback && (
+          <div
+            className={`p-3.5 rounded-xl border text-xs flex items-center gap-2 ${
+              unlinkFeedback.type === "success"
+                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
+                : "bg-rose-500/10 border-rose-500/30 text-rose-300"
+            }`}
+          >
+            {unlinkFeedback.type === "success" ? (
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+            ) : (
+              <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />
+            )}
+            <span>{unlinkFeedback.text}</span>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* 1. Google Account */}
+          <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/10 space-y-4 flex flex-col justify-between">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
+                      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-white text-sm">Google Account</h3>
+                    <p className="text-[11px] text-slate-400">One-click social sign-in</p>
+                  </div>
+                </div>
+
+                {isGoogleLinked ? (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" />
+                    Connected
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-white/5 text-slate-400 border border-white/10">
+                    Not Linked
+                  </span>
+                )}
+              </div>
+
+              <p className="text-xs text-slate-300">
+                {isGoogleLinked
+                  ? "Your Google account is linked. You can sign in instantly with one click using Google."
+                  : "Link your Google account to log in with 1-click without having to remember or enter passwords."}
+              </p>
+            </div>
+
+            <div className="pt-2 border-t border-white/5">
+              {isGoogleLinked ? (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] text-slate-400 font-mono truncate max-w-[180px]">
+                    {user.email || "Google Account"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleUnlinkGoogle}
+                    disabled={isUnlinking}
+                    className="px-3 py-1.5 rounded-xl text-xs font-semibold text-rose-300 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 transition-all flex items-center gap-1"
+                  >
+                    <Unlink className="w-3.5 h-3.5" />
+                    <span>{isUnlinking ? "Unlinking..." : "Unlink"}</span>
+                  </button>
+                </div>
+              ) : (
+                <a
+                  href="/api/auth/google?action=link&redirect=/account"
+                  className="w-full py-2.5 px-3 rounded-xl text-xs font-bold text-white bg-white/10 hover:bg-white/15 border border-white/20 transition-all flex items-center justify-center gap-2 group"
+                >
+                  <svg className="w-4 h-4 transition-transform group-hover:scale-110" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
+                  </svg>
+                  <span>Link Google Account</span>
+                </a>
+              )}
+            </div>
+          </div>
+
+          {/* 2. Password & Direct Login */}
+          <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/10 space-y-4 flex flex-col justify-between">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
+                    <KeyRound className="w-4 h-4 text-cyan-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-white text-sm">Account Password</h3>
+                    <p className="text-[11px] text-slate-400">Email &amp; phone credentials</p>
+                  </div>
+                </div>
+
+                {user.hasPassword ? (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" />
+                    Configured
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                    No Password Set
+                  </span>
+                )}
+              </div>
+
+              <p className="text-xs text-slate-300">
+                {user.hasPassword
+                  ? "Password login is active. You can log into PremiKeys using your email or phone and password."
+                  : "You registered via Google OAuth. Set up a password so you can also sign in directly using email or phone."}
+              </p>
+            </div>
+
+            <div className="pt-2 border-t border-white/5">
+              <button
+                type="button"
+                onClick={() => {
+                  setPasswordError("");
+                  setPasswordSuccess("");
+                  setCurrentPassword("");
+                  setNewPassword("");
+                  setConfirmPassword("");
+                  setIsPasswordModalOpen(true);
+                }}
+                className={`w-full py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                  user.hasPassword
+                    ? "btn-secondary"
+                    : "btn-primary shadow-lg shadow-cyan-500/20"
+                }`}
+              >
+                <Lock className="w-3.5 h-3.5" />
+                <span>{user.hasPassword ? "Change Password" : "+ Set Account Password"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* EDIT PROFILE MODAL (NAME, EMAIL, AND PHONE) */}
+      {/* ========================================================================= */}
       {isEditModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-[#0b1026] border border-white/15 rounded-3xl p-6 sm:p-8 max-w-md w-full space-y-6 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
+          <div className="bg-[#0b1026] border border-cyan-500/30 rounded-3xl p-6 sm:p-8 max-w-md w-full space-y-6 shadow-2xl">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
-              <h3 className="font-bold text-lg text-white flex items-center gap-2">
+              <h3 className="font-bold text-base text-white flex items-center gap-2">
                 <User className="w-5 h-5 text-cyan-400" />
-                <span>Update Account Information</span>
+                <span>Update Contact Details</span>
               </h3>
               <button
                 type="button"
@@ -256,13 +679,15 @@ export default function AccountProfilePage() {
 
             <form onSubmit={handleSaveProfile} className="space-y-4">
               {editError && (
-                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs">
-                  {editError}
+                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{editError}</span>
                 </div>
               )}
               {editSuccess && (
-                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs">
-                  {editSuccess}
+                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>{editSuccess}</span>
                 </div>
               )}
 
@@ -292,11 +717,28 @@ export default function AccountProfilePage() {
                   placeholder="yourname@example.com"
                 />
                 <span className="text-[11px] text-slate-400 mt-1 block">
-                  You can use this email to sign in and receive order confirmation keys.
+                  Used for order receipts, license key delivery, and sign in.
                 </span>
               </div>
 
-              <div className="flex gap-2 pt-2">
+              <div>
+                <label className="text-xs font-semibold text-slate-300 block mb-1 flex items-center justify-between">
+                  <span>Mobile Phone Number</span>
+                  <span className="text-[10px] text-cyan-400 font-normal">WhatsApp delivery</span>
+                </label>
+                <input
+                  type="tel"
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  className="w-full glass-input px-3.5 py-2.5 rounded-xl text-sm font-mono"
+                  placeholder="+201012345678 or 01012345678"
+                />
+                <span className="text-[11px] text-slate-400 mt-1 block">
+                  Enter Egyptian number (e.g. 010...) or international format with country code (e.g. +20...).
+                </span>
+              </div>
+
+              <div className="flex gap-2.5 pt-2">
                 <button
                   type="button"
                   onClick={() => setIsEditModalOpen(false)}
@@ -307,7 +749,7 @@ export default function AccountProfilePage() {
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="flex-1 py-2.5 rounded-xl font-bold text-xs text-white btn-primary shadow-lg shadow-blue-500/30 disabled:opacity-50"
+                  className="flex-1 py-2.5 rounded-xl font-bold text-xs text-white btn-primary shadow-lg shadow-cyan-500/25 disabled:opacity-50"
                 >
                   {isSaving ? "Saving..." : "Save Changes"}
                 </button>
@@ -316,6 +758,133 @@ export default function AccountProfilePage() {
           </div>
         </div>
       )}
+
+      {/* ========================================================================= */}
+      {/* SET / CHANGE PASSWORD MODAL */}
+      {/* ========================================================================= */}
+      {isPasswordModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
+          <div className="bg-[#0b1026] border border-cyan-500/30 rounded-3xl p-6 sm:p-8 max-w-md w-full space-y-6 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <h3 className="font-bold text-base text-white flex items-center gap-2">
+                <KeyRound className="w-5 h-5 text-cyan-400" />
+                <span>{user.hasPassword ? "Change Password" : "Create Account Password"}</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsPasswordModalOpen(false);
+                  setPasswordError("");
+                  setPasswordSuccess("");
+                }}
+                className="p-1 text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handlePasswordSubmit} className="space-y-4">
+              {passwordError && (
+                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{passwordError}</span>
+                </div>
+              )}
+              {passwordSuccess && (
+                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>{passwordSuccess}</span>
+                </div>
+              )}
+
+              {user.hasPassword && (
+                <div>
+                  <label className="text-xs font-semibold text-slate-300 block mb-1">
+                    Current Password
+                  </label>
+                  <input
+                    type={showPasswordText ? "text" : "password"}
+                    required
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    className="w-full glass-input px-3.5 py-2.5 rounded-xl text-sm font-mono"
+                    placeholder="Enter your current password"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="text-xs font-semibold text-slate-300 block mb-1">
+                  New Password
+                </label>
+                <input
+                  type={showPasswordText ? "text" : "password"}
+                  required
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full glass-input px-3.5 py-2.5 rounded-xl text-sm font-mono"
+                  placeholder="At least 6 characters"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-300 block mb-1">
+                  Confirm New Password
+                </label>
+                <input
+                  type={showPasswordText ? "text" : "password"}
+                  required
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full glass-input px-3.5 py-2.5 rounded-xl text-sm font-mono"
+                  placeholder="Re-enter new password"
+                />
+              </div>
+
+              <div className="flex items-center justify-between text-xs text-slate-400 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowPasswordText(!showPasswordText)}
+                  className="hover:text-cyan-300 transition-colors"
+                >
+                  {showPasswordText ? "Hide Passwords" : "Show Passwords"}
+                </button>
+              </div>
+
+              <div className="flex gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsPasswordModalOpen(false)}
+                  className="flex-1 py-2.5 rounded-xl text-xs font-semibold btn-secondary"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isPasswordSaving || !newPassword}
+                  className="flex-1 py-2.5 rounded-xl font-bold text-xs text-white btn-primary shadow-lg shadow-cyan-500/25 disabled:opacity-50"
+                >
+                  {isPasswordSaving ? "Updating..." : user.hasPassword ? "Save Password" : "Set Password"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+export default function AccountProfilePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-[70vh] flex items-center justify-center text-slate-400 text-xs font-mono">
+          Loading profile...
+        </div>
+      }
+    >
+      <AccountProfileContent />
+    </Suspense>
   );
 }

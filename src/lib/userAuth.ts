@@ -73,6 +73,8 @@ export async function getUserSession() {
             phone: true,
             avatar: true,
             authProvider: true,
+            googleId: true,
+            passwordHash: true,
             createdAt: true,
           },
         },
@@ -96,7 +98,18 @@ export async function getUserSession() {
         .catch(() => {});
     }
 
-    return session.user;
+    return {
+      id: session.user.id,
+      name: session.user.name,
+      email: session.user.email,
+      phone: session.user.phone,
+      avatar: session.user.avatar,
+      authProvider: session.user.authProvider,
+      googleId: session.user.googleId,
+      hasGoogle: Boolean(session.user.googleId),
+      hasPassword: Boolean(session.user.passwordHash),
+      createdAt: session.user.createdAt,
+    };
   } catch (error) {
     console.error("Error verifying customer user session:", error);
     return null;

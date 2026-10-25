@@ -9,6 +9,9 @@ export interface CustomerUser {
   phone: string | null;
   avatar?: string | null;
   authProvider?: string;
+  googleId?: string | null;
+  hasGoogle?: boolean;
+  hasPassword?: boolean;
   createdAt?: string;
 }
 
@@ -40,6 +43,7 @@ interface AuthContextType {
   loginWithGoogleCredential: (
     credential: string
   ) => Promise<{ success: boolean; error?: string }>;
+  unlinkGoogle: () => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -172,6 +176,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const unlinkGoogle = async (): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const res = await fetch("/api/user/unlink-google", {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        return { success: false, error: data.error || "Failed to unlink Google account." };
+      }
+      await refreshUser();
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || "Failed to unlink Google account." };
+    }
+  };
+
   const logout = async () => {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
@@ -191,6 +211,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login,
         register,
         loginWithGoogleCredential,
+        unlinkGoogle,
         logout,
         refreshUser,
       }}
