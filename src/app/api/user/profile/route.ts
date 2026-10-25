@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUserSession, isEmail, normalizePhone } from "@/lib/userAuth";
+import {
+  findCountryByCode,
+  detectCountryFromPhone,
+  validatePhoneForCountry,
+} from "@/lib/countryCodes";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +16,7 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { name, email, phone } = await req.json();
+    const { name, email, phone, countryCode } = await req.json();
 
     const updateData: { name?: string; email?: string | null; phone?: string | null } = {};
 
@@ -62,14 +67,23 @@ export async function PATCH(req: Request) {
         updateData.phone = null;
       } else {
         const cleanPhone = normalizePhone(phone);
-        if (!cleanPhone || cleanPhone.replace(/[^\d]/g, "").length < 8) {
-          return NextResponse.json({ error: "Please enter a valid mobile phone number." }, { status: 400 });
+        let targetCountry = countryCode ? findCountryByCode(countryCode) : null;
+        if (!targetCountry) {
+          const detected = detectCountryFromPhone(cleanPhone);
+          targetCountry = detected.country;
         }
+
+        const validation = validatePhoneForCountry(targetCountry, cleanPhone);
+        if (!validation.isValid) {
+          return NextResponse.json({ error: validation.error || "Please enter a valid mobile phone number." }, { status: 400 });
+        }
+
+        const finalPhone = validation.fullInternationalNumber;
 
         // Check uniqueness
         const existing = await prisma.user.findFirst({
           where: {
-            phone: cleanPhone,
+            phone: finalPhone,
             NOT: { id: sessionUser.id },
           },
         });
@@ -78,7 +92,7 @@ export async function PATCH(req: Request) {
           return NextResponse.json({ error: "This phone number is already registered to another account." }, { status: 409 });
         }
 
-        updateData.phone = cleanPhone;
+        updateData.phone = finalPhone;
       }
     }
 

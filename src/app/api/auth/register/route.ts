@@ -5,6 +5,11 @@ import { createUserSession, normalizePhone, isEmail } from "@/lib/userAuth";
 import { sanitizeString } from "@/lib/sanitizer";
 import { getClientIp } from "@/lib/security";
 import { checkRateLimit } from "@/lib/rateLimit";
+import {
+  findCountryByCode,
+  detectCountryFromPhone,
+  validatePhoneForCountry,
+} from "@/lib/countryCodes";
 
 export async function POST(req: Request) {
   try {
@@ -24,7 +29,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { name, identifier, email, phone, password } = body;
+    const { name, identifier, email, phone, countryCode, password } = body;
 
     const cleanName = sanitizeString(name, 70);
     if (!cleanName || cleanName.length < 2) {
@@ -63,6 +68,23 @@ export async function POST(req: Request) {
         { error: "Please provide either a valid email address or phone number." },
         { status: 400 }
       );
+    }
+
+    // Validate phone number format and exact digit length for the specified country
+    if (parsedPhone) {
+      let targetCountry = countryCode ? findCountryByCode(countryCode) : null;
+      if (!targetCountry) {
+        const detected = detectCountryFromPhone(parsedPhone);
+        targetCountry = detected.country;
+      }
+      const phoneVal = validatePhoneForCountry(targetCountry, parsedPhone);
+      if (!phoneVal.isValid) {
+        return NextResponse.json(
+          { error: phoneVal.error || `Please enter a valid mobile phone number for ${targetCountry.name}.` },
+          { status: 400 }
+        );
+      }
+      parsedPhone = phoneVal.fullInternationalNumber;
     }
 
     // Check if user already exists

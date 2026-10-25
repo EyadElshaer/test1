@@ -26,6 +26,13 @@ import {
   Unlink,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import {
+  COUNTRY_CODES,
+  CountryCode,
+  detectCountryFromPhone,
+  validatePhoneForCountry,
+} from "@/lib/countryCodes";
+import { PhoneInput } from "@/components/PhoneInput";
 
 function AccountProfileContent() {
   const router = useRouter();
@@ -37,6 +44,7 @@ function AccountProfileContent() {
   const [editName, setEditName] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editPhone, setEditPhone] = useState("");
+  const [editCountry, setEditCountry] = useState<CountryCode>(COUNTRY_CODES[0]);
   const [editError, setEditError] = useState("");
   const [editSuccess, setEditSuccess] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -104,7 +112,13 @@ function AccountProfileContent() {
     if (!user) return;
     setEditName(user.name || "");
     setEditEmail(user.email || "");
-    setEditPhone(user.phone || "");
+    if (user.phone) {
+      const detected = detectCountryFromPhone(user.phone);
+      setEditCountry(detected.country);
+      setEditPhone(detected.nationalNumber);
+    } else {
+      setEditPhone("");
+    }
     setEditError("");
     setEditSuccess("");
     setIsEditModalOpen(true);
@@ -114,6 +128,17 @@ function AccountProfileContent() {
     e.preventDefault();
     setEditError("");
     setEditSuccess("");
+
+    let formattedPhone: string | null = null;
+    if (editPhone.trim()) {
+      const val = validatePhoneForCountry(editCountry, editPhone);
+      if (!val.isValid) {
+        setEditError(val.error || `Please enter a valid mobile number for ${editCountry.name}.`);
+        return;
+      }
+      formattedPhone = val.fullInternationalNumber;
+    }
+
     setIsSaving(true);
 
     try {
@@ -123,7 +148,8 @@ function AccountProfileContent() {
         body: JSON.stringify({
           name: editName.trim(),
           email: editEmail.trim() || null,
-          phone: editPhone.trim() || null,
+          phone: formattedPhone,
+          countryCode: editCountry.code,
         }),
       });
 
@@ -722,19 +748,20 @@ function AccountProfileContent() {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-300 block mb-1 flex items-center justify-between">
-                  <span>Mobile Phone Number</span>
-                  <span className="text-[10px] text-cyan-400 font-normal">WhatsApp delivery</span>
-                </label>
-                <input
-                  type="tel"
+                <PhoneInput
+                  id="profile-phone-input"
+                  label="Mobile Phone Number (WhatsApp & Order delivery)"
                   value={editPhone}
-                  onChange={(e) => setEditPhone(e.target.value)}
-                  className="w-full glass-input px-3.5 py-2.5 rounded-xl text-sm font-mono"
-                  placeholder="+201012345678 or 01012345678"
+                  country={editCountry}
+                  onCountryChange={(c) => setEditCountry(c)}
+                  onChange={(nationalDigits) => {
+                    setEditPhone(nationalDigits);
+                    setEditError("");
+                  }}
+                  autoDetectIp={!user?.phone}
                 />
                 <span className="text-[11px] text-slate-400 mt-1 block">
-                  Enter Egyptian number (e.g. 010...) or international format with country code (e.g. +20...).
+                  Your country code is automatically selected based on your IP location. The phone number must contain the exact required digits for {editCountry.name}.
                 </span>
               </div>
 

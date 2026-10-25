@@ -38,6 +38,7 @@ interface AuthContextType {
     identifier?: string;
     email?: string;
     phone?: string;
+    countryCode?: string;
     password: string;
   }) => Promise<{ success: boolean; error?: string }>;
   loginWithGoogleCredential: (
@@ -135,6 +136,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     identifier?: string;
     email?: string;
     phone?: string;
+    countryCode?: string;
     password: string;
   }) => {
     try {

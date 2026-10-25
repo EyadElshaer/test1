@@ -203,6 +203,27 @@ export default function AccountOrdersPage() {
         </div>
       </div>
 
+      {/* Phone Number Missing Notice for Google SSO or Direct Users */}
+      {user && !user.phone && (
+        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-wrap items-center justify-between gap-3 mb-6">
+          <div className="flex items-center gap-2.5">
+            <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
+            <div>
+              <p className="text-xs font-bold text-amber-300">No Mobile Phone Number Linked</p>
+              <p className="text-[11px] text-slate-300">
+                Google accounts do not share phone numbers by default. Add your mobile number to receive instant order notifications via WhatsApp.
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/account"
+            className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-amber-500 text-black hover:bg-amber-400 shadow-md shadow-amber-500/20 transition-all shrink-0"
+          >
+            + Add Phone Number
+          </Link>
+        </div>
+      )}
+
       {errorMessage && (
         <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs flex items-center gap-2">
           <AlertCircle className="w-4 h-4 shrink-0" />

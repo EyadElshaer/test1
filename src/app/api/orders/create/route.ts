@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
 import { generateUniqueOrderNumber } from "@/lib/orderNumber";
-import { normalizePhoneNumber } from "@/lib/countryCodes";
+import {
+  normalizePhoneNumber,
+  findCountryByCode,
+  findCountryByDialCode,
+  validatePhoneForCountry,
+} from "@/lib/countryCodes";
 import { getUserSession, createUserSession } from "@/lib/userAuth";
 import { sendTelegramOrderAlert } from "@/lib/telegram";
 import { sanitizeString } from "@/lib/sanitizer";
@@ -46,15 +51,21 @@ export async function POST(req: Request) {
     if (!cleanCustomerName || cleanCustomerName.length < 2) {
       return NextResponse.json({ error: "Please enter your full name." }, { status: 400 });
     }
-    if (!customerPhone || typeof customerPhone !== "string" || customerPhone.trim().length < 6) {
-      return NextResponse.json({ error: "Please enter a valid phone number." }, { status: 400 });
+
+    const targetCountry = countryCode
+      ? findCountryByCode(countryCode)
+      : findCountryByDialCode(countryDialCode || "+20");
+
+    const phoneValidation = validatePhoneForCountry(targetCountry, customerPhone);
+    if (!phoneValidation.isValid) {
+      return NextResponse.json({ error: phoneValidation.error || "Please enter a valid phone number." }, { status: 400 });
     }
+
     if (!cleanCustomerEmail || !cleanCustomerEmail.includes("@")) {
       return NextResponse.json({ error: "Please enter a valid email address." }, { status: 400 });
     }
 
-    const dial = countryDialCode || "+20";
-    const normalizedPhone = normalizePhoneNumber(dial, customerPhone.trim());
+    const normalizedPhone = phoneValidation.fullInternationalNumber;
 
     // 2. Validate Items
     if (!Array.isArray(items) || items.length === 0) {

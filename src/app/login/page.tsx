@@ -19,7 +19,12 @@ import {
   Clock,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { COUNTRY_CODES, CountryCode } from "@/lib/countryCodes";
+import {
+  COUNTRY_CODES,
+  CountryCode,
+  validatePhoneForCountry,
+} from "@/lib/countryCodes";
+import { PhoneInput } from "@/components/PhoneInput";
 import { GoogleReCaptcha, GoogleReCaptchaRef } from "@/components/GoogleReCaptcha";
 import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 
@@ -39,8 +44,6 @@ function AuthForm() {
 
   // Country Code selector for phone
   const [selectedCountry, setSelectedCountry] = useState<CountryCode>(COUNTRY_CODES[0]); // Default Egypt (+20)
-  const [isCountryDropdownOpen, setIsCountryDropdownOpen] = useState(false);
-  const [countrySearch, setCountrySearch] = useState("");
 
   // Form fields
   const [name, setName] = useState("");
@@ -131,28 +134,6 @@ function AuthForm() {
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
-  // Filter countries
-  const filteredCountries = COUNTRY_CODES.filter(
-    (c) =>
-      c.name.toLowerCase().includes(countrySearch.toLowerCase()) ||
-      c.dialCode.includes(countrySearch)
-  );
-
-  // Handle phone input with automatic leading zero(s) removal
-  const handlePhoneChange = (val: string) => {
-    let raw = val.trim();
-    if (raw.startsWith("+")) {
-      const match = COUNTRY_CODES.find((c) => raw.startsWith(c.dialCode));
-      if (match) {
-        setSelectedCountry(match);
-        raw = raw.slice(match.dialCode.length);
-      }
-    }
-    let digits = raw.replace(/\D/g, "");
-    digits = digits.replace(/^0+/, "");
-    setPhoneInput(digits);
-  };
-
   // If already logged in, redirect
   useEffect(() => {
     if (user) {
@@ -170,14 +151,16 @@ function AuthForm() {
       return;
     }
 
-    const finalIdentifier =
-      identifierType === "phone"
-        ? `${selectedCountry.dialCode}${phoneInput}`
-        : emailInput.trim();
-
-    if (identifierType === "phone" && !phoneInput.trim()) {
-      setErrorMessage("Please enter your mobile phone number.");
-      return;
+    if (identifierType === "phone") {
+      if (!phoneInput.trim()) {
+        setErrorMessage("Please enter your mobile phone number.");
+        return;
+      }
+      const phoneVal = validatePhoneForCountry(selectedCountry, phoneInput);
+      if (!phoneVal.isValid) {
+        setErrorMessage(phoneVal.error || `Please enter a valid mobile number for ${selectedCountry.name}.`);
+        return;
+      }
     }
 
     if (identifierType === "email" && !emailInput.trim()) {
@@ -189,6 +172,16 @@ function AuthForm() {
       setErrorMessage("Please enter your password.");
       return;
     }
+
+    const validatedPhone =
+      identifierType === "phone"
+        ? validatePhoneForCountry(selectedCountry, phoneInput)
+        : null;
+
+    const finalIdentifier =
+      identifierType === "phone"
+        ? validatedPhone?.fullInternationalNumber || `${selectedCountry.dialCode}${phoneInput}`
+        : emailInput.trim();
 
     if (activeTab === "register") {
       if (!name.trim()) {
@@ -208,6 +201,7 @@ function AuthForm() {
       const res = await register({
         name: name.trim(),
         identifier: finalIdentifier,
+        countryCode: identifierType === "phone" ? selectedCountry.code : undefined,
         password,
       });
 
@@ -441,74 +435,18 @@ function AuthForm() {
               </div>
 
               {identifierType === "phone" ? (
-                <div className="space-y-1.5">
-                  <div className="relative flex items-center gap-2">
-                    {/* Country Code Trigger */}
-                    <button
-                      type="button"
-                      onClick={() => setIsCountryDropdownOpen(!isCountryDropdownOpen)}
-                      className="glass-input px-3 py-2.5 rounded-xl text-xs flex items-center gap-1.5 shrink-0 hover:border-cyan-400/50 transition-colors"
-                    >
-                      <span className="text-base">{selectedCountry.flag}</span>
-                      <span className="font-semibold text-white font-mono">{selectedCountry.dialCode}</span>
-                    </button>
-
-                    {/* Phone Input */}
-                    <div className="relative flex-1">
-                      <Phone className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="tel"
-                        required
-                        placeholder="e.g. 1012345678"
-                        value={phoneInput}
-                        onChange={(e) => handlePhoneChange(e.target.value)}
-                        className="w-full glass-input pl-9 pr-3 py-2.5 rounded-xl text-xs font-mono"
-                      />
-                    </div>
-
-                    {/* Country Selector Dropdown */}
-                    {isCountryDropdownOpen && (
-                      <div className="absolute top-12 left-0 w-72 max-h-64 bg-[#0a102b] border border-white/15 rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col">
-                        <div className="p-2 border-b border-white/10">
-                          <input
-                            type="text"
-                            placeholder="Search country or dial code..."
-                            value={countrySearch}
-                            onChange={(e) => setCountrySearch(e.target.value)}
-                            className="w-full glass-input px-2.5 py-1.5 rounded-lg text-xs"
-                          />
-                        </div>
-                        <div className="overflow-y-auto flex-1 divide-y divide-white/5">
-                          {filteredCountries.map((c) => (
-                            <button
-                              key={c.code}
-                              type="button"
-                              onClick={() => {
-                                setSelectedCountry(c);
-                                setIsCountryDropdownOpen(false);
-                              }}
-                              className="w-full px-3 py-2 text-left text-xs flex items-center justify-between hover:bg-white/10 text-slate-300 hover:text-white"
-                            >
-                              <div className="flex items-center gap-2">
-                                <span className="text-base">{c.flag}</span>
-                                <span>{c.name}</span>
-                              </div>
-                              <span className="font-mono text-cyan-400 font-semibold">{c.dialCode}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  {phoneInput && (
-                    <span className="text-[10px] text-cyan-400/90 font-mono block pl-1">
-                      Full International: {selectedCountry.dialCode}{phoneInput}
-                    </span>
-                  )}
-                  <span className="text-[10px] text-slate-400 block pl-1">
-                    Leading 0 is automatically removed for international accuracy.
-                  </span>
-                </div>
+                <PhoneInput
+                  id="auth-phone-input"
+                  required
+                  value={phoneInput}
+                  country={selectedCountry}
+                  onCountryChange={(c) => setSelectedCountry(c)}
+                  onChange={(nationalDigits) => {
+                    setPhoneInput(nationalDigits);
+                    setErrorMessage("");
+                  }}
+                  autoDetectIp={true}
+                />
               ) : (
                 <div className="relative">
                   <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />

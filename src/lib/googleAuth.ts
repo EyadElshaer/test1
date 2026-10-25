@@ -77,7 +77,7 @@ export function buildGoogleOAuthUrl(stateParam: string, req?: Request): string {
     response_type: "code",
     scope: "openid email profile",
     access_type: "offline",
-    prompt: "select_account",
+    prompt: "select_account consent",
     state: stateParam,
   });
 
