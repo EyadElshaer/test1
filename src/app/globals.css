@@ -234,3 +234,29 @@ button, a, input, select, textarea {
   bottom: env(safe-area-inset-bottom, 0px);
 }
 
+/* Google One Tap container & iframe transparency fix for mobile and dark mode */
+#credential_picker_container,
+#credential_picker_container > div,
+#credential_picker_container iframe,
+#credential_picker_iframe,
+iframe[src*="accounts.google.com"],
+iframe[title*="Google"],
+iframe[title="Sign in with Google Dialog"] {
+  background: transparent !important;
+  background-color: transparent !important;
+  color-scheme: light dark !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+@supports (-webkit-touch-callout: none) {
+  #credential_picker_container,
+  #credential_picker_container > div,
+  #credential_picker_container iframe,
+  #credential_picker_iframe {
+    background: transparent !important;
+    background-color: transparent !important;
+    color-scheme: light dark !important;
+  }
+}
+

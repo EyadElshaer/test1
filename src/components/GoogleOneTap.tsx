@@ -163,6 +163,55 @@ export function GoogleOneTap() {
     return () => clearInterval(interval);
   }, []);
 
+  // Observe DOM and force transparent backgrounds on Google Identity Services container & iframes
+  useEffect(() => {
+    const makeTransparent = () => {
+      const container = document.getElementById("credential_picker_container");
+      if (container) {
+        container.style.setProperty("background", "transparent", "important");
+        container.style.setProperty("background-color", "transparent", "important");
+        container.style.setProperty("box-shadow", "none", "important");
+        container.style.setProperty("color-scheme", "light dark", "important");
+
+        const allChildren = container.querySelectorAll<HTMLElement>("*");
+        allChildren.forEach((el) => {
+          el.style.setProperty("background", "transparent", "important");
+          el.style.setProperty("background-color", "transparent", "important");
+          el.style.setProperty("box-shadow", "none", "important");
+          el.style.setProperty("color-scheme", "light dark", "important");
+          if (el.tagName.toLowerCase() === "iframe") {
+            el.setAttribute("allowtransparency", "true");
+          }
+        });
+      }
+
+      const iframes = document.querySelectorAll<HTMLIFrameElement>(
+        'iframe[src*="accounts.google.com"], iframe[title*="Google"], #credential_picker_iframe'
+      );
+      iframes.forEach((iframe) => {
+        iframe.style.setProperty("background", "transparent", "important");
+        iframe.style.setProperty("background-color", "transparent", "important");
+        iframe.style.setProperty("color-scheme", "light dark", "important");
+        iframe.setAttribute("allowtransparency", "true");
+      });
+    };
+
+    makeTransparent();
+
+    const observer = new MutationObserver(() => {
+      makeTransparent();
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["style", "class"],
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
   // Trigger Google Official One Tap prompt across desktop and mobile
   useEffect(() => {
     // If user is already logged in, auth is loading, or on admin route, cancel and skip
