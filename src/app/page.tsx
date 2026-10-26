@@ -47,16 +47,6 @@ export default async function HomePage() {
       ? regularProducts
       : allProducts;
 
-  // 2. Fetch active categories
-  const categories = await prisma.category.findMany({
-    where: { isActive: true },
-    orderBy: { displayOrder: "asc" },
-    include: {
-      _count: {
-        select: { products: { where: { isPublished: true, isArchived: false } } },
-      },
-    },
-  });
 
   // 3. Fetch store settings
   const settingsRecords = await prisma.storeSetting.findMany();

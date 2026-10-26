@@ -149,7 +149,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: "Refunds", href: "/admin/refunds", icon: RotateCcw, permissionKey: "refunds" },
     { name: "Products", href: "/admin/products", icon: Package, permissionKey: "products" },
     { name: "Categories", href: "/admin/categories", icon: Layers, permissionKey: "categories" },
-    { name: "Catalog Filters", href: "/admin/filters", icon: SlidersHorizontal, permissionKey: "filters" },
     { name: "Payment Methods", href: "/admin/payment-methods", icon: CreditCard, permissionKey: "payment-methods" },
     { name: "Promo Codes", href: "/admin/promo-codes", icon: Tag, permissionKey: "promo-codes" },
     { name: "FAQ Management", href: "/admin/faq", icon: HelpCircle, permissionKey: "faq" },

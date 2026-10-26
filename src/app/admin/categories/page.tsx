@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import Image from "next/image";
 import { Layers, Plus, Edit, Trash2, X, CheckCircle2, AlertCircle } from "lucide-react";
 
 export default function AdminCategoriesPage() {
@@ -16,7 +15,6 @@ export default function AdminCategoriesPage() {
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
-  const [image, setImage] = useState("");
   const [displayOrder, setDisplayOrder] = useState(0);
   const [isFeatured, setIsFeatured] = useState(false);
   const [isActive, setIsActive] = useState(true);
@@ -49,7 +47,6 @@ export default function AdminCategoriesPage() {
     setName("");
     setSlug("");
     setDescription("");
-    setImage("");
     setDisplayOrder(categories.length + 1);
     setIsFeatured(false);
     setIsActive(true);
@@ -63,7 +60,6 @@ export default function AdminCategoriesPage() {
     setName(cat.name);
     setSlug(cat.slug);
     setDescription(cat.description || "");
-    setImage(cat.image || "");
     setDisplayOrder(cat.displayOrder);
     setIsFeatured(cat.isFeatured);
     setIsActive(cat.isActive);
@@ -103,7 +99,6 @@ export default function AdminCategoriesPage() {
       name: name.trim(),
       slug: slug.trim(),
       description: description.trim(),
-      image: image.trim(),
       displayOrder: Number(displayOrder) || 0,
       isFeatured,
       isActive,
@@ -191,17 +186,8 @@ export default function AdminCategoriesPage() {
                   <tr key={cat.id} className="hover:bg-white/[0.02]">
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-3">
-                        <div className="relative w-9 h-9 rounded-lg overflow-hidden bg-slate-950 border border-white/10 shrink-0 flex items-center justify-center p-0.5">
-                          {cat.image ? (
-                            <>
-                              <Image src={cat.image} alt="" fill className="object-cover blur-xs opacity-25 scale-125 pointer-events-none" />
-                              <Image src={cat.image} alt={cat.name} fill className="object-contain p-0.5" />
-                            </>
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-slate-600 font-mono text-[10px]">
-                              CAT
-                            </div>
-                          )}
+                        <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 text-cyan-400 shrink-0 flex items-center justify-center">
+                          <Layers className="w-4 h-4" />
                         </div>
                         <span className="font-bold text-white text-sm">{cat.name}</span>
                       </div>
@@ -328,19 +314,6 @@ export default function AdminCategoriesPage() {
                   placeholder="Category overview..."
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="w-full glass-input px-3.5 py-2 rounded-xl text-xs"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-slate-300 block mb-1">
-                  Cover Image URL
-                </label>
-                <input
-                  type="text"
-                  placeholder="https://..."
-                  value={image}
-                  onChange={(e) => setImage(e.target.value)}
                   className="w-full glass-input px-3.5 py-2 rounded-xl text-xs"
                 />
               </div>
