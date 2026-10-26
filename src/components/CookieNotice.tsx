@@ -40,9 +40,9 @@ export default function CookieNotice() {
     <div
       role="region"
       aria-label="Cookie consent banner"
-      className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:max-w-md z-50 animate-in fade-in slide-in-from-bottom-5 duration-300"
+      className="fixed bottom-3 left-3 right-3 sm:left-auto sm:right-6 sm:bottom-4 sm:max-w-md z-50 animate-in fade-in slide-in-from-bottom-5 duration-300 pb-[env(safe-area-inset-bottom,0px)]"
     >
-      <div className="glass-card rounded-2xl p-5 border border-cyan-500/30 bg-[#060c1d]/95 backdrop-blur-xl shadow-2xl shadow-cyan-950/40 relative">
+      <div className="glass-card rounded-2xl p-4 sm:p-5 border border-cyan-500/30 bg-[#060c1d]/95 backdrop-blur-xl shadow-2xl shadow-cyan-950/40 relative">
         <button
           onClick={handleDismiss}
           className="absolute top-3.5 right-3.5 p-1 text-slate-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors"

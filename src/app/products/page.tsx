@@ -59,6 +59,18 @@ function ProductsCatalogContent() {
   // Mobile Filter Drawer Toggle
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
+  // Lock body scroll when mobile filter is open
+  useEffect(() => {
+    if (mobileFilterOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [mobileFilterOpen]);
+
   // Local Search Input
   const [searchInput, setSearchInput] = useState(currentSearch);
 
@@ -378,12 +390,15 @@ function ProductsCatalogContent() {
           </div>
 
           {mobileFilterOpen && (
-            <button
-              onClick={() => setMobileFilterOpen(false)}
-              className="w-full py-3 rounded-xl btn-primary text-xs font-bold uppercase"
-            >
-              Apply & Close Filters
-            </button>
+            <div className="sticky bottom-0 -mx-6 -mb-6 p-4 bg-[#030712]/95 border-t border-white/10 backdrop-blur-xl pb-[calc(1rem+env(safe-area-inset-bottom,0px))]">
+              <button
+                type="button"
+                onClick={() => setMobileFilterOpen(false)}
+                className="w-full py-3.5 rounded-xl btn-primary text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/25"
+              >
+                <span>View Results ({totalCount} Products)</span>
+              </button>
+            </div>
           )}
         </aside>
 

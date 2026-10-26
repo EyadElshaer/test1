@@ -62,16 +62,16 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-40 w-full backdrop-blur-md bg-[#030712]/85 border-b border-white/10 transition-colors duration-200">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16 sm:h-20">
           {/* Transparent Logo (Acts as Home Button) */}
-          <Link href="/" className="flex items-center group py-2" title="PremiKeys Home">
-            <div className="relative h-12 w-28 sm:h-14 sm:w-32 transition-transform duration-300 group-hover:scale-105">
+          <Link href="/" className="flex items-center group py-1 sm:py-2" title="PremiKeys Home">
+            <div className="relative h-10 w-24 sm:h-14 sm:w-32 transition-transform duration-300 group-hover:scale-105">
               <Image
                 src="/images/premikeys-logo.png"
                 alt="PremiKeys"
                 fill
-                sizes="(max-width: 640px) 112px, 128px"
+                sizes="(max-width: 640px) 96px, 128px"
                 priority
                 className="object-contain"
               />
@@ -96,7 +96,7 @@ export default function Header() {
           </nav>
 
           {/* Right Action Buttons */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3">
             {/* Quick Catalog Button */}
             <Link
               href="/products"
@@ -109,12 +109,12 @@ export default function Header() {
             {/* Shopping Cart Button */}
             <button
               onClick={() => setIsCartOpen(true)}
-              className="relative p-2.5 rounded-xl bg-slate-900/90 border border-white/10 hover:border-cyan-400/50 hover:bg-slate-800 text-slate-200 hover:text-white transition-all shadow-inner group active:scale-95"
+              className="relative p-2 sm:p-2.5 rounded-xl bg-slate-900/90 border border-white/10 hover:border-cyan-400/50 hover:bg-slate-800 text-slate-200 hover:text-white transition-all shadow-inner group active:scale-95"
               aria-label="View Shopping Cart"
             >
-              <ShoppingBag className="w-5 h-5 group-hover:scale-110 transition-transform text-cyan-400" />
+              <ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5 group-hover:scale-110 transition-transform text-cyan-400" />
               {itemCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 bg-gradient-to-r from-red-600 to-rose-500 text-white text-[11px] font-bold h-5 min-w-[20px] px-1 rounded-full flex items-center justify-center shadow-md shadow-red-500/40 animate-pulse">
+                <span className="absolute -top-1.5 -right-1.5 bg-gradient-to-r from-red-600 to-rose-500 text-white text-[10px] sm:text-[11px] font-bold h-4 sm:h-5 min-w-[16px] sm:min-w-[20px] px-1 rounded-full flex items-center justify-center shadow-md shadow-red-500/40 animate-pulse">
                   {itemCount}
                 </span>
               )}
@@ -127,26 +127,26 @@ export default function Header() {
                   <div>
                     <button
                       onClick={() => setAccountMenuOpen(!accountMenuOpen)}
-                      className="flex items-center gap-2 px-3 py-2 rounded-xl bg-blue-600/10 border border-blue-500/30 hover:border-cyan-400/60 hover:bg-blue-600/20 text-slate-200 hover:text-white transition-all shadow-inner group text-xs font-semibold"
+                      className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-blue-600/10 border border-blue-500/30 hover:border-cyan-400/60 hover:bg-blue-600/20 text-slate-200 hover:text-white transition-all shadow-inner group text-xs font-semibold"
                       aria-label="Open Account Menu"
                     >
                       {user.avatar ? (
                         <img
                           src={user.avatar}
                           alt={user.name || "User"}
-                          className="w-6 h-6 rounded-lg object-cover border border-white/20 shadow-sm shrink-0"
+                          className="w-5 h-5 sm:w-6 sm:h-6 rounded-lg object-cover border border-white/20 shadow-sm shrink-0"
                           referrerPolicy="no-referrer"
                         />
                       ) : (
-                        <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-blue-600 to-cyan-400 flex items-center justify-center text-white font-bold text-[11px] uppercase shadow-sm">
+                        <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-lg bg-gradient-to-tr from-blue-600 to-cyan-400 flex items-center justify-center text-white font-bold text-[10px] sm:text-[11px] uppercase shadow-sm">
                           {user.name ? user.name.charAt(0) : "U"}
                         </div>
                       )}
-                      <span className="max-w-[110px] truncate text-cyan-200 group-hover:text-white">
+                      <span className="hidden sm:inline-block max-w-[100px] truncate text-cyan-200 group-hover:text-white">
                         {user.name.split(" ")[0]}
                       </span>
                       <ChevronDown
-                        className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${
+                        className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 hidden sm:block ${
                           accountMenuOpen ? "rotate-180 text-cyan-400" : ""
                         }`}
                       />
@@ -214,10 +214,11 @@ export default function Header() {
                 ) : (
                   <Link
                     href="/login"
-                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-900/90 border border-white/10 hover:border-cyan-400/50 hover:bg-slate-800 text-slate-200 hover:text-white transition-all shadow-inner group"
+                    className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs font-semibold bg-slate-900/90 border border-white/10 hover:border-cyan-400/50 hover:bg-slate-800 text-slate-200 hover:text-white transition-all shadow-inner group"
+                    title="Sign In"
                   >
                     <User className="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform" />
-                    <span>Sign In</span>
+                    <span className="hidden sm:inline">Sign In</span>
                   </Link>
                 )}
               </div>

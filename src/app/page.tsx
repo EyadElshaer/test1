@@ -75,15 +75,15 @@ export default async function HomePage() {
         {/* Ambient Subtle Glow - Lightweight on GPU */}
         <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] sm:w-[700px] h-[300px] bg-gradient-to-tr from-blue-600/15 via-cyan-500/10 to-indigo-600/10 blur-[100px] rounded-full pointer-events-none" />
 
-        <div className="max-w-5xl mx-auto w-full text-center relative z-10 space-y-6 sm:space-y-8">
+        <div className="max-w-5xl mx-auto w-full text-center relative z-10 space-y-5 sm:space-y-8">
           {/* Trust Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold bg-blue-500/10 text-cyan-300 border border-blue-500/30 backdrop-blur-md shadow-sm">
-            <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Official PremiKeys Storefront • Verified Digital License Fulfillment</span>
+          <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 rounded-full text-[11px] sm:text-xs font-semibold bg-blue-500/10 text-cyan-300 border border-blue-500/30 backdrop-blur-md shadow-sm">
+            <Sparkles className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+            <span className="line-clamp-1 sm:line-clamp-none">Official PremiKeys Storefront • Verified Digital Licenses</span>
           </div>
 
           {/* Premium Headline */}
-          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black text-white tracking-tight leading-[1.1] sm:leading-[1.08]">
+          <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-black text-white tracking-tight leading-[1.15] sm:leading-[1.08]">
             {customHeading ? (
               customHeading
             ) : (

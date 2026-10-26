@@ -224,7 +224,7 @@ export function PhoneInput({
 
         {/* Country Dropdown Panel */}
         {isDropdownOpen && (
-          <div className="absolute top-full left-0 mt-1.5 w-72 max-h-72 bg-[#0a102b] border border-cyan-500/30 rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col backdrop-blur-xl animate-fadeIn">
+          <div className="absolute top-full left-0 mt-1.5 w-[calc(100vw-2.5rem)] max-w-xs sm:w-72 max-h-72 bg-[#0a102b] border border-cyan-500/30 rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col backdrop-blur-xl animate-fadeIn">
             {/* Search Input */}
             <div className="p-2.5 border-b border-white/10 bg-black/40">
               <div className="relative">

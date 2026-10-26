@@ -22,6 +22,7 @@ import {
   EyeOff,
   User,
   Package,
+  ChevronDown,
 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
@@ -80,6 +81,7 @@ export default function CheckoutPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [copiedAccount, setCopiedAccount] = useState(false);
+  const [mobileSummaryOpen, setMobileSummaryOpen] = useState(false);
 
   // Order Successful Pop-up Modal State
   const [orderSuccessModal, setOrderSuccessModal] = useState<{
@@ -300,11 +302,53 @@ export default function CheckoutPage() {
       )}
 
       <form onSubmit={handleSubmitOrder}>
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+        {/* Mobile Collapsible Order Summary Accordion */}
+        <div className="lg:hidden glass-card rounded-2xl border border-white/10 overflow-hidden mb-6">
+          <button
+            type="button"
+            onClick={() => setMobileSummaryOpen(!mobileSummaryOpen)}
+            className="w-full p-4 flex items-center justify-between text-xs font-semibold text-slate-200 bg-white/[0.02] hover:bg-white/[0.05] transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Package className="w-4 h-4 text-cyan-400" />
+              <span>{mobileSummaryOpen ? "Hide" : "Show"} Order Summary ({items.length} item{items.length !== 1 ? "s" : ""})</span>
+              <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${mobileSummaryOpen ? "rotate-180" : ""}`} />
+            </div>
+            <span className="font-mono font-bold text-cyan-300 text-sm">
+              {total.toLocaleString()} EGP
+            </span>
+          </button>
+          {mobileSummaryOpen && (
+            <div className="p-4 border-t border-white/10 space-y-3 bg-[#070c1d] animate-in fade-in duration-200">
+              {items.map((item) => (
+                <div key={`${item.productId}_${item.configurationId || "default"}`} className="flex items-center justify-between text-xs py-1">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-5 h-5 rounded-md bg-white/10 text-cyan-300 flex items-center justify-center text-[10px] font-mono shrink-0">
+                      {item.quantity}x
+                    </span>
+                    <span className="truncate text-slate-200 font-medium">{item.title}</span>
+                    {item.configurationName && (
+                      <span className="text-[10px] text-cyan-400 shrink-0">({item.configurationName})</span>
+                    )}
+                  </div>
+                  <span className="font-mono text-white shrink-0 ml-2">
+                    {(item.salePrice * item.quantity).toLocaleString()} EGP
+                  </span>
+                </div>
+              ))}
+              <div className="pt-2 border-t border-white/5 flex justify-between text-xs text-slate-400">
+                <span>Total Due:</span>
+                <span className="font-mono font-bold text-cyan-300">{total.toLocaleString()} EGP</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10">
           {/* LEFT: Customer Info & Payment Method */}
-          <div className="lg:col-span-7 space-y-8">
+          <div className="lg:col-span-7 space-y-6 sm:space-y-8">
             {/* 1. Customer Information Card */}
-            <div className="glass-card rounded-2xl p-6 border border-white/10 space-y-5">
+            <div className="glass-card rounded-2xl p-4 sm:p-6 border border-white/10 space-y-5">
               <div className="flex items-center gap-2 text-white font-bold text-base border-b border-white/10 pb-3">
                 <span className="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center text-xs">
                   1
@@ -458,7 +502,7 @@ export default function CheckoutPage() {
             </div>
 
             {/* 2. Payment Method Selection & Instructions */}
-            <div className="glass-card rounded-2xl p-6 border border-white/10 space-y-5">
+            <div className="glass-card rounded-2xl p-4 sm:p-6 border border-white/10 space-y-5">
               <div className="flex items-center gap-2 text-white font-bold text-base border-b border-white/10 pb-3">
                 <span className="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center text-xs">
                   2
@@ -637,7 +681,7 @@ export default function CheckoutPage() {
 
           {/* RIGHT: Order Summary Snapshot */}
           <div className="lg:col-span-5 space-y-6">
-            <div className="glass-card rounded-2xl p-6 border border-white/10 space-y-6 sticky top-28">
+            <div className="glass-card rounded-2xl p-4 sm:p-6 border border-white/10 space-y-6 sticky top-28">
               <h3 className="font-bold text-lg text-white">Order Summary</h3>
 
               {/* Items List */}

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { CartProvider } from "@/context/CartContext";
 import { AuthProvider } from "@/context/AuthContext";
@@ -8,6 +8,13 @@ import AnnouncementBanner from "@/components/AnnouncementBanner";
 import CartDrawer from "@/components/CartDrawer";
 import CookieNotice from "@/components/CookieNotice";
 import GoogleOneTap from "@/components/GoogleOneTap";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  themeColor: "#030712",
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://premikeys.com"),

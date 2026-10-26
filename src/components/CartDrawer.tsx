@@ -85,9 +85,9 @@ export default function CartDrawer() {
       />
 
       {/* Drawer Panel with hardware-accelerated slide-in */}
-      <div className="fixed inset-y-0 right-0 max-w-full flex pl-6 sm:pl-10">
+      <div className="fixed inset-y-0 right-0 max-w-full flex pl-0 sm:pl-10">
         <div
-          className={`w-screen max-w-md bg-[#0a0f24] border-l border-white/10 text-white flex flex-col shadow-2xl transition-transform duration-300 cubic-bezier(0.16, 1, 0.3, 1) transform-gpu ${
+          className={`w-screen max-w-full sm:max-w-md bg-[#0a0f24] border-l border-white/10 text-white flex flex-col shadow-2xl transition-transform duration-300 cubic-bezier(0.16, 1, 0.3, 1) transform-gpu ${
             isCartOpen ? "translate-x-0" : "translate-x-full"
           }`}
         >
@@ -199,22 +199,26 @@ export default function CartDrawer() {
                         <span className="text-[10px] text-cyan-400 font-sans">EGP</span>
                       </span>
 
-                      {/* Quantity Controls */}
-                      <div className="flex items-center gap-1 bg-black/40 border border-white/10 rounded-lg p-0.5">
+                      {/* Quantity Controls with mobile-friendly touch targets */}
+                      <div className="flex items-center gap-1 bg-black/40 border border-white/10 rounded-xl p-0.5">
                         <button
+                          type="button"
                           onClick={() => updateQuantity(item.productId, item.quantity - 1, item.configurationId)}
-                          className="w-6 h-6 flex items-center justify-center text-slate-400 hover:text-white rounded hover:bg-white/10 transition-colors"
+                          className="w-8 h-8 sm:w-7 sm:h-7 flex items-center justify-center text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors active:scale-95"
+                          aria-label="Decrease quantity"
                         >
-                          <Minus className="w-3 h-3" />
+                          <Minus className="w-3.5 h-3.5" />
                         </button>
-                        <span className="w-6 text-center text-xs font-mono font-bold text-white">
+                        <span className="w-7 sm:w-6 text-center text-xs font-mono font-bold text-white select-none">
                           {item.quantity}
                         </span>
                         <button
+                          type="button"
                           onClick={() => updateQuantity(item.productId, item.quantity + 1, item.configurationId)}
-                          className="w-6 h-6 flex items-center justify-center text-slate-400 hover:text-white rounded hover:bg-white/10 transition-colors"
+                          className="w-8 h-8 sm:w-7 sm:h-7 flex items-center justify-center text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors active:scale-95"
+                          aria-label="Increase quantity"
                         >
-                          <Plus className="w-3 h-3" />
+                          <Plus className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
@@ -290,7 +294,7 @@ export default function CartDrawer() {
               </div>
 
               {/* Action Buttons */}
-              <div className="space-y-2 pt-1">
+              <div className="space-y-2 pt-1 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]">
                 <Link
                   href="/checkout"
                   onClick={() => setIsCartOpen(false)}
@@ -309,6 +313,7 @@ export default function CartDrawer() {
                     View Full Cart Page
                   </Link>
                   <button
+                    type="button"
                     onClick={clearCart}
                     className="text-xs text-slate-500 hover:text-red-400 transition-colors"
                   >

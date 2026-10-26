@@ -62,7 +62,7 @@ export default async function ProductDetailPage({
   });
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-16">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-10 pb-28 sm:pb-12 space-y-12 sm:space-y-16">
       {/* Breadcrumb Navigation */}
       <nav className="text-xs text-slate-400 flex items-center gap-2">
         <Link href="/" className="hover:text-white">

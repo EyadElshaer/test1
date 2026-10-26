@@ -212,3 +212,25 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* Mobile Optimizations: Touch response and iOS input zoom prevention */
+button, a, input, select, textarea {
+  touch-action: manipulation;
+}
+
+@media (max-width: 640px) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+.pb-safe {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom, 1rem));
+}
+
+.bottom-safe {
+  bottom: env(safe-area-inset-bottom, 0px);
+}
+

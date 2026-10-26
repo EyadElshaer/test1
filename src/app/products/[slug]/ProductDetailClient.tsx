@@ -497,16 +497,23 @@ export default function ProductDetailClient({ product }: { product: any }) {
       </div>
 
       {/* Sticky Mobile Buy Bar for effortless thumb shopping on phones */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 bg-[#060a18]/95 backdrop-blur-xl border-t border-white/10 p-3 sm:hidden flex items-center justify-between gap-3 shadow-2xl">
+      <div className="fixed bottom-0 left-0 right-0 z-30 bg-[#060a18]/95 backdrop-blur-xl border-t border-white/10 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] sm:hidden flex items-center justify-between gap-3 shadow-2xl">
         <div className="min-w-0 flex-1">
-          <span className="text-[11px] text-slate-400 line-clamp-1 font-medium">{product.title}</span>
-          <div className="flex items-baseline gap-1.5">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] text-slate-300 line-clamp-1 font-semibold">{product.title}</span>
+            {activeConfig && (
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 truncate max-w-[80px]">
+                {activeConfig.name}
+              </span>
+            )}
+          </div>
+          <div className="flex items-baseline gap-1.5 mt-0.5">
             <span className="text-base font-black text-white font-mono">
-              {product.salePrice.toLocaleString()} <span className="text-[10px] text-cyan-400 font-sans">EGP</span>
+              {activeSalePrice.toLocaleString()} <span className="text-[10px] text-cyan-400 font-sans">EGP</span>
             </span>
-            {product.discountPercent > 0 && (
+            {activeDiscountPercent > 0 && (
               <span className="text-[10px] text-slate-500 line-through">
-                {product.originalPrice.toLocaleString()}
+                {activeOriginalPrice.toLocaleString()}
               </span>
             )}
           </div>
@@ -517,7 +524,7 @@ export default function ProductDetailClient({ product }: { product: any }) {
             type="button"
             onClick={handleAddToCart}
             disabled={isOutOfStock}
-            className={`p-2.5 rounded-xl font-bold text-xs transition-all duration-200 ${
+            className={`p-3 rounded-xl font-bold text-xs transition-all duration-200 active:scale-95 ${
               justAdded
                 ? "bg-emerald-500 text-white border border-emerald-400"
                 : "btn-secondary text-white"
@@ -531,7 +538,7 @@ export default function ProductDetailClient({ product }: { product: any }) {
             type="button"
             onClick={handleBuyNow}
             disabled={isOutOfStock}
-            className="px-4 py-2.5 rounded-xl font-bold text-xs btn-primary flex items-center gap-1.5"
+            className="px-4 py-3 rounded-xl font-bold text-xs btn-primary flex items-center gap-1.5 active:scale-95"
           >
             <Zap className="w-3.5 h-3.5 fill-current" />
             <span>Buy Now</span>
