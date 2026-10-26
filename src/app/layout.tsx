@@ -7,6 +7,7 @@ import Footer from "@/components/Footer";
 import AnnouncementBanner from "@/components/AnnouncementBanner";
 import CartDrawer from "@/components/CartDrawer";
 import CookieNotice from "@/components/CookieNotice";
+import GoogleOneTap from "@/components/GoogleOneTap";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://premikeys.com"),
@@ -53,6 +54,7 @@ export default function RootLayout({
     <html lang="en" className="dark">
       <body className="min-h-screen bg-[#030712] text-slate-100 flex flex-col antialiased selection:bg-cyan-500 selection:text-black">
         <AuthProvider>
+          <GoogleOneTap />
           <CartProvider>
             <AnnouncementBanner />
             <Header />
