@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
@@ -31,6 +31,21 @@ export default function ProductDetailClient({ product }: { product: any }) {
   const [justAdded, setJustAdded] = useState(false);
   const [imageRatio, setImageRatio] = useState<number | null>(null);
   const [isZoomOpen, setIsZoomOpen] = useState(false);
+  const [showStickyBar, setShowStickyBar] = useState(false);
+  const pricingSectionRef = useRef<HTMLDivElement>(null);
+
+  // Only show bottom sticky bar on mobile when the user scrolls past the main pricing card
+  useEffect(() => {
+    const handleScroll = () => {
+      if (!pricingSectionRef.current) return;
+      const rect = pricingSectionRef.current.getBoundingClientRect();
+      setShowStickyBar(rect.bottom < 80);
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   // Configurations
   const configs: ProductConfiguration[] = extractConfigurations(product);
@@ -317,7 +332,7 @@ export default function ProductDetailClient({ product }: { product: any }) {
           )}
 
           {/* Pricing Card */}
-          <div className="glass-card rounded-2xl p-5 sm:p-6 border border-white/10 space-y-4">
+          <div ref={pricingSectionRef} className="glass-card rounded-2xl p-5 sm:p-6 border border-white/10 space-y-4">
             <div className="flex items-baseline justify-between">
               <div>
                 <div className="text-xs text-slate-400 font-medium">Digital Product Price</div>
@@ -496,53 +511,61 @@ export default function ProductDetailClient({ product }: { product: any }) {
         </div>
       </div>
 
-      {/* Sticky Mobile Buy Bar for effortless thumb shopping on phones */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 bg-[#060a18]/95 backdrop-blur-xl border-t border-white/10 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] sm:hidden flex items-center justify-between gap-3 shadow-2xl">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <span className="text-[11px] text-slate-300 line-clamp-1 font-semibold">{product.title}</span>
-            {activeConfig && (
-              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 truncate max-w-[80px]">
-                {activeConfig.name}
+      {/* Sticky Mobile Buy Bar for effortless thumb shopping on phones (appears only after scrolling past main buy card) */}
+      <div
+        className={`fixed bottom-0 left-0 right-0 z-40 bg-[#070d1e]/98 backdrop-blur-2xl border-t border-cyan-500/20 px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom,1rem))] sm:hidden transition-all duration-300 ease-out shadow-[0_-10px_30px_rgba(0,0,0,0.8)] ${
+          showStickyBar
+            ? "translate-y-0 opacity-100 pointer-events-auto"
+            : "translate-y-full opacity-0 pointer-events-none"
+        }`}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] text-slate-300 line-clamp-1 font-semibold">{product.title}</span>
+              {activeConfig && (
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 truncate max-w-[80px]">
+                  {activeConfig.name}
+                </span>
+              )}
+            </div>
+            <div className="flex items-baseline gap-1.5 mt-0.5">
+              <span className="text-base font-black text-cyan-300 font-mono">
+                {activeSalePrice.toLocaleString()} <span className="text-[10px] text-cyan-400 font-sans font-semibold">EGP</span>
               </span>
-            )}
+              {activeDiscountPercent > 0 && (
+                <span className="text-[10px] text-slate-500 line-through">
+                  {activeOriginalPrice.toLocaleString()}
+                </span>
+              )}
+            </div>
           </div>
-          <div className="flex items-baseline gap-1.5 mt-0.5">
-            <span className="text-base font-black text-white font-mono">
-              {activeSalePrice.toLocaleString()} <span className="text-[10px] text-cyan-400 font-sans">EGP</span>
-            </span>
-            {activeDiscountPercent > 0 && (
-              <span className="text-[10px] text-slate-500 line-through">
-                {activeOriginalPrice.toLocaleString()}
-              </span>
-            )}
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={handleAddToCart}
+              disabled={isOutOfStock}
+              className={`p-3 rounded-xl font-bold text-xs transition-all duration-200 active:scale-95 ${
+                justAdded
+                  ? "bg-emerald-500 text-white border border-emerald-400"
+                  : "bg-white/5 border border-white/10 hover:border-cyan-400/50 text-slate-200 hover:text-white"
+              }`}
+              aria-label="Add to cart"
+            >
+              {justAdded ? <Check className="w-4 h-4 stroke-[3]" /> : <ShoppingCart className="w-4 h-4 text-cyan-400" />}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleBuyNow}
+              disabled={isOutOfStock}
+              className="px-5 py-3 rounded-xl font-bold text-xs btn-primary flex items-center gap-1.5 active:scale-95 shadow-lg shadow-blue-500/30"
+            >
+              <Zap className="w-3.5 h-3.5 fill-current" />
+              <span>Buy Now</span>
+            </button>
           </div>
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={handleAddToCart}
-            disabled={isOutOfStock}
-            className={`p-3 rounded-xl font-bold text-xs transition-all duration-200 active:scale-95 ${
-              justAdded
-                ? "bg-emerald-500 text-white border border-emerald-400"
-                : "btn-secondary text-white"
-            }`}
-            aria-label="Add to cart"
-          >
-            {justAdded ? <Check className="w-4 h-4 stroke-[3]" /> : <ShoppingCart className="w-4 h-4 text-cyan-400" />}
-          </button>
-
-          <button
-            type="button"
-            onClick={handleBuyNow}
-            disabled={isOutOfStock}
-            className="px-4 py-3 rounded-xl font-bold text-xs btn-primary flex items-center gap-1.5 active:scale-95"
-          >
-            <Zap className="w-3.5 h-3.5 fill-current" />
-            <span>Buy Now</span>
-          </button>
         </div>
       </div>
 

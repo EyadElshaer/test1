@@ -62,16 +62,16 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-40 w-full backdrop-blur-md bg-[#030712]/85 border-b border-white/10 transition-colors duration-200">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 sm:h-20">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-20">
           {/* Transparent Logo (Acts as Home Button) */}
-          <Link href="/" className="flex items-center group py-1 sm:py-2" title="PremiKeys Home">
-            <div className="relative h-10 w-24 sm:h-14 sm:w-32 transition-transform duration-300 group-hover:scale-105">
+          <Link href="/" className="flex items-center group py-2" title="PremiKeys Home">
+            <div className="relative h-12 w-28 sm:h-14 sm:w-32 transition-transform duration-300 group-hover:scale-105">
               <Image
                 src="/images/premikeys-logo.png"
                 alt="PremiKeys"
                 fill
-                sizes="(max-width: 640px) 96px, 128px"
+                sizes="(max-width: 640px) 112px, 128px"
                 priority
                 className="object-contain"
               />
@@ -214,11 +214,11 @@ export default function Header() {
                 ) : (
                   <Link
                     href="/login"
-                    className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs font-semibold bg-slate-900/90 border border-white/10 hover:border-cyan-400/50 hover:bg-slate-800 text-slate-200 hover:text-white transition-all shadow-inner group"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-900/90 border border-white/10 hover:border-cyan-400/50 hover:bg-slate-800 text-slate-200 hover:text-white transition-all shadow-inner group"
                     title="Sign In"
                   >
                     <User className="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform" />
-                    <span className="hidden sm:inline">Sign In</span>
+                    <span>Sign In</span>
                   </Link>
                 )}
               </div>
