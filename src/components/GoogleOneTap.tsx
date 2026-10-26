@@ -45,6 +45,31 @@ interface StatusToast {
   message: string;
 }
 
+/**
+ * Deletes Google Identity Services exponential cooldown cookie (g_state).
+ * When a user dismisses Google One Tap, Google sets this cookie to suppress
+ * the prompt for 2 hours to 1 week. Removing it allows the prompt to show.
+ */
+function clearGoogleCooldownCookie() {
+  if (typeof document === "undefined") return;
+  try {
+    const expired = "expires=Thu, 01 Jan 1970 00:00:00 UTC";
+    const host = window.location.hostname;
+    document.cookie = `g_state=; ${expired}; path=/`;
+    document.cookie = `g_state=; ${expired}; path=/; domain=${host}`;
+    document.cookie = `g_state=; ${expired}; path=/; domain=.${host}`;
+
+    const parts = host.split(".");
+    if (parts.length > 2) {
+      const parentDomain = parts.slice(-2).join(".");
+      document.cookie = `g_state=; ${expired}; path=/; domain=${parentDomain}`;
+      document.cookie = `g_state=; ${expired}; path=/; domain=.${parentDomain}`;
+    }
+  } catch (err) {
+    console.warn("[Google One Tap] Could not clear cooldown cookie:", err);
+  }
+}
+
 export function GoogleOneTap() {
   const pathname = usePathname();
   const { user, loading: authLoading, loginWithGoogleCredential } = useAuth();
@@ -54,7 +79,9 @@ export function GoogleOneTap() {
     process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || null
   );
   const [statusToast, setStatusToast] = useState<StatusToast | null>(null);
+
   const isPromptingRef = useRef(false);
+  const promptedOnceRef = useRef(false);
 
   // Do not prompt Google One Tap on admin dashboard routes
   const isAdminRoute = pathname?.startsWith("/admin");
@@ -115,18 +142,32 @@ export function GoogleOneTap() {
     [loginWithGoogleCredential]
   );
 
-  // Check if GIS script was already loaded in window
+  // Poll for Google GSI script ready state (in addition to Script onLoad)
   useEffect(() => {
-    if (typeof window !== "undefined" && window.google?.accounts?.id) {
-      setScriptLoaded(true);
-    }
+    const checkGoogle = () => {
+      if (typeof window !== "undefined" && window.google?.accounts?.id) {
+        setScriptLoaded(true);
+        return true;
+      }
+      return false;
+    };
+
+    if (checkGoogle()) return;
+
+    const interval = setInterval(() => {
+      if (checkGoogle()) {
+        clearInterval(interval);
+      }
+    }, 200);
+
+    return () => clearInterval(interval);
   }, []);
 
   // Trigger Google Official One Tap prompt across desktop and mobile
   useEffect(() => {
     // If user is already logged in, auth is loading, or on admin route, cancel and skip
     if (user || authLoading || isAdminRoute) {
-      if (window.google?.accounts?.id) {
+      if (user && window.google?.accounts?.id) {
         window.google.accounts.id.cancel();
       }
       return;
@@ -136,49 +177,68 @@ export function GoogleOneTap() {
       return;
     }
 
-    if (isPromptingRef.current) return;
-
-    try {
-      isPromptingRef.current = true;
-
-      window.google.accounts.id.initialize({
-        client_id: clientId,
-        callback: handleCredentialResponse,
-        auto_select: false,
-        cancel_on_tap_outside: true,
-        itp_support: true,
-        use_fedcm_for_prompt: true,
-        context: "signin",
-      });
-
-      window.google.accounts.id.prompt((notification) => {
-        isPromptingRef.current = false;
-        if (notification.isNotDisplayed()) {
-          console.info(
-            "[Google One Tap] Prompt not displayed reason:",
-            notification.getNotDisplayedReason()
-          );
-        } else if (notification.isSkippedMoment()) {
-          console.info(
-            "[Google One Tap] Prompt skipped reason:",
-            notification.getSkippedReason()
-          );
-        } else if (notification.isDismissedMoment()) {
-          console.info(
-            "[Google One Tap] Prompt dismissed reason:",
-            notification.getDismissedReason()
-          );
-        }
-      });
-    } catch (err) {
-      isPromptingRef.current = false;
-      console.warn("[Google One Tap] Official GIS prompt error:", err);
+    if (isPromptingRef.current || promptedOnceRef.current) {
+      return;
     }
 
-    return () => {
-      if (window.google?.accounts?.id) {
-        window.google.accounts.id.cancel();
+    // Clear cooldown cookie so Google does not suppress the prompt
+    clearGoogleCooldownCookie();
+
+    const triggerPrompt = () => {
+      if (!window.google?.accounts?.id) return;
+
+      try {
+        isPromptingRef.current = true;
+        promptedOnceRef.current = true;
+
+        window.google.accounts.id.initialize({
+          client_id: clientId,
+          callback: handleCredentialResponse,
+          auto_select: false,
+          cancel_on_tap_outside: false, // Don't dismiss when user taps to scroll
+          itp_support: true,
+          use_fedcm_for_prompt: true,
+          context: "signin",
+        });
+
+        window.google.accounts.id.prompt((notification) => {
+          isPromptingRef.current = false;
+
+          if (notification.isNotDisplayed()) {
+            const reason = notification.getNotDisplayedReason();
+            console.info("[Google One Tap] Prompt not displayed reason:", reason);
+
+            if (reason === "suppressed_by_user") {
+              // User had dismissed it previously; clear cookie for future visits
+              clearGoogleCooldownCookie();
+            }
+          } else if (notification.isSkippedMoment()) {
+            console.info(
+              "[Google One Tap] Prompt skipped reason:",
+              notification.getSkippedReason()
+            );
+          } else if (notification.isDismissedMoment()) {
+            console.info(
+              "[Google One Tap] Prompt dismissed reason:",
+              notification.getDismissedReason()
+            );
+            // Clear cooldown so it shows again when navigating or reopening
+            clearGoogleCooldownCookie();
+          } else if (notification.isDisplayed()) {
+            console.info("[Google One Tap] Official prompt displayed successfully!");
+          }
+        });
+      } catch (err) {
+        isPromptingRef.current = false;
+        console.warn("[Google One Tap] Official GIS prompt error:", err);
       }
+    };
+
+    // Small delay ensures DOM and layout are settled
+    const timer = setTimeout(triggerPrompt, 600);
+
+    return () => {
+      clearTimeout(timer);
     };
   }, [
     scriptLoaded,
@@ -186,7 +246,6 @@ export function GoogleOneTap() {
     user,
     authLoading,
     isAdminRoute,
-    pathname,
     handleCredentialResponse,
   ]);
 
