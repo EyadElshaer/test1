@@ -235,7 +235,7 @@ export default function CartPage() {
                   <div className="flex gap-2">
                     <input
                       type="text"
-                      placeholder="e.g. PREMI10"
+                      placeholder="Promo Code"
                       value={promoCodeInput}
                       onChange={(e) => setPromoCodeInput(e.target.value.toUpperCase())}
                       className="flex-1 glass-input px-3 py-2 rounded-xl text-xs uppercase"
