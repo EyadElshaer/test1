@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import prisma from "@/lib/prisma";
 import { getAdminSession, logAdminAudit } from "@/lib/auth";
+import { syncOrderToGoogleSheets } from "@/lib/googleSheets";
 
 export async function GET(
   req: Request,
@@ -163,6 +164,13 @@ export async function PATCH(
         shouldDeleteScreenshot ? " (Receipt screenshot purged to free database storage)" : ""
       }`
     );
+
+    // Sync updated order state to Google Sheets
+    try {
+      await syncOrderToGoogleSheets(updatedOrder);
+    } catch (sheetErr) {
+      console.warn("Google Sheets update sync note:", sheetErr);
+    }
 
     return NextResponse.json({ success: true, order: updatedOrder });
   } catch (error) {

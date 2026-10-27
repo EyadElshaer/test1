@@ -10,6 +10,7 @@ export async function GET() {
       "telegram_chat_id",
       "smtp_password",
       "api_secret",
+      "google_sheets_webhook_url",
     ]);
 
     for (const s of settings) {

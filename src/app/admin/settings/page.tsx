@@ -21,7 +21,12 @@ import {
   RefreshCw,
   Zap,
   Link2,
+  Table,
+  Copy,
+  Check,
+  Download,
 } from "lucide-react";
+import { GOOGLE_APPS_SCRIPT_CODE } from "@/lib/googleAppsScriptTemplate";
 
 export default function AdminSettingsPage() {
   const [settings, setSettings] = useState<Record<string, string>>({});
@@ -35,6 +40,16 @@ export default function AdminSettingsPage() {
   const [isRegisteringWebhook, setIsRegisteringWebhook] = useState(false);
   const [webhookInfo, setWebhookInfo] = useState<any>(null);
   const [isPolling, setIsPolling] = useState(false);
+
+  // Google Sheets Integration State
+  const [isTestingGoogleSheets, setIsTestingGoogleSheets] = useState(false);
+  const [googleSheetsTestSuccess, setGoogleSheetsTestSuccess] = useState("");
+  const [googleSheetsTestError, setGoogleSheetsTestError] = useState("");
+  const [isSyncingAllOrders, setIsSyncingAllOrders] = useState(false);
+  const [syncAllSuccess, setSyncAllSuccess] = useState("");
+  const [syncAllError, setSyncAllError] = useState("");
+  const [copiedScript, setCopiedScript] = useState(false);
+  const [showScriptModal, setShowScriptModal] = useState(false);
 
   const loadSettings = async () => {
     setLoading(true);
@@ -201,6 +216,69 @@ export default function AdminSettingsPage() {
     } finally {
       setIsPolling(false);
     }
+  };
+
+  const handleTestGoogleSheets = async () => {
+    setIsTestingGoogleSheets(true);
+    setGoogleSheetsTestSuccess("");
+    setGoogleSheetsTestError("");
+
+    const webhookUrl = settings.google_sheets_webhook_url;
+    if (!webhookUrl || !webhookUrl.trim()) {
+      setGoogleSheetsTestError("Please enter your Google Apps Script Webhook URL before testing.");
+      setIsTestingGoogleSheets(false);
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/admin/google-sheets/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ webhookUrl: webhookUrl.trim() }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to connect to Google Sheets.");
+      }
+
+      setGoogleSheetsTestSuccess(data.message || "Successfully connected to Google Sheet!");
+      setTimeout(() => setGoogleSheetsTestSuccess(""), 6000);
+    } catch (err: any) {
+      setGoogleSheetsTestError(err.message || "Failed to connect to Google Sheets.");
+    } finally {
+      setIsTestingGoogleSheets(false);
+    }
+  };
+
+  const handleSyncAllOrders = async () => {
+    setIsSyncingAllOrders(true);
+    setSyncAllSuccess("");
+    setSyncAllError("");
+
+    try {
+      const res = await fetch("/api/admin/google-sheets/sync-all", {
+        method: "POST",
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to batch sync orders.");
+      }
+
+      setSyncAllSuccess(data.message || `Successfully synced ${data.count} orders to Google Sheets!`);
+      setTimeout(() => setSyncAllSuccess(""), 6000);
+    } catch (err: any) {
+      setSyncAllError(err.message || "Failed to sync orders to Google Sheets.");
+    } finally {
+      setIsSyncingAllOrders(false);
+    }
+  };
+
+  const handleCopyScript = () => {
+    navigator.clipboard.writeText(GOOGLE_APPS_SCRIPT_CODE);
+    setCopiedScript(true);
+    setTimeout(() => setCopiedScript(false), 2500);
   };
 
   if (loading) {
@@ -633,7 +711,240 @@ export default function AdminSettingsPage() {
           </div>
         </div>
 
-        {/* 5. Google reCAPTCHA v3 Bot Protection */}
+        {/* 5. Google Sheets Real-Time Orders Sync (100% Free Forever) */}
+        <div className="glass-card rounded-3xl p-6 sm:p-8 border border-white/10 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <Table className="w-5 h-5 text-emerald-400" />
+                <h3 className="font-bold text-white text-base">
+                  Google Sheets Real-Time Orders Sync
+                </h3>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                  100% Free
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-1">
+                Automatically archive and live-update all customer orders in your personal Google Sheet with full status tracking, phone numbers, items, and totals.
+              </p>
+            </div>
+
+            <label className="flex items-center gap-2.5 cursor-pointer bg-white/[0.04] hover:bg-white/[0.08] px-3.5 py-2 rounded-xl border border-white/10 transition-colors">
+              <input
+                type="checkbox"
+                checked={settings.google_sheets_enabled === "true" || settings.google_sheets_enabled === "1"}
+                onChange={(e) =>
+                  handleChange("google_sheets_enabled", e.target.checked ? "true" : "false")
+                }
+                className="rounded border-slate-700 text-emerald-500 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+              />
+              <span className="text-xs font-semibold text-white">Enable Sheets Sync</span>
+            </label>
+          </div>
+
+          {/* Test & Batch Sync Feedback Alerts */}
+          {googleSheetsTestSuccess && (
+            <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <span>{googleSheetsTestSuccess}</span>
+            </div>
+          )}
+          {googleSheetsTestError && (
+            <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{googleSheetsTestError}</span>
+            </div>
+          )}
+          {syncAllSuccess && (
+            <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <span>{syncAllSuccess}</span>
+            </div>
+          )}
+          {syncAllError && (
+            <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{syncAllError}</span>
+            </div>
+          )}
+
+          {/* Configuration Inputs */}
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs font-semibold text-slate-300 block mb-1">
+                Google Apps Script Web App URL
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="https://script.google.com/macros/s/AKfycbx.../exec"
+                  value={settings.google_sheets_webhook_url || ""}
+                  onChange={(e) => handleChange("google_sheets_webhook_url", e.target.value)}
+                  className="w-full glass-input px-3.5 py-2.5 rounded-xl text-xs font-mono text-emerald-300 placeholder:text-slate-600"
+                />
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1">
+                Generated when you deploy the Apps Script as a Web App inside your Google Sheet.
+              </p>
+            </div>
+          </div>
+
+          {/* Action Toolbar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl bg-white/[0.02] border border-white/5">
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-slate-400">Sync Status:</span>
+              {settings.google_sheets_webhook_url ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>Webhook Ready</span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-800 text-slate-400 border border-white/5">
+                  <span>Not Configured Yet</span>
+                </span>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handleCopyScript}
+                className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-white/[0.05] hover:bg-white/[0.1] text-slate-200 border border-white/10 flex items-center gap-1.5 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                title="Copy the Google Apps Script to paste into your Google Sheet"
+              >
+                {copiedScript ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="text-emerald-400 font-bold">Script Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Copy Apps Script</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleTestGoogleSheets}
+                disabled={isTestingGoogleSheets}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 flex items-center gap-1.5 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>{isTestingGoogleSheets ? "Testing Connection..." : "Test Connection"}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSyncAllOrders}
+                disabled={isSyncingAllOrders}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/40 flex items-center gap-1.5 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+                title="Sync all historical and existing database orders to your Google Sheet"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isSyncingAllOrders ? "animate-spin text-sky-400" : ""}`} />
+                <span>{isSyncingAllOrders ? "Syncing All Orders..." : "Sync All Existing Orders"}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Capabilities Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+            <div className="p-3.5 rounded-2xl bg-white/[0.02] border border-white/5 space-y-1">
+              <strong className="text-white flex items-center gap-1.5">
+                <Zap className="w-3.5 h-3.5 text-amber-400" />
+                <span>Real-Time Insert & Update</span>
+              </strong>
+              <p className="text-slate-400 text-[11px] leading-relaxed">
+                New orders are appended instantly. If you approve, reject, or mark an order DONE, the existing row updates in-place automatically.
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-white/[0.02] border border-white/5 space-y-1">
+              <strong className="text-white flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Auto-Formatted Badges</span>
+              </strong>
+              <p className="text-slate-400 text-[11px] leading-relaxed">
+                Status cells are automatically highlighted in visual colors (Emerald for Approved, Rose for Rejected, Blue for Pending) inside Google Sheets.
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-white/[0.02] border border-white/5 space-y-1">
+              <strong className="text-white flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
+                <span>100% Free Forever</span>
+              </strong>
+              <p className="text-slate-400 text-[11px] leading-relaxed">
+                Uses Google Sheets built-in Apps Script engine. No subscriptions, no Zapier task limits, and no paid third-party add-ons required.
+              </p>
+            </div>
+          </div>
+
+          {/* Step-by-Step 60-Second Setup Guide */}
+          <div className="p-5 rounded-2xl bg-emerald-950/20 border border-emerald-500/20 space-y-4">
+            <div className="flex items-center justify-between gap-2 text-emerald-300 font-bold text-xs uppercase tracking-wider">
+              <div className="flex items-center gap-2">
+                <HelpCircle className="w-4 h-4" />
+                <span>How to Setup Your Free Google Sheet (Takes Under 60 Seconds)</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleCopyScript}
+                className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 underline flex items-center gap-1"
+              >
+                {copiedScript ? "Copied!" : "Copy Script"}
+              </button>
+            </div>
+
+            <ol className="space-y-3 text-xs text-slate-300 list-decimal list-inside leading-relaxed">
+              <li className="pl-1">
+                <strong className="text-white">Create a New Google Sheet:</strong> Go to{" "}
+                <a
+                  href="https://sheets.new"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-emerald-400 font-mono hover:underline inline-flex items-center gap-0.5"
+                >
+                  sheets.new <ExternalLink className="w-3 h-3 inline" />
+                </a>{" "}
+                and name it (e.g. <em>PremiKeys Orders 2026</em>).
+              </li>
+              <li className="pl-1">
+                <strong className="text-white">Open Apps Script:</strong> In the top menu of your Google Sheet, click <strong className="text-white">Extensions</strong> → <strong className="text-white">Apps Script</strong>.
+              </li>
+              <li className="pl-1">
+                <strong className="text-white">Paste the Script:</strong> Delete any starter code in the editor, click{" "}
+                <button
+                  type="button"
+                  onClick={handleCopyScript}
+                  className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold hover:bg-emerald-500/30 inline-flex items-center gap-1"
+                >
+                  <Copy className="w-3 h-3 inline" />
+                  <span>Copy Apps Script</span>
+                </button>{" "}
+                and paste it into the editor. Click the <strong className="text-white">Save (floppy disk)</strong> icon.
+              </li>
+              <li className="pl-1">
+                <strong className="text-white">Deploy as Web App:</strong> In the top-right corner, click <strong className="text-white">Deploy</strong> → <strong className="text-white">New deployment</strong>.
+                <div className="mt-1 pl-4 space-y-1 text-slate-400 text-[11px]">
+                  <p>• Click the gear icon beside &quot;Select type&quot; and choose <strong className="text-white">Web app</strong>.</p>
+                  <p>• Description: <em>PremiKeys Orders Sync</em></p>
+                  <p>• Execute as: <strong className="text-white">Me (your email)</strong></p>
+                  <p>• Who has access: <strong className="text-emerald-400 font-bold">Anyone</strong> (crucial so the store can send new orders).</p>
+                </div>
+              </li>
+              <li className="pl-1">
+                <strong className="text-white">Authorize &amp; Copy URL:</strong> Click <strong className="text-white">Deploy</strong>. If prompted, click <em className="text-white">Review permissions</em> → choose your Google account → click <em className="text-white">Advanced</em> → <em className="text-white">Go to PremiKeys Orders Sync (unsafe)</em> → <em className="text-white">Allow</em>.
+              </li>
+              <li className="pl-1">
+                <strong className="text-white">Save and Test:</strong> Copy the provided <strong className="text-white">Web app URL</strong> (starts with <code className="text-emerald-300 font-mono text-[11px]">https://script.google.com/macros/s/...</code>), paste it into the input above, click <strong className="text-white">Save All Changes</strong> at the top, then click <strong className="text-white">Test Connection</strong>!
+              </li>
+            </ol>
+          </div>
+        </div>
+
+        {/* 6. Google reCAPTCHA v3 Bot Protection */}
         <div className="glass-card rounded-3xl p-6 sm:p-8 border border-white/10 space-y-4">
           <div className="flex items-center justify-between border-b border-white/10 pb-3">
             <h3 className="font-bold text-white text-base flex items-center gap-2">

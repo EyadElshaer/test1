@@ -25,6 +25,9 @@ import {
   RotateCcw,
   X,
   Trash2,
+  Table,
+  Download,
+  RefreshCw,
 } from "lucide-react";
 
 export default function AdminOrdersPage() {
@@ -51,6 +54,82 @@ export default function AdminOrdersPage() {
   // Order Deletion Confirmation
   const [orderToDelete, setOrderToDelete] = useState<any | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Google Sheets Quick Sync & Export State
+  const [isSyncingSheets, setIsSyncingSheets] = useState(false);
+  const [sheetsSyncMsg, setSheetsSyncMsg] = useState("");
+  const [sheetsSyncErr, setSheetsSyncErr] = useState("");
+
+  const handleSyncSheets = async () => {
+    setIsSyncingSheets(true);
+    setSheetsSyncMsg("");
+    setSheetsSyncErr("");
+    try {
+      const res = await fetch("/api/admin/google-sheets/sync-all", {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to sync to Google Sheets.");
+      }
+      setSheetsSyncMsg(data.message || `Successfully synced ${data.count} orders to Google Sheets!`);
+      setTimeout(() => setSheetsSyncMsg(""), 5000);
+    } catch (err: any) {
+      setSheetsSyncErr(err.message || "Failed to sync orders.");
+      setTimeout(() => setSheetsSyncErr(""), 6000);
+    } finally {
+      setIsSyncingSheets(false);
+    }
+  };
+
+  const handleExportCSV = () => {
+    if (!orders || orders.length === 0) {
+      alert("No orders to export.");
+      return;
+    }
+
+    const headers = [
+      "Order Number",
+      "Date",
+      "Customer Name",
+      "Phone",
+      "Email",
+      "Items",
+      "Total Amount",
+      "Currency",
+      "Payment Method",
+      "Payment Reference",
+      "Status",
+      "Payment Status",
+      "Customer Notes",
+    ];
+
+    const rows = orders.map((o) => [
+      `"${o.orderNumber}"`,
+      `"${new Date(o.createdAt).toLocaleString()}"`,
+      `"${(o.customerName || "").replace(/"/g, '""')}"`,
+      `"${o.customerPhone || ""}"`,
+      `"${o.customerEmail || ""}"`,
+      `"${(o.items?.map((i: any) => `${i.productTitle} (x${i.quantity})`).join(", ") || "").replace(/"/g, '""')}"`,
+      o.totalAmount || 0,
+      `"${o.currency || "EGP"}"`,
+      `"${(o.paymentMethodName || "").replace(/"/g, '""')}"`,
+      `"${(o.paymentReference || "").replace(/"/g, '""')}"`,
+      `"${o.status || ""}"`,
+      `"${o.paymentStatus || ""}"`,
+      `"${(o.customerNotes || "").replace(/"/g, '""')}"`,
+    ]);
+
+    const csvContent = "\uFEFF" + [headers.join(","), ...rows.map((r) => r.join(","))].join("\r\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `premikeys_orders_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const handleDeleteOrder = async () => {
     if (!orderToDelete) return;
@@ -200,10 +279,49 @@ export default function AdminOrdersPage() {
             Review customer submissions, verify manual payment proofs, dispatch license keys, and track status transitions.
           </p>
         </div>
-        <div className="text-xs text-slate-400">
-          Total in system: <strong className="text-cyan-400 font-mono text-sm">{totalOrders}</strong>
+        
+        {/* Actions & Stats */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleSyncSheets}
+              disabled={isSyncingSheets}
+              className="px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+              title="Sync all orders to your connected Google Sheet"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncingSheets ? "animate-spin text-emerald-400" : ""}`} />
+              <span>{isSyncingSheets ? "Syncing..." : "Sync Sheets"}</span>
+            </button>
+
+            <button
+              onClick={handleExportCSV}
+              className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 flex items-center gap-1.5 transition-all hover:scale-[1.02] active:scale-[0.98]"
+              title="Export displayed orders to CSV spreadsheet"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Export CSV</span>
+            </button>
+          </div>
+
+          <div className="text-xs text-slate-400 sm:border-l sm:border-white/10 sm:pl-3">
+            Total: <strong className="text-cyan-400 font-mono text-sm">{totalOrders}</strong>
+          </div>
         </div>
       </div>
+
+      {/* Sync Status Notifications */}
+      {sheetsSyncMsg && (
+        <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2 animate-in fade-in">
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          <span>{sheetsSyncMsg}</span>
+        </div>
+      )}
+      {sheetsSyncErr && (
+        <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2 animate-in fade-in">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span>{sheetsSyncErr}</span>
+        </div>
+      )}
 
       {/* Filters & Search Toolbar */}
       <div className="glass-card rounded-2xl p-4 border border-white/10 flex flex-col md:flex-row gap-4 justify-between items-center">

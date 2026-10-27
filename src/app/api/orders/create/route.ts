@@ -14,6 +14,7 @@ import { sanitizeString } from "@/lib/sanitizer";
 import { getClientIp } from "@/lib/security";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { extractConfigurations } from "@/lib/configurations";
+import { syncOrderToGoogleSheets } from "@/lib/googleSheets";
 
 export async function POST(req: Request) {
   try {
@@ -382,6 +383,13 @@ export async function POST(req: Request) {
       });
     } catch (telegramErr) {
       console.error("Telegram notification error:", telegramErr);
+    }
+
+    // Sync order to Google Sheets if configured
+    try {
+      await syncOrderToGoogleSheets(newOrder);
+    } catch (sheetErr) {
+      console.warn("Google Sheets order sync note:", sheetErr);
     }
 
     return NextResponse.json({

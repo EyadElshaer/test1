@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import prisma from "@/lib/prisma";
+import { syncOrderToGoogleSheets } from "@/lib/googleSheets";
 
 export interface TelegramConfig {
   botToken?: string;
@@ -479,6 +480,11 @@ export async function handleTelegramCallbackQuery(callbackQuery: any): Promise<{
         } catch {}
       }
 
+      // Sync updated order status to Google Sheets
+      syncOrderToGoogleSheets(order.id).catch((e) =>
+        console.warn("Google Sheets telegram sync err:", e)
+      );
+
       // Format concise, high-visibility updated banner (well under 1024 char limit)
       const adminName = callbackQuery.from?.username
         ? `@${callbackQuery.from.username}`
@@ -569,6 +575,11 @@ export async function handleTelegramCallbackQuery(callbackQuery: any): Promise<{
           if (fs.existsSync(diskPath)) fs.unlinkSync(diskPath);
         } catch {}
       }
+
+      // Sync updated order status to Google Sheets
+      syncOrderToGoogleSheets(order.id).catch((e) =>
+        console.warn("Google Sheets telegram sync err:", e)
+      );
 
       const adminName = callbackQuery.from?.username
         ? `@${callbackQuery.from.username}`
