@@ -245,21 +245,16 @@ export async function POST(req: Request) {
         });
 
         if (user) {
+          // If account exists, link order to it, but NEVER overwrite passwords without prior auth
           orderUserId = user.id;
           if (user.passwordHash) {
             const isMatch = await bcrypt.compare(password, user.passwordHash);
             if (isMatch) {
               await createUserSession(user.id, req.headers);
             }
-          } else {
-            // User previously registered via Google; allow setting a password now
-            const newPasswordHash = await bcrypt.hash(password, 10);
-            await prisma.user.update({
-              where: { id: user.id },
-              data: { passwordHash: newPasswordHash },
-            });
-            await createUserSession(user.id, req.headers);
           }
+          // Note: If user was registered via Google (!user.passwordHash), we do NOT set a password
+          // or log in automatically from an unauthenticated checkout form to prevent account hijacking.
         } else {
           const passwordHash = await bcrypt.hash(password, 10);
           user = await prisma.user.create({

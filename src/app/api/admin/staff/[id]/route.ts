@@ -30,11 +30,26 @@ export async function PATCH(
       return NextResponse.json({ error: "Admin account not found." }, { status: 404 });
     }
 
+    // Protection: Non-superadmins cannot modify a SUPER_ADMIN account
+    if (targetAdmin.role === "SUPER_ADMIN" && !isSuperAdmin) {
+      return NextResponse.json(
+        { error: "Forbidden: Only a SUPER_ADMIN can modify another SUPER_ADMIN account." },
+        { status: 403 }
+      );
+    }
+
     const updateData: any = {};
     if (password && typeof password === "string" && password.length >= 6) {
       updateData.passwordHash = await bcrypt.hash(password, 10);
     }
     if (role && (role === "SUPER_ADMIN" || role === "ADMIN")) {
+      // Privilege Escalation Prevention: Only a SUPER_ADMIN can assign the SUPER_ADMIN role
+      if (role === "SUPER_ADMIN" && !isSuperAdmin) {
+        return NextResponse.json(
+          { error: "Forbidden: Only a SUPER_ADMIN can promote an account to SUPER_ADMIN." },
+          { status: 403 }
+        );
+      }
       updateData.role = role;
     }
     if (permissions !== undefined) {
@@ -98,6 +113,27 @@ export async function DELETE(
 
     if (!targetAdmin) {
       return NextResponse.json({ error: "Admin account not found." }, { status: 404 });
+    }
+
+    // Protection: Non-superadmins cannot delete a SUPER_ADMIN
+    if (targetAdmin.role === "SUPER_ADMIN" && !isSuperAdmin) {
+      return NextResponse.json(
+        { error: "Forbidden: Only a SUPER_ADMIN can delete another SUPER_ADMIN account." },
+        { status: 403 }
+      );
+    }
+
+    // Guard: Prevent deleting the last SUPER_ADMIN in the system
+    if (targetAdmin.role === "SUPER_ADMIN") {
+      const superAdminCount = await prisma.admin.count({
+        where: { role: "SUPER_ADMIN" },
+      });
+      if (superAdminCount <= 1) {
+        return NextResponse.json(
+          { error: "Cannot delete the last remaining SUPER_ADMIN account." },
+          { status: 400 }
+        );
+      }
     }
 
     // Delete sessions then admin

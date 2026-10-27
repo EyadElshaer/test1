@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
 import prisma from "@/lib/prisma";
 import { syncOrderToGoogleSheets } from "@/lib/googleSheets";
 
@@ -873,18 +874,43 @@ export async function testTelegramBot(
 }
 
 /**
- * Register public Webhook URL with Telegram
+ * Generate a deterministic secret token for Telegram webhook validation
+ */
+export function getTelegramWebhookSecret(botToken: string): string {
+  return crypto.createHash("sha256").update(`${botToken}_telegram_webhook_secret_key`).digest("hex");
+}
+
+/**
+ * Verify whether an incoming webhook request has the legitimate secret token header
+ */
+export function verifyTelegramWebhookSecret(botToken: string, providedSecret?: string | null): boolean {
+  if (!providedSecret || typeof providedSecret !== "string") return false;
+  const expected = getTelegramWebhookSecret(botToken);
+  try {
+    const providedBuf = Buffer.from(providedSecret);
+    const expectedBuf = Buffer.from(expected);
+    if (providedBuf.length !== expectedBuf.length) return false;
+    return crypto.timingSafeEqual(providedBuf, expectedBuf);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Register public Webhook URL with Telegram including cryptographic secret_token
  */
 export async function setTelegramWebhook(
   token: string,
   webhookUrl: string
 ): Promise<{ success: boolean; description?: string }> {
   try {
+    const secretToken = getTelegramWebhookSecret(token);
     const res = await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         url: webhookUrl,
+        secret_token: secretToken,
         allowed_updates: ["message", "callback_query"],
       }),
     });

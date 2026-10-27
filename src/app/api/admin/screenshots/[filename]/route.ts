@@ -12,11 +12,9 @@ export async function GET(
     const { filename } = await params;
     const safeFilename = path.basename(filename);
 
-    // Verify access: either admin session is active OR the file is a cryptographically random proof file
+    // Strictly require active administrator session to access customer payment proof receipts
     const admin = await getAdminSession();
-    const isProofFile = safeFilename.startsWith("proof_");
-
-    if (!admin && !isProofFile) {
+    if (!admin) {
       return new NextResponse("Unauthorized: Administrator session required.", { status: 401 });
     }
 

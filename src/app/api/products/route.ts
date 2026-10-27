@@ -14,8 +14,8 @@ export async function GET(req: Request) {
     const availability = searchParams.get("availability") || "ALL";
     const platform = searchParams.get("platform") || "ALL";
     const productType = searchParams.get("productType") || "ALL";
-    const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
-    const limit = Math.max(1, parseInt(searchParams.get("limit") || "16"));
+    const page = Math.min(1000, Math.max(1, parseInt(searchParams.get("page") || "1") || 1));
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "16") || 16));
     const skip = (page - 1) * limit;
 
     const where: any = {

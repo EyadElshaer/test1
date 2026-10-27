@@ -40,6 +40,7 @@ function MyOrdersContent() {
   const [refundReason, setRefundReason] = useState("Defective or unredeemed key");
   const [refundExplanation, setRefundExplanation] = useState("");
   const [refundAmount, setRefundAmount] = useState<number | "">("");
+  const [refundContact, setRefundContact] = useState("");
   const [refundSubmitting, setRefundSubmitting] = useState(false);
   const [refundMessage, setRefundMessage] = useState("");
   const [refundError, setRefundError] = useState("");
@@ -105,6 +106,7 @@ function MyOrdersContent() {
           reason: refundReason,
           explanation: refundExplanation,
           requestedAmount: refundAmount || activeOrder.totalAmount,
+          verificationContact: user ? undefined : refundContact.trim(),
         }),
       });
       const data = await res.json();
@@ -741,6 +743,25 @@ function MyOrdersContent() {
                   Default is full order amount ({activeOrder.totalAmount} {activeOrder.currency}).
                 </span>
               </div>
+
+              {!user && (
+                <div>
+                  <label className="text-xs font-semibold text-slate-300 block mb-1">
+                    Order Email or Phone Number <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Enter the email or phone used for this order"
+                    value={refundContact}
+                    onChange={(e) => setRefundContact(e.target.value)}
+                    className="w-full glass-input px-3.5 py-2 rounded-xl text-xs"
+                  />
+                  <span className="text-[11px] text-slate-500">
+                    Required for security verification to confirm order ownership.
+                  </span>
+                </div>
+              )}
 
               {refundError && (
                 <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs">

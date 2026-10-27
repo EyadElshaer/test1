@@ -9,6 +9,11 @@ import {
 
 export async function GET() {
   try {
+    const admin = await getAdminSession();
+    if (!admin) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const config = await getTelegramConfig();
     if (!config.botToken) {
       return NextResponse.json({ error: "Bot token not configured" }, { status: 400 });

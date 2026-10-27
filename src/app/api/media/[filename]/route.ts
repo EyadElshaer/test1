@@ -11,13 +11,18 @@ export async function GET(
     const { filename } = await params;
     const safeFilename = path.basename(filename);
 
-    // 1. Try PostgreSQL database storage first
+    // Security check: Private payment screenshots (proof_*) must NOT be served via public media endpoint
+    if (safeFilename.startsWith("proof_")) {
+      return new NextResponse("Not found", { status: 404 });
+    }
+
+    // 1. Try PostgreSQL database storage first (only product images and public catalog assets)
     try {
       const dbFile = await prisma.uploadedFile.findUnique({
         where: { filename: safeFilename },
       });
 
-      if (dbFile && dbFile.data) {
+      if (dbFile && dbFile.data && dbFile.category !== "screenshot") {
         return new NextResponse(dbFile.data, {
           headers: {
             "Content-Type": dbFile.mimeType || "image/jpeg",

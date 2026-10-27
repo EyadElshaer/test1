@@ -46,9 +46,12 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const items = Array.isArray(body?.items) ? body.items : [];
+    const items = Array.isArray(body?.items) ? body.items.slice(0, 50) : [];
 
     const cartString = items.length > 0 ? JSON.stringify(items) : null;
+    if (cartString && cartString.length > 100000) {
+      return NextResponse.json({ error: "Cart payload exceeds maximum allowable size." }, { status: 400 });
+    }
 
     await (prisma.user as any).update({
       where: { id: sessionUser.id },

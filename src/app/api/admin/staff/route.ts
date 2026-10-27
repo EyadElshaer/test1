@@ -80,12 +80,15 @@ export async function POST(req: Request) {
     const passwordHash = await bcrypt.hash(password, 10);
     const cleanPermissions = typeof permissions === "string" ? permissions.trim() : Array.isArray(permissions) ? permissions.join(",") : "";
 
+    // Privilege Escalation Prevention: Only a SUPER_ADMIN can create another SUPER_ADMIN
+    const assignedRole = isSuperAdmin && role === "SUPER_ADMIN" ? "SUPER_ADMIN" : "ADMIN";
+
     const newAdmin = await prisma.admin.create({
       data: {
         username: cleanUsername,
         passwordHash,
         email: email ? email.trim().toLowerCase() : null,
-        role: role === "SUPER_ADMIN" ? "SUPER_ADMIN" : "ADMIN",
+        role: assignedRole,
         permissions: cleanPermissions || null,
         mustChangePassword: false,
       },

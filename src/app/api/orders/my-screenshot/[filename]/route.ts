@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import prisma from "@/lib/prisma";
+import { getUserSession } from "@/lib/userAuth";
+import { getAdminSession } from "@/lib/auth";
 
 export async function GET(
   req: Request,
@@ -26,8 +28,22 @@ export async function GET(
       return new NextResponse("Not found or unauthorized.", { status: 404 });
     }
 
-    // If phone is provided, verify match (preventing guessing order number)
-    if (phone && order.customerPhone.replace(/\D/g, "") !== phone.replace(/\D/g, "")) {
+    // Verify ownership: Admin, logged-in customer account, or verified customer phone
+    const admin = await getAdminSession();
+    const sessionUser = await getUserSession();
+
+    const isOwnerUser = Boolean(
+      sessionUser &&
+      (order.userId === sessionUser.id ||
+        (sessionUser.email && order.customerEmail.toLowerCase() === sessionUser.email.toLowerCase()) ||
+        (sessionUser.phone && order.customerPhone.replace(/\D/g, "") === sessionUser.phone.replace(/\D/g, "")))
+    );
+
+    const isPhoneVerified = Boolean(
+      phone && order.customerPhone.replace(/\D/g, "") === phone.replace(/\D/g, "")
+    );
+
+    if (!admin && !isOwnerUser && !isPhoneVerified) {
       return new NextResponse("Unauthorized: Verification failed.", { status: 403 });
     }
 

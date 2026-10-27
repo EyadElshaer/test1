@@ -24,16 +24,24 @@ export async function GET(req: Request) {
   let destination = "/account/orders";
   let decodedState: any = null;
 
-  // Decode redirect target & action from state if present
+  // Decode redirect target & action from state if present (preventing open redirect)
   if (state) {
     try {
       decodedState = JSON.parse(Buffer.from(state, "base64url").toString("utf-8"));
       if (
         decodedState.redirect &&
         typeof decodedState.redirect === "string" &&
-        decodedState.redirect.startsWith("/")
+        decodedState.redirect.startsWith("/") &&
+        !decodedState.redirect.startsWith("//") &&
+        !decodedState.redirect.startsWith("/\\")
       ) {
-        destination = decodedState.redirect;
+        // Double check origin resolution
+        try {
+          const testUrl = new URL(decodedState.redirect, req.url);
+          if (testUrl.origin === new URL(req.url).origin) {
+            destination = testUrl.pathname + testUrl.search;
+          }
+        } catch {}
       }
     } catch {
       // ignore state parse errors

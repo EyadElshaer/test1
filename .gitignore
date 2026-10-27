@@ -41,3 +41,8 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+
+# Sensitive setup credentials & local screenshot storage
+INITIAL_ADMIN_SETUP.json
+/storage/
+

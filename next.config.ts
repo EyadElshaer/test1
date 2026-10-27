@@ -1,6 +1,24 @@
 import type { NextConfig } from "next";
 
+const cspDirectives = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/ https://accounts.google.com/gsi/client",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' data: https://fonts.gstatic.com",
+  "img-src 'self' data: blob: https://images.unsplash.com https://lh3.googleusercontent.com https://*.googleusercontent.com",
+  "connect-src 'self' https://www.google.com/recaptcha/ https://accounts.google.com/ https://identitytoolkit.googleapis.com",
+  "frame-src 'self' https://www.google.com/recaptcha/ https://recaptcha.google.com/recaptcha/ https://accounts.google.com/",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self' https://accounts.google.com/",
+  "frame-ancestors 'self'",
+].join("; ");
+
 const securityHeaders = [
+  {
+    key: "Content-Security-Policy",
+    value: cspDirectives,
+  },
   {
     key: "X-Frame-Options",
     value: "SAMEORIGIN",
@@ -24,6 +42,10 @@ const securityHeaders = [
   {
     key: "X-XSS-Protection",
     value: "1; mode=block",
+  },
+  {
+    key: "Cross-Origin-Opener-Policy",
+    value: "same-origin-allow-popups",
   },
 ];
 

@@ -5,6 +5,7 @@ import { sendTelegramRefundAlert } from "@/lib/telegram";
 import { sanitizeString } from "@/lib/sanitizer";
 import { getClientIp } from "@/lib/security";
 import { checkRateLimit } from "@/lib/rateLimit";
+import { getUserSession } from "@/lib/userAuth";
 
 export async function POST(req: Request) {
   try {
@@ -17,7 +18,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const { orderNumber, reason, explanation, requestedAmount } = await req.json();
+    const { orderNumber, reason, explanation, requestedAmount, verificationContact } = await req.json();
 
     const cleanOrderNumber = sanitizeString(orderNumber, 30).toUpperCase();
     const cleanReason = sanitizeString(reason, 100);
@@ -34,6 +35,32 @@ export async function POST(req: Request) {
 
     if (!order) {
       return NextResponse.json({ error: "Order not found." }, { status: 404 });
+    }
+
+    // Ownership Verification: Active account session or matching phone/email
+    const sessionUser = await getUserSession();
+    const isOwnerSession = Boolean(
+      sessionUser &&
+      (order.userId === sessionUser.id ||
+        (sessionUser.email && order.customerEmail.toLowerCase() === sessionUser.email.toLowerCase()) ||
+        (sessionUser.phone && order.customerPhone.replace(/\D/g, "") === sessionUser.phone.replace(/\D/g, "")))
+    );
+
+    const contactStr = (verificationContact || "").toString().trim().toLowerCase();
+    const cleanPhoneDigits = contactStr.replace(/\D/g, "");
+    const orderPhoneDigits = order.customerPhone.replace(/\D/g, "");
+
+    const isContactMatched = Boolean(
+      contactStr &&
+      (contactStr === order.customerEmail.toLowerCase() ||
+        (cleanPhoneDigits.length >= 8 && orderPhoneDigits.endsWith(cleanPhoneDigits)))
+    );
+
+    if (!isOwnerSession && !isContactMatched) {
+      return NextResponse.json(
+        { error: "Verification required: Please sign in or provide the email or phone number used when placing this order." },
+        { status: 403 }
+      );
     }
 
     // Check if there is already a pending or approved refund request

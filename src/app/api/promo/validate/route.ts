@@ -1,8 +1,22 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { getClientIp } from "@/lib/security";
+import { checkRateLimit } from "@/lib/rateLimit";
 
 export async function POST(req: Request) {
   try {
+    const ip = getClientIp(req);
+    const rateCheck = checkRateLimit(`promo_val_${ip}`, 20, 5 * 60 * 1000);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        {
+          valid: false,
+          message: `Too many promo code attempts. Please wait ${rateCheck.retryAfterSec} seconds.`,
+        },
+        { status: 429 }
+      );
+    }
+
     const { code, subtotal, items } = await req.json();
 
     if (!code || typeof code !== "string") {
