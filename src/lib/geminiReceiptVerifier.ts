@@ -62,7 +62,7 @@ export interface ResolvedGeminiModel {
 const modelCache = new Map<string, { resolved: ResolvedGeminiModel; cachedAt: number }>();
 
 /**
- * Automatically discover which Gemini models are available for this specific API key
+ * Automatically discover and verify a working Gemini Flash model for this specific API key
  */
 export async function getAvailableGeminiModel(apiKey: string): Promise<ResolvedGeminiModel | null> {
   const cached = modelCache.get(apiKey);
@@ -70,20 +70,21 @@ export async function getAvailableGeminiModel(apiKey: string): Promise<ResolvedG
     return cached.resolved;
   }
 
-  // Preferred candidate model identifiers in order of preference (Flash models first for vision)
-  const preferredModels = [
-    "gemini-2.5-flash",
+  // Priority list of models to probe (Gemini 3.8 and flash-latest prioritized as recommended by Google)
+  const candidateModels = [
+    "gemini-3.8-flash",
+    "gemini-flash-latest",
+    "gemini-2.5-pro",
     "gemini-2.0-flash",
-    "gemini-2.0-flash-exp",
     "gemini-1.5-flash-latest",
     "gemini-1.5-flash",
-    "gemini-1.5-flash-8b",
-    "gemini-1.5-pro",
-    "gemini-pro",
+    "gemini-2.5-flash",
   ];
 
   const apiVersions = ["v1beta", "v1"];
 
+  // 1. Fetch the exact model list from Google for this key
+  const availableFromGoogle: string[] = [];
   for (const apiVersion of apiVersions) {
     try {
       const listUrl = `https://generativelanguage.googleapis.com/${apiVersion}/models?key=${apiKey}`;
@@ -91,70 +92,59 @@ export async function getAvailableGeminiModel(apiKey: string): Promise<ResolvedG
       if (res.ok) {
         const data = await res.json();
         const models: Array<{ name: string; supportedGenerationMethods?: string[] }> = data.models || [];
-
-        const supported = models.filter((m) =>
-          Array.isArray(m.supportedGenerationMethods)
-            ? m.supportedGenerationMethods.includes("generateContent")
-            : true
-        );
-
-        if (supported.length > 0) {
-          for (const pref of preferredModels) {
-            const match = supported.find(
-              (m) =>
-                m.name.toLowerCase().endsWith(pref) ||
-                m.name.toLowerCase() === `models/${pref}` ||
-                m.name.toLowerCase() === pref
-            );
-            if (match) {
-              const cleanName = match.name.startsWith("models/") ? match.name.slice(7) : match.name;
-              const resolved: ResolvedGeminiModel = {
-                endpointUrl: `https://generativelanguage.googleapis.com/${apiVersion}/models/${cleanName}:generateContent?key=${apiKey}`,
-                modelName: cleanName,
-                apiVersion,
-              };
-              modelCache.set(apiKey, { resolved, cachedAt: Date.now() });
-              return resolved;
-            }
+        for (const m of models) {
+          const clean = m.name?.replace("models/", "");
+          if (clean && !availableFromGoogle.includes(clean)) {
+            availableFromGoogle.push(clean);
           }
+        }
+      }
+    } catch {}
+  }
 
-          // Fallback to any model with "flash"
-          const flash = supported.find((m) => m.name.toLowerCase().includes("flash"));
-          if (flash) {
-            const cleanName = flash.name.startsWith("models/") ? flash.name.slice(7) : flash.name;
-            const resolved: ResolvedGeminiModel = {
-              endpointUrl: `https://generativelanguage.googleapis.com/${apiVersion}/models/${cleanName}:generateContent?key=${apiKey}`,
-              modelName: cleanName,
-              apiVersion,
-            };
-            modelCache.set(apiKey, { resolved, cachedAt: Date.now() });
-            return resolved;
-          }
+  // Combine Google's reported models with prioritized candidates
+  const prioritizedToProbe = Array.from(
+    new Set([
+      "gemini-3.8-flash",
+      "gemini-flash-latest",
+      ...availableFromGoogle.filter((m) => m === "gemini-flash-latest" || m.includes("flash")),
+      ...candidateModels,
+      ...availableFromGoogle,
+    ])
+  );
 
-          // Fallback to any supported model
-          const anyModel = supported[0];
-          const cleanName = anyModel.name.startsWith("models/") ? anyModel.name.slice(7) : anyModel.name;
+  // 2. Actively probe each candidate until one returns HTTP 200 OK
+  for (const model of prioritizedToProbe) {
+    for (const apiVersion of apiVersions) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/${apiVersion}/models/${model}:generateContent?key=${apiKey}`;
+        const pingRes = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: "hi" }] }],
+          }),
+        });
+
+        if (pingRes.ok) {
           const resolved: ResolvedGeminiModel = {
-            endpointUrl: `https://generativelanguage.googleapis.com/${apiVersion}/models/${cleanName}:generateContent?key=${apiKey}`,
-            modelName: cleanName,
+            endpointUrl: url,
+            modelName: model,
             apiVersion,
           };
           modelCache.set(apiKey, { resolved, cachedAt: Date.now() });
           return resolved;
         }
-      }
-    } catch (e) {
-      console.warn(`Gemini ListModels check error (${apiVersion}):`, e);
+      } catch {}
     }
   }
 
-  // Fallback default if ListModels endpoint is restricted
-  const defaultResolved: ResolvedGeminiModel = {
-    endpointUrl: `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-    modelName: "gemini-2.0-flash",
+  // Fallback
+  return {
+    endpointUrl: `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`,
+    modelName: "gemini-flash-latest",
     apiVersion: "v1beta",
   };
-  return defaultResolved;
 }
 
 /**
