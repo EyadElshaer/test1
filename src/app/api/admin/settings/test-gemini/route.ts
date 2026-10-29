@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
-import { getGeminiApiKey } from "@/lib/geminiReceiptVerifier";
+import { getGeminiApiKey, getAvailableGeminiModel } from "@/lib/geminiReceiptVerifier";
 
 export async function POST(req: Request) {
   try {
@@ -22,9 +22,21 @@ export async function POST(req: Request) {
       );
     }
 
-    // Ping Gemini 1.5 Flash
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${keyToTest}`;
-    const testRes = await fetch(geminiUrl, {
+    // 1. Query Google to discover the best available model for this key
+    const resolved = await getAvailableGeminiModel(keyToTest);
+
+    if (!resolved) {
+      return NextResponse.json(
+        {
+          error:
+            "Could not discover any available Gemini models for this API key. Please ensure your key is active in Google AI Studio (aistudio.google.com).",
+        },
+        { status: 400 }
+      );
+    }
+
+    // 2. Ping the discovered Gemini model
+    const testRes = await fetch(resolved.endpointUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -43,7 +55,29 @@ export async function POST(req: Request) {
         const json = JSON.parse(errText);
         parsedErr = json.error?.message || parsedErr;
       } catch {}
-      return NextResponse.json({ error: `Connection failed: ${parsedErr}` }, { status: 400 });
+
+      // If specific model failed, also fetch available models list to show in error for debugging
+      let availableNames = "";
+      try {
+        const listRes = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models?key=${keyToTest}`
+        );
+        if (listRes.ok) {
+          const listData = await listRes.json();
+          const names = (listData.models || [])
+            .map((m: any) => m.name?.replace("models/", ""))
+            .filter((n: string) => n.includes("gemini"))
+            .slice(0, 5);
+          if (names.length > 0) {
+            availableNames = ` (Available models for your key: ${names.join(", ")})`;
+          }
+        }
+      } catch {}
+
+      return NextResponse.json(
+        { error: `Connection failed for ${resolved.modelName}: ${parsedErr}${availableNames}` },
+        { status: 400 }
+      );
     }
 
     const data = await testRes.json();
@@ -51,7 +85,9 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      message: `Google Gemini 1.5 Flash Vision connected successfully! (Model response: ${reply})`,
+      message: `Google Gemini connected successfully! Using model: ${resolved.modelName} (${resolved.apiVersion}). Response: ${reply}`,
+      model: resolved.modelName,
+      apiVersion: resolved.apiVersion,
     });
   } catch (error: any) {
     console.error("Gemini test failed:", error);
