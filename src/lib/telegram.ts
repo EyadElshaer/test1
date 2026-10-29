@@ -140,6 +140,9 @@ export async function sendTelegramOrderAlert(order: {
   customerPhone: string;
   customerEmail: string;
   customerNotes?: string | null;
+  aiVerified?: boolean;
+  detectedAmount?: number | null;
+  detectedReceiver?: string | null;
   items?: Array<{
     productTitle: string;
     quantity: number;
@@ -185,6 +188,11 @@ export async function sendTelegramOrderAlert(order: {
       ? `\n🔖 <b>Reference No:</b> <code>${escapeHtml(order.paymentReference.trim())}</code>`
       : "";
 
+    // 4.5 Format AI Proof Audit line
+    const aiProofLine = order.aiVerified
+      ? `\n🤖 <b>AI Proof Audit:</b> ✅ <b>VERIFIED</b> (Matched: ${order.detectedAmount || order.totalAmount} ${order.currency}${order.detectedReceiver ? ` | Receiver: ${escapeHtml(order.detectedReceiver)}` : ""})`
+      : "";
+
     // 5. Build rich HTML message
     const messageHtml =
       `🔔 <b>NEW ORDER RECEIVED!</b> 🔔\n\n` +
@@ -193,7 +201,7 @@ export async function sendTelegramOrderAlert(order: {
       (order.subtotal && order.discountAmount && order.discountAmount > 0
         ? ` <i>(Subtotal: ${order.subtotal} ${order.currency})</i>`
         : "") +
-      `\n💳 <b>Payment:</b> ${escapeHtml(order.paymentMethodName)}${refLine}\n\n` +
+      `\n💳 <b>Payment:</b> ${escapeHtml(order.paymentMethodName)}${refLine}${aiProofLine}\n\n` +
       `👤 <b>Customer Details:</b>\n` +
       `• <b>Name:</b> ${escapeHtml(order.customerName)}\n` +
       `• <b>Phone:</b> <code>${escapeHtml(order.customerPhone)}</code>\n` +

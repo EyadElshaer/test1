@@ -15,6 +15,7 @@ import { getClientIp } from "@/lib/security";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { extractConfigurations } from "@/lib/configurations";
 import { syncOrderToGoogleSheets } from "@/lib/googleSheets";
+import { verifyPaymentReceiptWithGemini } from "@/lib/geminiReceiptVerifier";
 
 export async function POST(req: Request) {
   try {
@@ -47,7 +48,7 @@ export async function POST(req: Request) {
     const cleanCustomerName = sanitizeString(customerName, 80);
     const cleanCustomerEmail = sanitizeString(customerEmail, 100).toLowerCase();
     const cleanCustomerNotes = customerNotes ? sanitizeString(customerNotes, 500) : null;
-    const cleanPaymentRef = paymentReference ? sanitizeString(paymentReference, 100) : null;
+    let cleanPaymentRef = paymentReference ? sanitizeString(paymentReference, 100) : null;
 
     // 1. Validate Customer Information
     if (!cleanCustomerName || cleanCustomerName.length < 2) {
@@ -273,6 +274,48 @@ export async function POST(req: Request) {
       }
     }
 
+    // 6.5. Automated Payment Proof Verification (Google Gemini 1.5 Flash - Free Tier)
+    let isAiVerified = false;
+    let aiVerificationNote = "";
+    let aiDetectedAmount: number | null = null;
+    let aiDetectedReceiver: string | null = null;
+    let initialPaymentStatus = "AWAITING_VERIFICATION";
+
+    if (paymentMethod.requireScreenshot && paymentScreenshotUrl) {
+      const verification = await verifyPaymentReceiptWithGemini({
+        screenshotUrl: paymentScreenshotUrl,
+        expectedAmount: finalTotal,
+        currency: paymentMethod.currency || "EGP",
+        expectedRecipientName: paymentMethod.recipientName,
+        expectedAccountDetails: paymentMethod.accountDetails,
+        paymentMethodName: paymentMethod.name,
+      });
+
+      if (!verification.isValid) {
+        // Auto-declined: Screenshot fails amount, receiver name, or authenticity
+        return NextResponse.json(
+          {
+            error: `Payment Proof Verification Declined: ${
+              verification.rejectionReason || "The uploaded screenshot does not match the required payment details."
+            }`,
+          },
+          { status: 400 }
+        );
+      }
+
+      if (verification.status === "VERIFIED") {
+        isAiVerified = true;
+        initialPaymentStatus = "VERIFIED";
+        aiDetectedAmount = verification.detectedAmount || finalTotal;
+        aiDetectedReceiver = verification.detectedReceiver || paymentMethod.recipientName || null;
+        aiVerificationNote = ` [AI Verified: Matched ${aiDetectedAmount} ${paymentMethod.currency || "EGP"}]`;
+
+        if (!cleanPaymentRef && verification.transactionReference) {
+          cleanPaymentRef = verification.transactionReference;
+        }
+      }
+    }
+
     // 7. Atomic Database Transaction
     const newOrder = await prisma.$transaction(async (tx: any) => {
       // Create order
@@ -285,7 +328,7 @@ export async function POST(req: Request) {
           countryCode: countryCode || "EG",
           customerEmail: cleanCustomerEmail,
           status: "PENDING",
-          paymentStatus: "AWAITING_VERIFICATION",
+          paymentStatus: initialPaymentStatus,
           paymentMethodId: paymentMethod.id,
           paymentMethodName: paymentMethod.name,
           paymentReference: cleanPaymentRef,
@@ -315,7 +358,7 @@ export async function POST(req: Request) {
               fromStatus: "NONE",
               toStatus: "PENDING",
               changedBy: "CUSTOMER",
-              notes: `Order created online. Payment method: ${paymentMethod.name}. Awaiting manual verification.`,
+              notes: `Order created online. Payment method: ${paymentMethod.name}.${aiVerificationNote || " Awaiting manual verification."}`,
             },
           },
         },
@@ -370,6 +413,9 @@ export async function POST(req: Request) {
         customerPhone: newOrder.customerPhone,
         customerEmail: newOrder.customerEmail,
         customerNotes: newOrder.customerNotes,
+        aiVerified: isAiVerified,
+        detectedAmount: aiDetectedAmount,
+        detectedReceiver: aiDetectedReceiver,
         items: newOrder.items.map((i: any) => ({
           productTitle: i.productTitle,
           quantity: i.quantity,

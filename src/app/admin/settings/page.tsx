@@ -25,6 +25,7 @@ import {
   Copy,
   Check,
   Download,
+  Sparkles,
 } from "lucide-react";
 import { GOOGLE_APPS_SCRIPT_CODE } from "@/lib/googleAppsScriptTemplate";
 
@@ -40,6 +41,33 @@ export default function AdminSettingsPage() {
   const [isRegisteringWebhook, setIsRegisteringWebhook] = useState(false);
   const [webhookInfo, setWebhookInfo] = useState<any>(null);
   const [isPolling, setIsPolling] = useState(false);
+
+  // Gemini AI Verification State
+  const [isTestingGemini, setIsTestingGemini] = useState(false);
+  const [geminiTestSuccess, setGeminiTestSuccess] = useState("");
+  const [geminiTestError, setGeminiTestError] = useState("");
+
+  const handleTestGemini = async () => {
+    setIsTestingGemini(true);
+    setGeminiTestSuccess("");
+    setGeminiTestError("");
+    try {
+      const res = await fetch("/api/admin/settings/test-gemini", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apiKey: settings.gemini_api_key }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to connect to Google Gemini.");
+      }
+      setGeminiTestSuccess(data.message || "Connection verified successfully!");
+    } catch (err: any) {
+      setGeminiTestError(err.message || "Gemini connection failed.");
+    } finally {
+      setIsTestingGemini(false);
+    }
+  };
 
   // Google Sheets Integration State
   const [isTestingGoogleSheets, setIsTestingGoogleSheets] = useState(false);
@@ -944,7 +972,122 @@ export default function AdminSettingsPage() {
           </div>
         </div>
 
-        {/* 6. Google reCAPTCHA v3 Bot Protection */}
+        {/* 6. AI Payment Proof Verification (Google Gemini 1.5 Flash - Free Tier) */}
+        <div className="glass-card rounded-3xl p-6 sm:p-8 border border-white/10 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
+            <div>
+              <h3 className="font-bold text-white text-base flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-amber-400" />
+                <span>AI Receipt &amp; Payment Proof Verification (Gemini Flash - Free Tier)</span>
+              </h3>
+              <p className="text-xs text-slate-400 mt-1">
+                Automatically audits InstaPay, Vodafone Cash, and bank transfer receipts using AI vision before notifying you. False receipts, wrong amounts, or recipient mismatches get auto-declined instantly.
+              </p>
+            </div>
+
+            <label className="flex items-center gap-2.5 cursor-pointer bg-white/[0.04] hover:bg-white/[0.08] px-3.5 py-2 rounded-xl border border-white/10 transition-colors shrink-0">
+              <input
+                type="checkbox"
+                checked={settings.gemini_verification_enabled !== "false"}
+                onChange={(e) =>
+                  handleChange("gemini_verification_enabled", e.target.checked ? "true" : "false")
+                }
+                className="rounded border-slate-700 text-amber-500 focus:ring-amber-500 w-4 h-4 cursor-pointer"
+              />
+              <span className="text-xs font-semibold text-white">Enable AI Verification</span>
+            </label>
+          </div>
+
+          {/* Test banners */}
+          {geminiTestSuccess && (
+            <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <span>{geminiTestSuccess}</span>
+            </div>
+          )}
+          {geminiTestError && (
+            <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{geminiTestError}</span>
+            </div>
+          )}
+
+          {/* Configuration Inputs */}
+          <div className="space-y-4">
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-semibold text-slate-300">
+                  Google Gemini API Key (100% Free Tier - No Credit Card Required)
+                </label>
+                <a
+                  href="https://aistudio.google.com/app/apikey"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-amber-400 hover:text-amber-300 underline flex items-center gap-1 font-semibold"
+                >
+                  <span>Get Free Key at Google AI Studio</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="password"
+                  placeholder="e.g. AIzaSy..."
+                  value={settings.gemini_api_key || ""}
+                  onChange={(e) => handleChange("gemini_api_key", e.target.value)}
+                  className="w-full glass-input px-3.5 py-2.5 rounded-xl text-xs font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={handleTestGemini}
+                  disabled={isTestingGemini}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 flex items-center gap-1.5 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 shrink-0"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>{isTestingGemini ? "Testing..." : "Test Key"}</span>
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">
+                You can also configure <code className="text-amber-300 font-mono">GEMINI_API_KEY</code> directly in your <code className="text-amber-300 font-mono">.env</code> file.
+              </p>
+            </div>
+
+            {/* Feature highlights */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs pt-2">
+              <div className="p-3.5 rounded-2xl bg-white/[0.02] border border-white/5 space-y-1">
+                <strong className="text-white flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Recipient &amp; Amount Match</span>
+                </strong>
+                <p className="text-slate-400 text-[11px] leading-relaxed">
+                  Extracts Arabic and English text to verify that the transfer amount matches the order total and the recipient matches your payment method account.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-white/[0.02] border border-white/5 space-y-1">
+                <strong className="text-white flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Auto-Decline False Proofs</span>
+                </strong>
+                <p className="text-slate-400 text-[11px] leading-relaxed">
+                  If the receipt is fake, unpaid, shows a different receiver, or has a lower amount, the order is declined immediately with zero spam alerts sent to your Telegram.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-white/[0.02] border border-white/5 space-y-1">
+                <strong className="text-white flex items-center gap-1.5">
+                  <Zap className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Anti-Fraud Duplicate Check</span>
+                </strong>
+                <p className="text-slate-400 text-[11px] leading-relaxed">
+                  Reads transaction reference numbers and blocks customers from recycling previous screenshots for new orders.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 7. Google reCAPTCHA v3 Bot Protection */}
         <div className="glass-card rounded-3xl p-6 sm:p-8 border border-white/10 space-y-4">
           <div className="flex items-center justify-between border-b border-white/10 pb-3">
             <h3 className="font-bold text-white text-base flex items-center gap-2">
