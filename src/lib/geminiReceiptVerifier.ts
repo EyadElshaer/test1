@@ -135,6 +135,7 @@ export async function verifyPaymentReceiptWithGemini(
 
   // Load screenshot image data
   const imageData = await loadScreenshotBuffer(params.screenshotUrl);
+
   if (!imageData) {
     console.warn("Screenshot buffer could not be loaded; passing to manual review.");
     return {
