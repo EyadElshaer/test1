@@ -66,8 +66,8 @@ const modelCache = new Map<string, { resolved: ResolvedGeminiModel; cachedAt: nu
  */
 export async function getAvailableGeminiModel(apiKey: string): Promise<ResolvedGeminiModel> {
   return {
-    endpointUrl: `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`,
-    modelName: "gemini-flash-latest",
+    endpointUrl: `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`,
+    modelName: "gemini-3.5-flash",
     apiVersion: "v1beta",
   };
 }

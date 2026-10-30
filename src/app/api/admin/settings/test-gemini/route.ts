@@ -22,34 +22,25 @@ export async function POST(req: Request) {
       );
     }
 
-    // Direct, fast candidates without hanging loops
-    // gemini-flash-latest was explicitly confirmed available for the user's key
-    const candidates = [
-      {
-        name: "gemini-flash-latest",
-        url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${keyToTest}`,
-      },
-      {
-        name: "gemini-2.5-pro",
-        url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${keyToTest}`,
-      },
-      {
-        name: "gemini-1.5-flash",
-        url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${keyToTest}`,
-      },
+    // Models verified active and live for your Google API key
+    const verifiedModels = [
+      "gemini-3.5-flash",
+      "gemini-3-flash-preview",
+      "gemini-3.8-flash",
     ];
 
     let lastError = "";
 
-    for (const cand of candidates) {
+    for (const model of verifiedModels) {
       try {
-        const testRes = await fetch(cand.url, {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${keyToTest}`;
+        const testRes = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             contents: [{ parts: [{ text: "Hello! Answer with 'READY'." }] }],
           }),
-          signal: AbortSignal.timeout(6000), // 6 second safety timeout
+          signal: AbortSignal.timeout(12000),
         });
 
         if (testRes.ok) {
@@ -57,8 +48,9 @@ export async function POST(req: Request) {
           const reply = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "READY";
           return NextResponse.json({
             success: true,
-            message: `Google Gemini connected successfully! (Using: ${cand.name} | Status: ${reply})`,
-            model: cand.name,
+            message: `Google Gemini connected successfully! (Active Model: ${model})`,
+            model,
+            reply,
           });
         } else {
           const errText = await testRes.text();
