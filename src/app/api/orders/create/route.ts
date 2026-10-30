@@ -282,12 +282,22 @@ export async function POST(req: Request) {
     let initialPaymentStatus = "AWAITING_VERIFICATION";
 
     if (paymentMethod.requireScreenshot && paymentScreenshotUrl) {
+      const customerVisibleNotes = [
+        paymentMethod.instructions,
+        paymentMethod.description,
+        paymentMethod.accountDetails ? `Account / Phone / Wallet: ${paymentMethod.accountDetails}` : null,
+        paymentMethod.recipientName ? `Recipient Name: ${paymentMethod.recipientName}` : null,
+      ]
+        .filter(Boolean)
+        .join("\n");
+
       const verification = await verifyPaymentReceiptWithGemini({
         screenshotUrl: paymentScreenshotUrl,
         expectedAmount: finalTotal,
         currency: paymentMethod.currency || "EGP",
         expectedRecipientName: paymentMethod.recipientName,
         expectedAccountDetails: paymentMethod.accountDetails,
+        customerVisibleNotes,
         paymentMethodName: paymentMethod.name,
       });
 

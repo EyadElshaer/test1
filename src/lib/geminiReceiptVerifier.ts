@@ -8,6 +8,7 @@ export interface ReceiptVerificationParams {
   currency?: string;
   expectedRecipientName?: string | null;
   expectedAccountDetails?: string | null;
+  customerVisibleNotes?: string | null;
   paymentMethodName: string;
 }
 
@@ -149,30 +150,59 @@ export async function verifyPaymentReceiptWithGemini(
     const expectedAmount = Number(params.expectedAmount) || 0;
     const recipientName = (params.expectedRecipientName || "").trim();
     const accountDetails = (params.expectedAccountDetails || "").trim();
+    const customerNotes = (params.customerVisibleNotes || "").trim();
 
-    const prompt = `You are an automated financial transaction auditor verifying an uploaded payment receipt or transfer screenshot for an e-commerce order.
+    const prompt = `You are an automated financial transaction auditor verifying an uploaded payment transfer receipt or transaction screenshot for an e-commerce order.
 
---- EXPECTED ORDER DETAILS ---
-• Expected Payment Amount: ${expectedAmount} ${currency}
+--- EXPECTED ORDER & STORE DETAILS ---
+• Expected Order Amount: ${expectedAmount} ${currency}
 • Expected Store Recipient Name: "${recipientName}"
-• Expected Account / Phone / Handle / IBAN: "${accountDetails}"
-• Payment Method: "${params.paymentMethodName}"
+• Expected Recipient Phone / Wallet / Account / IPA: "${accountDetails}"
+• Payment Method Instructions & Notes Visible to the Customer:
+"""
+${customerNotes}
+"""
+• Payment Method Name: "${params.paymentMethodName}"
 
---- INSTRUCTIONS ---
-1. Identify if this image is a genuine payment confirmation receipt / transfer screen (e.g. InstaPay Egypt, Vodafone Cash, Orange Money, Etisalat Cash, Telda, Bank Transfer, CIB, Banque Misr, NBE, PayPal).
-   - If it is a meme, product screenshot, selfie, random picture, or not a payment screenshot, mark "isLegitimateReceipt": false.
-2. Check Transaction Status:
-   - Must be a successful/completed transfer (e.g. "Successful", "تم التحويل بنجاح", "Completed", "Done").
-   - If it is "Pending", "Failed", "Cancelled", or an unsubmitted draft/form screen, mark "isSuccessfulTransaction": false.
-3. Check Recipient:
-   - Does the recipient name, handle (e.g. InstaPay IPA), or wallet phone number match the expected details?
-   - Note: Names can be in Arabic or English, or transliterated (e.g., "Ahmed Mohamed" matches "احمد محمد" or "PremiKeys" matches "بريمي كيز").
-   - If expected recipient is empty, mark "receiverMatches": true.
-4. Check Amount:
-   - Does the transferred amount on the receipt match or exceed ${expectedAmount} ${currency}?
-   - Allow a tiny tolerance of up to 1.0 unit for rounding. If paid amount is less, mark "amountMatches": false.
-5. Extract Transaction Reference:
-   - Extract any visible reference number, transaction ID, or operation code.
+--- AUDIT INSTRUCTIONS ---
+1. IDENTIFY LEGITIMATE PAYMENT RECEIPT:
+   - Check if this image is a genuine financial transfer confirmation receipt or screenshot (e.g., InstaPay Egypt, Vodafone Cash, Orange Money, Etisalat Cash, WE Pay, Telda, Bank Transfer, CIB, NBE, Banque Misr, QNB, etc.).
+   - If it is a meme, product screenshot, selfie, random picture, or unrelated image, mark "isLegitimateReceipt": false.
+
+2. CHECK TRANSACTION STATUS:
+   - The transaction MUST be completed and successful (e.g. "Successful", "تم التحويل بنجاح", "تمت العملية بنجاح", "Transaction Succeeded", "Completed", "Done").
+   - If it is "Pending" (قيد التنفيذ), "Failed" (فشلت), "Cancelled", a draft/review transfer screen, or awaiting OTP/confirmation, mark "isSuccessfulTransaction": false.
+
+3. CHECK RECIPIENT PERSON & PHONE / WALLET NUMBER:
+   - Carefully read the "Payment Method Instructions & Notes Visible to the Customer" above. It contains our official store recipient name, phone number, wallet number, and/or InstaPay address.
+   - Look at the recipient details in the screenshot (name, phone number, wallet number, InstaPay IPA, IBAN, or bank account).
+   - NUMBER & NAME MATCHING RULES:
+     * Check both English and Arabic digits (e.g. 010... vs ٠١٠...).
+     * Phone Number Normalization: Ignore spaces, hyphens, parentheses, leading zeros, and country dial codes (+20, 0020, 20). For instance, "01012345678", "010 1234 5678", "+201012345678", and "٠١٠١٢٣٤٥٦٧٨" are all the EXACT same phone number.
+     * Name Matching: Support Arabic, English, transliterations, and partial names (e.g., "Ahmed Mohamed", "احمد محمد", "PremiKeys", "بريمي كيز").
+     * Verification Check:
+       - If the screenshot shows a recipient phone or account number, it MUST match the number in our notes/account details.
+       - If the screenshot shows a recipient name, it MUST match the recipient name in our notes/store details.
+       - If the screenshot displays BOTH the recipient name AND the phone/account number, BOTH must match our authorized details.
+       - If the screenshot clearly shows money was sent to a WRONG person or WRONG phone number not in our notes/instructions, mark "receiverMatches": false and state in rejectionReason that the transfer was sent to the wrong recipient or number.
+
+4. CHECK AMOUNT (WITH COMMON ROUNDING-UP LOGIC):
+   - Expected Order Amount: ${expectedAmount} ${currency}.
+   - CRITICAL ROUNDING-UP RULE: In Egypt, customers frequently round up amounts when sending transfers via InstaPay or mobile cash wallets to avoid awkward change:
+     * If the order price is 399 ${currency}, BOTH 399 AND 400 are 100% correct and valid!
+     * If the order price is 199 ${currency}, BOTH 199 AND 200 are 100% correct and valid!
+     * If the order price is 299 ${currency}, BOTH 299 AND 300 are 100% correct and valid!
+     * If the order price is 499 ${currency}, BOTH 499 AND 500 are 100% correct and valid!
+     * If the order price is 99 ${currency}, BOTH 99 AND 100 are 100% correct and valid!
+     * If the order price is 799 ${currency}, BOTH 799 AND 800 are 100% correct and valid!
+     * If the order price is 999 ${currency}, BOTH 999 AND 1000 are 100% correct and valid!
+     * If the order price is 395 ${currency}, BOTH 395 AND 400 are 100% correct and valid!
+     * Rule: Any transferred amount that EQUALS ${expectedAmount} OR is rounded up to the next integer, 5, 10, or 100 (or up to +5 to +20 ${currency} convenience) is VALID ("amountMatches": true).
+   - STRICT UNDERPAYMENT RULE:
+     * If the transferred amount in the screenshot is LESS than ${expectedAmount} (for example, paid 100, 200, 300, or 350 when 399 was required), mark "amountMatches": false and set rejectionReason to "The transferred amount ({detectedAmount} ${currency}) is less than the required order total (${expectedAmount} ${currency})."
+
+5. EXTRACT TRANSACTION REFERENCE:
+   - Extract any visible transaction ID, reference number, or operation sequence code.
 
 --- STRICT OUTPUT FORMAT ---
 Respond ONLY with a valid JSON object matching this schema:
@@ -194,13 +224,13 @@ Respond ONLY with a valid JSON object matching this schema:
 - amountMatches is true
 - receiverMatches is true
 
-If "isValid" is false, "rejectionReason" MUST be a clear, user-friendly explanation in English (e.g. "The receipt shows an amount of 100 EGP, but your order total is 350 EGP", "The recipient name on the receipt does not match our store account", or "The screenshot does not show a completed transaction").`;
+If "isValid" is false, "rejectionReason" MUST be a clear, polite explanation in English (e.g. "The transferred amount is 100 EGP, but your order total is 399 EGP", "The transfer was sent to an incorrect recipient or phone number", or "The screenshot does not show a completed successful transfer").`;
 
-    // Resolve best available Gemini Vision model for this API key (auto-discovers gemini-2.0-flash / gemini-1.5-flash)
+    // Resolve best available Gemini Vision model for this API key
     const resolved = await getAvailableGeminiModel(apiKey);
     const geminiUrl =
       resolved?.endpointUrl ||
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`;
 
     const apiResponse = await fetch(geminiUrl, {
       method: "POST",
