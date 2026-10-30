@@ -323,6 +323,8 @@ export async function POST(req: Request) {
         if (!cleanPaymentRef && verification.transactionReference) {
           cleanPaymentRef = verification.transactionReference;
         }
+      } else if (verification.status === "SKIPPED" && verification.note) {
+        aiVerificationNote = ` [${verification.note}]`;
       }
     }
 

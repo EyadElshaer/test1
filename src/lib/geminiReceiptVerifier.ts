@@ -250,6 +250,8 @@ If "isValid" is false, "rejectionReason" MUST be a clear, polite explanation in 
     ];
     let candidateText = "";
     let lastError = "";
+    let anyQuotaExceeded = false;
+    let anyTemporaryOverload = false;
 
     for (const model of freeFlashModels) {
       try {
@@ -283,8 +285,14 @@ If "isValid" is false, "rejectionReason" MUST be a clear, polite explanation in 
           candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
           if (candidateText) break;
         } else {
+          const status = apiResponse.status;
           lastError = await apiResponse.text();
-          console.warn(`Gemini model ${model} returned HTTP ${apiResponse.status}:`, lastError);
+          console.warn(`Gemini model ${model} returned HTTP ${status}:`, lastError);
+          if (status === 429) {
+            anyQuotaExceeded = true;
+          } else if (status === 503) {
+            anyTemporaryOverload = true;
+          }
         }
       } catch (err: any) {
         lastError = err?.message || "fetch error";
@@ -293,6 +301,19 @@ If "isValid" is false, "rejectionReason" MUST be a clear, polite explanation in 
     }
 
     if (!candidateText) {
+      // If daily free quota ended or all models are busy, gracefully auto-approve
+      // and pass through for manual admin review so customer checkout is never blocked
+      if (anyQuotaExceeded || anyTemporaryOverload) {
+        console.warn("[GEMINI VERIFY] Daily AI free quota reached or service busy. Auto-allowing order through for manual review.");
+        return {
+          status: "SKIPPED",
+          isValid: true,
+          note: anyQuotaExceeded
+            ? "Daily AI verification quota reached (HTTP 429). Order automatically passed through for manual admin review."
+            : "AI verification service temporarily busy (HTTP 503). Order automatically passed through for manual admin review.",
+        };
+      }
+
       return {
         status: "DECLINED",
         isValid: false,
