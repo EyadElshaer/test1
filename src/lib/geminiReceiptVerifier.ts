@@ -249,7 +249,30 @@ If "isValid" is false, "rejectionReason" MUST be a clear, user-friendly explanat
       };
     }
 
-    const parsed = JSON.parse(candidateText);
+    let parsed: any = null;
+    try {
+      const cleanJson = candidateText
+        .replace(/```json/gi, "")
+        .replace(/```/g, "")
+        .trim();
+      parsed = JSON.parse(cleanJson);
+    } catch {
+      const match = candidateText.match(/\{[\s\S]*\}/);
+      if (match) {
+        try {
+          parsed = JSON.parse(match[0]);
+        } catch {}
+      }
+    }
+
+    if (!parsed || typeof parsed !== "object") {
+      console.warn("Failed to parse AI response as JSON:", candidateText);
+      return {
+        status: "SKIPPED",
+        isValid: true,
+        note: "Could not parse AI response JSON; passed to manual review.",
+      };
+    }
 
     // If Gemini marked it as invalid, decline the order
     if (!parsed.isValid) {

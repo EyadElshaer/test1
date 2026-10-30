@@ -23,6 +23,7 @@ import {
   User,
   Package,
   ChevronDown,
+  RefreshCw,
 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
@@ -190,36 +191,53 @@ export default function CheckoutPage() {
     e.preventDefault();
     setErrorMessage("");
 
+    const triggerError = (msg: string) => {
+      setErrorMessage(msg);
+      // Ensure error is brought into customer's view immediately
+      setTimeout(() => {
+        const errorBox = document.getElementById("checkout-submit-error");
+        if (errorBox) {
+          errorBox.scrollIntoView({ behavior: "smooth", block: "center" });
+        } else {
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+      }, 50);
+    };
+
     if (!customerName.trim() || customerName.trim().length < 2) {
-      setErrorMessage("Please enter your full name.");
+      triggerError("Please enter your full name.");
       return;
     }
 
     const phoneVal = validatePhoneForCountry(selectedCountry, customerPhone);
     if (!phoneVal.isValid) {
-      setErrorMessage(phoneVal.error || "Please enter a valid mobile number.");
+      triggerError(phoneVal.error || "Please enter a valid mobile number.");
       return;
     }
 
     if (!customerEmail.trim() || !customerEmail.includes("@")) {
-      setErrorMessage("Please enter a valid email address.");
+      triggerError("Please enter a valid email address.");
       return;
     }
 
     if (!selectedPaymentMethod) {
-      setErrorMessage("Please select a payment method.");
+      triggerError("Please select a payment method.");
       return;
     }
 
     if (!user && autoSignup) {
       if (!autoSignupPassword || autoSignupPassword.length < 6) {
-        setErrorMessage("Please enter an account password of at least 6 characters.");
+        triggerError("Please enter an account password of at least 6 characters.");
         return;
       }
     }
 
     if (selectedPaymentMethod.requireScreenshot && !screenshotUrl) {
-      setErrorMessage(`Please upload proof of transfer for ${selectedPaymentMethod.name}.`);
+      triggerError(
+        isUploadingScreenshot
+          ? "Your screenshot is still uploading, please wait a moment..."
+          : `Please upload your transfer screenshot proof for ${selectedPaymentMethod.name}.`
+      );
       return;
     }
 
@@ -276,7 +294,7 @@ export default function CheckoutPage() {
       // Clear cart
       clearCart();
     } catch (err: any) {
-      setErrorMessage(err.message || "An error occurred while creating your order.");
+      triggerError(err.message || "An error occurred while creating your order.");
     } finally {
       setIsSubmitting(false);
     }
@@ -744,14 +762,45 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
+              {/* Prominent Error Box Directly Above Submit Button */}
+              {errorMessage && (
+                <div
+                  id="checkout-submit-error"
+                  className="p-4 rounded-2xl bg-red-500/15 border-2 border-red-500/40 text-red-200 text-xs flex items-start gap-3 shadow-xl shadow-red-950/50"
+                >
+                  <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                  <div className="flex-1 space-y-1">
+                    <strong className="block text-red-100 font-bold text-xs uppercase tracking-wider">
+                      Action Required:
+                    </strong>
+                    <p className="text-red-200 text-xs leading-relaxed font-medium">
+                      {errorMessage}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Submit Order Button */}
               <button
                 type="submit"
                 disabled={isSubmitting || isUploadingScreenshot}
-                className="w-full flex items-center justify-center gap-2 py-4 rounded-xl font-bold text-sm text-white btn-primary shadow-xl shadow-blue-500/30 disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2.5 py-4 rounded-xl font-bold text-sm text-white btn-primary shadow-xl shadow-blue-500/30 disabled:opacity-60 cursor-pointer disabled:cursor-not-allowed transition-all"
               >
-                {isSubmitting ? (
-                  <span>Verifying & Submitting Order...</span>
+                {isUploadingScreenshot ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin text-cyan-300" />
+                    <span>Uploading Screenshot... Please wait</span>
+                  </>
+                ) : isSubmitting ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin text-cyan-300" />
+                    <span>Auditing Receipt & Submitting Order...</span>
+                  </>
+                ) : selectedPaymentMethod?.requireScreenshot && !screenshotUrl ? (
+                  <>
+                    <UploadCloud className="w-4 h-4 text-amber-300" />
+                    <span>Upload Screenshot Proof to Complete Order</span>
+                  </>
                 ) : (
                   <>
                     <ShieldCheck className="w-4 h-4" />
