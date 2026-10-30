@@ -28,10 +28,26 @@ export interface ReceiptVerificationResult {
 /**
  * Retrieve the Gemini API key from environment variables or database store settings
  */
-export async function getGeminiApiKey(): Promise<{ apiKey: string | null; enabled: boolean }> {
-  try {
-    const envKey = process.env.GEMINI_API_KEY?.trim() || null;
+let cachedApiKey: string | null = process.env.GEMINI_API_KEY?.trim() || null;
+let cachedEnabled: boolean = true;
+let lastCacheTime = 0;
 
+/**
+ * Retrieve the Gemini API key from environment variables or database store settings
+ */
+export async function getGeminiApiKey(): Promise<{ apiKey: string | null; enabled: boolean }> {
+  const envKey = process.env.GEMINI_API_KEY?.trim() || null;
+  if (envKey) {
+    cachedApiKey = envKey;
+    return { apiKey: envKey, enabled: true };
+  }
+
+  // Use cached key if retrieved within last 5 minutes
+  if (cachedApiKey && Date.now() - lastCacheTime < 300000) {
+    return { apiKey: cachedApiKey, enabled: cachedEnabled };
+  }
+
+  try {
     const dbSettings = await prisma.storeSetting.findMany({
       where: {
         key: { in: ["gemini_api_key", "gemini_verification_enabled"] },
@@ -46,10 +62,14 @@ export async function getGeminiApiKey(): Promise<{ apiKey: string | null; enable
     const apiKey = settingsMap.gemini_api_key?.trim() || envKey;
     const enabled = settingsMap.gemini_verification_enabled !== "false";
 
+    cachedApiKey = apiKey || null;
+    cachedEnabled = enabled;
+    lastCacheTime = Date.now();
+
     return { apiKey: apiKey || null, enabled };
   } catch (err) {
-    console.error("Error retrieving Gemini API settings:", err);
-    return { apiKey: process.env.GEMINI_API_KEY?.trim() || null, enabled: true };
+    console.warn("Could not query storeSetting for Gemini key, falling back to cache/env:", err);
+    return { apiKey: cachedApiKey || envKey || null, enabled: cachedEnabled };
   }
 }
 
@@ -59,22 +79,8 @@ export interface ResolvedGeminiModel {
   apiVersion: string;
 }
 
-// In-memory cache for resolved model per apiKey to keep calls ultra fast
-const modelCache = new Map<string, { resolved: ResolvedGeminiModel; cachedAt: number }>();
-
 /**
- * Automatically return the working Gemini Flash model endpoint for this API key
- */
-export async function getAvailableGeminiModel(apiKey: string): Promise<ResolvedGeminiModel> {
-  return {
-    endpointUrl: `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`,
-    modelName: "gemini-3.5-flash",
-    apiVersion: "v1beta",
-  };
-}
-
-/**
- * Retrieve the screenshot image buffer from PostgreSQL or local disk
+ * Retrieve the screenshot image buffer from local disk or PostgreSQL
  */
 async function loadScreenshotBuffer(
   screenshotUrl: string
@@ -83,7 +89,27 @@ async function loadScreenshotBuffer(
     const cleanFilename = path.basename(screenshotUrl.split("?")[0]);
     if (!cleanFilename) return null;
 
-    // 1. Try PostgreSQL database first
+    // 1. Try local filesystem storage first (ultra-fast 0ms, immune to DB connection pool latency)
+    const candidateDirs = [
+      path.join(process.cwd(), "storage", "screenshots"),
+      "C:\\Users\\ayman\\Documents\\test3\\storage\\screenshots",
+      "C:\\Users\\ayman\\Documents\\test1\\storage\\screenshots",
+    ];
+
+    for (const dir of candidateDirs) {
+      const candidatePath = path.join(dir, cleanFilename);
+      if (fs.existsSync(candidatePath)) {
+        const ext = path.extname(cleanFilename).toLowerCase();
+        const mime =
+          ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg";
+        return {
+          buffer: fs.readFileSync(candidatePath),
+          mimeType: mime,
+        };
+      }
+    }
+
+    // 2. Fallback to PostgreSQL database storage
     const dbFile = await prisma.uploadedFile.findUnique({
       where: { filename: cleanFilename },
     });
@@ -92,18 +118,6 @@ async function loadScreenshotBuffer(
       return {
         buffer: Buffer.from(dbFile.data),
         mimeType: dbFile.mimeType || "image/jpeg",
-      };
-    }
-
-    // 2. Fallback to local filesystem storage
-    const localPath = path.join(process.cwd(), "storage", "screenshots", cleanFilename);
-    if (fs.existsSync(localPath)) {
-      const ext = path.extname(cleanFilename).toLowerCase();
-      const mime =
-        ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg";
-      return {
-        buffer: fs.readFileSync(localPath),
-        mimeType: mime,
       };
     }
 
@@ -227,56 +241,63 @@ Respond ONLY with a valid JSON object matching this schema:
 
 If "isValid" is false, "rejectionReason" MUST be a clear, polite explanation in English (e.g. "The transferred amount is 100 EGP, but your order total is 399 EGP", "The transfer was sent to an incorrect recipient or phone number", or "The screenshot does not show a completed successful transfer").`;
 
-    // Resolve best available Gemini Vision model for this API key
-    const resolved = await getAvailableGeminiModel(apiKey);
-    const geminiUrl =
-      resolved?.endpointUrl ||
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`;
+    // 100% Free Tier Google Gemini Vision models (each model has its own daily free quota pool)
+    const freeFlashModels = [
+      "gemini-3-flash-preview",
+      "gemini-3.7-flash",
+      "gemini-3.5-flash",
+      "gemini-3.8-flash",
+    ];
+    let candidateText = "";
+    let lastError = "";
 
-    const apiResponse = await fetch(geminiUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              { text: prompt },
+    for (const model of freeFlashModels) {
+      try {
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const apiResponse = await fetch(geminiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [
               {
-                inlineData: {
-                  mimeType: imageData.mimeType,
-                  data: base64Image,
-                },
+                parts: [
+                  { text: prompt },
+                  {
+                    inlineData: {
+                      mimeType: imageData.mimeType,
+                      data: base64Image,
+                    },
+                  },
+                ],
               },
             ],
-          },
-        ],
-        generationConfig: {
-          responseMimeType: "application/json",
-          temperature: 0.1,
-        },
-      }),
-    });
+            generationConfig: {
+              responseMimeType: "application/json",
+              temperature: 0.1,
+            },
+          }),
+        });
 
-    if (!apiResponse.ok) {
-      const errText = await apiResponse.text();
-      console.warn(`Gemini API error (HTTP ${apiResponse.status}):`, errText);
-      // Fallback: don't crash checkout if Google API has a temporary rate limit or hiccup
-      return {
-        status: "SKIPPED",
-        isValid: true,
-        note: `Gemini verification unavailable (${apiResponse.status}); passed to manual review.`,
-      };
+        if (apiResponse.ok) {
+          const data = await apiResponse.json();
+          candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+          if (candidateText) break;
+        } else {
+          lastError = await apiResponse.text();
+          console.warn(`Gemini model ${model} returned HTTP ${apiResponse.status}:`, lastError);
+        }
+      } catch (err: any) {
+        lastError = err?.message || "fetch error";
+        console.warn(`Gemini model ${model} fetch failed:`, lastError);
+      }
     }
-
-    const data = await apiResponse.json();
-    const candidateText =
-      data.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
     if (!candidateText) {
       return {
-        status: "SKIPPED",
-        isValid: true,
-        note: "Empty response from AI vision model; passed to manual review.",
+        status: "DECLINED",
+        isValid: false,
+        rejectionReason:
+          "Unable to automatically verify payment receipt image. Please ensure you upload a clear, legible screenshot of your completed transfer confirmation.",
       };
     }
 
