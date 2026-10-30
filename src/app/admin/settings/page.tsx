@@ -56,6 +56,7 @@ export default function AdminSettingsPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ apiKey: settings.gemini_api_key }),
+        signal: AbortSignal.timeout(10000),
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
@@ -63,7 +64,11 @@ export default function AdminSettingsPage() {
       }
       setGeminiTestSuccess(data.message || "Connection verified successfully!");
     } catch (err: any) {
-      setGeminiTestError(err.message || "Gemini connection failed.");
+      setGeminiTestError(
+        err.name === "TimeoutError" || err.name === "AbortError"
+          ? "Connection timed out. Please try again."
+          : err.message || "Gemini connection failed."
+      );
     } finally {
       setIsTestingGemini(false);
     }

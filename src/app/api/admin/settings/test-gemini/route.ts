@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
-import { getGeminiApiKey, getAvailableGeminiModel } from "@/lib/geminiReceiptVerifier";
+import { getGeminiApiKey } from "@/lib/geminiReceiptVerifier";
 
 export async function POST(req: Request) {
   try {
@@ -22,73 +22,62 @@ export async function POST(req: Request) {
       );
     }
 
-    // 1. Query Google to discover the best available model for this key
-    const resolved = await getAvailableGeminiModel(keyToTest);
+    // Direct, fast candidates without hanging loops
+    // gemini-flash-latest was explicitly confirmed available for the user's key
+    const candidates = [
+      {
+        name: "gemini-flash-latest",
+        url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${keyToTest}`,
+      },
+      {
+        name: "gemini-2.5-pro",
+        url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${keyToTest}`,
+      },
+      {
+        name: "gemini-1.5-flash",
+        url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${keyToTest}`,
+      },
+    ];
 
-    if (!resolved) {
-      return NextResponse.json(
-        {
-          error:
-            "Could not discover any available Gemini models for this API key. Please ensure your key is active in Google AI Studio (aistudio.google.com).",
-        },
-        { status: 400 }
-      );
-    }
+    let lastError = "";
 
-    // 2. Ping the discovered Gemini model
-    const testRes = await fetch(resolved.endpointUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [{ text: "Hello! Confirm you are active by answering with 'READY'." }],
-          },
-        ],
-      }),
-    });
-
-    if (!testRes.ok) {
-      const errText = await testRes.text();
-      let parsedErr = "Invalid API key or request rejected by Google.";
+    for (const cand of candidates) {
       try {
-        const json = JSON.parse(errText);
-        parsedErr = json.error?.message || parsedErr;
-      } catch {}
+        const testRes = await fetch(cand.url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: "Hello! Answer with 'READY'." }] }],
+          }),
+          signal: AbortSignal.timeout(6000), // 6 second safety timeout
+        });
 
-      // If specific model failed, also fetch available models list to show in error for debugging
-      let availableNames = "";
-      try {
-        const listRes = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models?key=${keyToTest}`
-        );
-        if (listRes.ok) {
-          const listData = await listRes.json();
-          const names = (listData.models || [])
-            .map((m: any) => m.name?.replace("models/", ""))
-            .filter((n: string) => n.includes("gemini"))
-            .slice(0, 5);
-          if (names.length > 0) {
-            availableNames = ` (Available models for your key: ${names.join(", ")})`;
+        if (testRes.ok) {
+          const data = await testRes.json();
+          const reply = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "READY";
+          return NextResponse.json({
+            success: true,
+            message: `Google Gemini connected successfully! (Using: ${cand.name} | Status: ${reply})`,
+            model: cand.name,
+          });
+        } else {
+          const errText = await testRes.text();
+          try {
+            const j = JSON.parse(errText);
+            lastError = j.error?.message || errText;
+          } catch {
+            lastError = errText;
           }
         }
-      } catch {}
-
-      return NextResponse.json(
-        { error: `Connection failed for ${resolved.modelName}: ${parsedErr}${availableNames}` },
-        { status: 400 }
-      );
+      } catch (fetchErr: any) {
+        lastError = fetchErr?.message || "Connection timeout";
+      }
     }
 
-    const data = await testRes.json();
-    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "READY";
-
-    return NextResponse.json({
-      success: true,
-      message: `Google Gemini connected successfully! Using model: ${resolved.modelName} (${resolved.apiVersion}). Response: ${reply}`,
-      model: resolved.modelName,
-      apiVersion: resolved.apiVersion,
-    });
+    return NextResponse.json(
+      { error: `Connection failed: ${lastError || "Could not reach Gemini service."}` },
+      { status: 400 }
+    );
   } catch (error: any) {
     console.error("Gemini test failed:", error);
     return NextResponse.json(
