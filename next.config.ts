@@ -47,6 +47,14 @@ const securityHeaders = [
     key: "Cross-Origin-Opener-Policy",
     value: "same-origin-allow-popups",
   },
+  {
+    key: "X-Permitted-Cross-Domain-Policies",
+    value: "none",
+  },
+  {
+    key: "X-DNS-Prefetch-Control",
+    value: "off",
+  },
 ];
 
 const nextConfig: NextConfig = {

@@ -28,7 +28,8 @@ export async function GET(
         return new NextResponse(new Uint8Array(dbFile.data), {
           headers: {
             "Content-Type": dbFile.mimeType || "image/jpeg",
-            "Cache-Control": "public, max-age=86400",
+            "Cache-Control": "private, no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
             "X-Content-Type-Options": "nosniff",
           },
         });
@@ -48,7 +49,8 @@ export async function GET(
       return new NextResponse(new Uint8Array(fileBuffer), {
         headers: {
           "Content-Type": contentType,
-          "Cache-Control": "public, max-age=86400",
+          "Cache-Control": "private, no-cache, no-store, must-revalidate",
+          "Pragma": "no-cache",
           "X-Content-Type-Options": "nosniff",
         },
       });

@@ -1,14 +1,25 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUserSession } from "@/lib/userAuth";
+import { getClientIp } from "@/lib/security";
+import { checkRateLimit } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   try {
+    const ip = getClientIp(req);
     const sessionUser = await getUserSession();
     if (!sessionUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const rateCheck = checkRateLimit(`unlink_google_${ip}_${sessionUser.id}`, 5, 15 * 60 * 1000);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: `Too many requests. Please wait ${rateCheck.retryAfterSec} seconds.` },
+        { status: 429 }
+      );
     }
 
     const user = await prisma.user.findUnique({

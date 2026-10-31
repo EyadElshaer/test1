@@ -28,23 +28,20 @@ export async function GET(
       return new NextResponse("Not found or unauthorized.", { status: 404 });
     }
 
-    // Verify ownership: Admin, logged-in customer account, or verified customer phone
+    // Strictly verify ownership: Admin session or authenticated customer account
     const admin = await getAdminSession();
     const sessionUser = await getUserSession();
 
     const isOwnerUser = Boolean(
       sessionUser &&
       (order.userId === sessionUser.id ||
-        (sessionUser.email && order.customerEmail.toLowerCase() === sessionUser.email.toLowerCase()) ||
-        (sessionUser.phone && order.customerPhone.replace(/\D/g, "") === sessionUser.phone.replace(/\D/g, "")))
+        (order.userId === null &&
+          ((sessionUser.email && order.customerEmail.toLowerCase() === sessionUser.email.toLowerCase()) ||
+            (sessionUser.phone && order.customerPhone.replace(/\D/g, "") === sessionUser.phone.replace(/\D/g, "")))))
     );
 
-    const isPhoneVerified = Boolean(
-      phone && order.customerPhone.replace(/\D/g, "") === phone.replace(/\D/g, "")
-    );
-
-    if (!admin && !isOwnerUser && !isPhoneVerified) {
-      return new NextResponse("Unauthorized: Verification failed.", { status: 403 });
+    if (!admin && !isOwnerUser) {
+      return new NextResponse("Unauthorized: You do not have permission to view this receipt.", { status: 403 });
     }
 
     // 1. Check database storage
@@ -56,7 +53,8 @@ export async function GET(
         return new NextResponse(new Uint8Array(dbFile.data), {
           headers: {
             "Content-Type": dbFile.mimeType || "image/jpeg",
-            "Cache-Control": "private, max-age=3600",
+            "Cache-Control": "private, no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
             "X-Content-Type-Options": "nosniff",
           },
         });
@@ -79,7 +77,9 @@ export async function GET(
     return new NextResponse(new Uint8Array(fileBuffer), {
       headers: {
         "Content-Type": contentType,
-        "Cache-Control": "private, max-age=3600",
+        "Cache-Control": "private, no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "X-Content-Type-Options": "nosniff",
       },
     });
   } catch (error) {

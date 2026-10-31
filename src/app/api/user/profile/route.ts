@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUserSession, isEmail, normalizePhone } from "@/lib/userAuth";
+import { getClientIp } from "@/lib/security";
+import { checkRateLimit } from "@/lib/rateLimit";
 import {
   findCountryByCode,
   detectCountryFromPhone,
@@ -11,9 +13,19 @@ export const dynamic = "force-dynamic";
 
 export async function PATCH(req: Request) {
   try {
+    const ip = getClientIp(req);
     const sessionUser = await getUserSession();
     if (!sessionUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Rate limit: max 10 profile updates per 10 minutes per IP/user
+    const rateCheck = checkRateLimit(`profile_upd_${ip}_${sessionUser.id}`, 10, 10 * 60 * 1000);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: `Too many profile update requests. Please wait ${rateCheck.retryAfterSec} seconds.` },
+        { status: 429 }
+      );
     }
 
     const { name, email, phone, countryCode } = await req.json();
@@ -112,24 +124,42 @@ export async function PATCH(req: Request) {
       },
     });
 
-    // Backlink past guest orders with updated email or phone
-    const orderLinkFilters: any[] = [];
-    if (updateData.email) {
-      orderLinkFilters.push({ customerEmail: updateData.email });
-    }
-    if (updateData.phone) {
-      orderLinkFilters.push({ customerPhone: updateData.phone });
-    }
-    if (orderLinkFilters.length > 0) {
-      await prisma.order.updateMany({
-        where: {
-          userId: null,
-          OR: orderLinkFilters,
-        },
-        data: {
-          userId: updatedUser.id,
-        },
-      }).catch(() => {});
+    // Securely backlink past unassigned guest orders strictly when both identifiers match if both are present
+    try {
+      if (updatedUser.email && updatedUser.phone) {
+        await prisma.order.updateMany({
+          where: {
+            userId: null,
+            customerEmail: updatedUser.email,
+            customerPhone: updatedUser.phone,
+          },
+          data: {
+            userId: updatedUser.id,
+          },
+        });
+      } else if (updatedUser.email) {
+        await prisma.order.updateMany({
+          where: {
+            userId: null,
+            customerEmail: updatedUser.email,
+          },
+          data: {
+            userId: updatedUser.id,
+          },
+        });
+      } else if (updatedUser.phone) {
+        await prisma.order.updateMany({
+          where: {
+            userId: null,
+            customerPhone: updatedUser.phone,
+          },
+          data: {
+            userId: updatedUser.id,
+          },
+        });
+      }
+    } catch (linkErr) {
+      console.warn("Backlink error during profile update:", linkErr);
     }
 
     return NextResponse.json({

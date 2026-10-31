@@ -10,8 +10,8 @@ export async function GET() {
     }
 
     const orConditions: any[] = [{ userId: user.id }];
-    if (user.email) orConditions.push({ customerEmail: user.email.toLowerCase() });
-    if (user.phone) orConditions.push({ customerPhone: user.phone });
+    if (user.email) orConditions.push({ userId: null, customerEmail: user.email.toLowerCase() });
+    if (user.phone) orConditions.push({ userId: null, customerPhone: user.phone });
 
     const orders = await prisma.order.findMany({
       where: {
