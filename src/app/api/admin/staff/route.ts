@@ -121,11 +121,16 @@ export async function POST(req: Request) {
     }
     const assignedRole = isSuperAdmin && role === "SUPER_ADMIN" ? "SUPER_ADMIN" : "ADMIN";
 
+    const cleanEmail =
+      email && typeof email === "string" && email.trim()
+        ? sanitizeString(email, 120).toLowerCase()
+        : `${cleanUsername}@premikeys.local`;
+
     const newAdmin = await prisma.admin.create({
       data: {
         username: cleanUsername,
         passwordHash,
-        email: email && typeof email === "string" ? sanitizeString(email, 120).toLowerCase() : null,
+        email: cleanEmail,
         role: assignedRole,
         permissions: assignedRole === "SUPER_ADMIN" ? "*" : cleanPermissions,
         mustChangePassword: false,
