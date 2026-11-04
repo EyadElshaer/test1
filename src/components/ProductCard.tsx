@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { ShoppingCart, ArrowRight, Eye, CheckCircle2, AlertCircle, Check } from "lucide-react";
+import { Glass, Button, SegmentedControl } from "glisse";
 import { useCart } from "@/context/CartContext";
 import { extractConfigurations, ProductConfiguration } from "@/lib/configurations";
 
@@ -102,115 +103,131 @@ export default function ProductCard({
   };
 
   return (
-    <div className="glass-card rounded-2xl overflow-hidden flex flex-col group relative border border-white/10 hover:border-cyan-400/50 transition-all duration-300 gpu-layer will-change-transform">
-      {/* Image Showcase */}
-      <Link
-        href={`/products/${slug}`}
-        className="relative aspect-[4/3] w-full overflow-hidden bg-[#060a17] flex items-center justify-center cursor-pointer block border-b border-white/5"
-      >
-        {/* Ambient Blurred Aura */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none select-none">
-          <Image
-            src={primaryImage}
-            alt=""
-            fill
-            className="object-cover blur-xl opacity-30 scale-125"
-            unoptimized={primaryImage.startsWith("data:")}
-            loading="lazy"
-          />
-          <div className="absolute inset-0 bg-[#060a17]/20" />
-        </div>
+      <Glass className="rounded-3xl overflow-hidden flex flex-col group relative border border-white/15 hover:border-cyan-400/50 transition-all duration-300 gpu-layer will-change-transform shadow-[0_14px_34px_-8px_rgba(0,0,0,0.5)] hover:shadow-[0_20px_44px_-8px_rgba(0,140,255,0.3)] hover:-translate-y-1">
+        {/* Image Showcase */}
+        <Link
+          href={`/products/${slug}`}
+          className="relative aspect-[4/3] w-full overflow-hidden bg-slate-950/60 flex items-center justify-center cursor-pointer block border-b border-white/10"
+        >
+          {/* Ambient Blurred Aura */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none select-none">
+            <Image
+              src={primaryImage}
+              alt=""
+              fill
+              className="object-cover blur-2xl opacity-35 scale-125"
+              unoptimized={primaryImage.startsWith("data:")}
+              loading="lazy"
+            />
+            <div className="absolute inset-0 bg-[#040814]/25" />
+          </div>
 
-        {/* Foreground Product Image */}
-        <div className="relative w-full h-full p-2.5 sm:p-3 flex items-center justify-center">
-          <Image
-            src={primaryImage}
-            alt={title}
-            fill
-            className="object-contain p-2 group-hover:scale-105 transition-transform duration-500 ease-out drop-shadow-lg select-none"
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-            loading="lazy"
-            unoptimized={primaryImage.startsWith("data:")}
-          />
-        </div>
+          {/* Foreground Product Image */}
+          <div className="relative w-full h-full p-2.5 sm:p-3 flex items-center justify-center">
+            <Image
+              src={primaryImage}
+              alt={title}
+              fill
+              className="object-contain p-2 group-hover:scale-105 transition-transform duration-500 ease-out drop-shadow-2xl select-none"
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+              loading="lazy"
+              unoptimized={primaryImage.startsWith("data:")}
+            />
+          </div>
 
-        {/* Subtle Bottom Vignette */}
-        <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-[#0a0f24]/80 to-transparent pointer-events-none" />
+          {/* Subtle Bottom Vignette */}
+          <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-[#05091a]/80 to-transparent pointer-events-none" />
 
-        {/* Badges on image */}
-        <div className="absolute top-3 left-3 flex flex-wrap gap-1.5 z-10 pointer-events-none">
-          {currentDiscountPercent > 0 && (
-            <span className="badge-discount text-[11px] px-2 py-0.5 rounded-md uppercase font-extrabold shadow-md shadow-red-900/40">
-              -{currentDiscountPercent}% OFF
-            </span>
+          {/* Badges on image */}
+          <div className="absolute top-3 left-3 flex flex-wrap gap-1.5 z-10 pointer-events-none">
+            {currentDiscountPercent > 0 && (
+                <span className="badge-discount text-[11px] px-2.5 py-0.5 rounded-full uppercase font-extrabold shadow-md shadow-red-900/40 border border-white/25">
+                  -{currentDiscountPercent}% OFF
+                </span>
           )}
-          {platform && (
-            <span className="badge-platform text-[10px] px-2 py-0.5 rounded-md font-semibold backdrop-blur-md">
-              {platform}
-            </span>
+                {platform && (
+                    <span className="glass-pill text-cyan-200 text-[10px] px-2.5 py-0.5 rounded-full font-semibold">
+                      {platform}
+                    </span>
           )}
-        </div>
+                  </div>
 
         {/* Quick View Icon */}
-        <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 hidden sm:block">
-          <span className="p-2 rounded-xl bg-black/60 backdrop-blur-md text-white hover:text-cyan-400 flex items-center justify-center border border-white/20 shadow-md">
-            <Eye className="w-4 h-4" />
-          </span>
-        </div>
-      </Link>
+                <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 hidden sm:block">
+                    <span className="p-2 rounded-full glass-pill text-white hover:text-cyan-300 flex items-center justify-center shadow-lg">
+                      <Eye className="w-4 h-4" />
+                    </span>
+                </div>
+              </Link>
 
       {/* Body Details */}
-      <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between space-y-3 sm:space-y-4">
-        <div>
-          {category && (
-            <span className="text-[10px] font-semibold tracking-wider text-slate-400 uppercase">
-              {category.name}
-            </span>
+            <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between space-y-3 sm:space-y-4">
+              <div>
+                {category && (
+                    <span className="text-[10px] font-semibold tracking-wider text-cyan-300/80 uppercase">
+                      {category.name}
+                    </span>
           )}
-          {/* Product Name / Title */}
-          <Link href={`/products/${slug}`} className="block mt-1">
-            <h3 className="font-bold text-sm sm:text-base text-white group-hover:text-cyan-300 transition-colors line-clamp-1">
-              {title}
-            </h3>
-          </Link>
-          {shortDescription && (
-            <p className="text-xs text-slate-400 line-clamp-2 mt-1.5 leading-relaxed">
-              {shortDescription}
-            </p>
+                    {/* Product Name / Title */}
+                    <Link href={`/products/${slug}`} className="block mt-1">
+                      <h3 className="font-bold text-sm sm:text-base text-white group-hover:text-cyan-300 transition-colors line-clamp-1">
+                        {title}
+                      </h3>
+                    </Link>
+                    {shortDescription && (
+                        <p className="text-xs text-slate-300/85 line-clamp-2 mt-1.5 leading-relaxed">
+                          {shortDescription}
+                        </p>
           )}
-        </div>
+                      </div>
 
         {/* Configuration Selection Pills / Chips */}
-        {hasMultipleConfigs && (
-          <div className="pt-2 border-t border-white/5 space-y-1.5">
-            <div className="flex items-center justify-between text-[11px]">
-              <span className="text-slate-400 font-medium">Select Option:</span>
-              {activeConfig && (
-                <span className="text-cyan-300 font-bold truncate max-w-[140px] text-[10px]">
-                  {activeConfig.name}
-                </span>
-              )}
-            </div>
+                    {hasMultipleConfigs && (
+                        <div className="pt-2.5 border-t border-white/10 space-y-2" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="text-slate-300 font-medium">Edition:</span>
+                            {activeConfig && (
+                              <span className="text-cyan-300 font-bold truncate max-w-[140px] text-[10px]">
+                                {activeConfig.name}
+                              </span>
+                            )}
+                          </div>
 
-            {availableConfigs.length <= 4 ? (
-              <div className="flex flex-wrap gap-1.5">
-                {availableConfigs.map((cfg, idx) => {
-                  const isSelected = selectedConfigIdx === idx;
-                  return (
-                    <button
-                      key={cfg.id || idx}
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setSelectedConfigIdx(idx);
-                      }}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all duration-200 border cursor-pointer select-none ${
-                        isSelected
-                          ? "bg-cyan-500/20 text-cyan-300 border-cyan-400/80 shadow-[0_0_12px_rgba(0,240,255,0.25)] scale-[1.02]"
-                          : "bg-white/[0.03] text-slate-400 border-white/10 hover:border-white/20 hover:text-white"
-                      }`}
-                      title={`${cfg.name} - ${cfg.salePrice.toLocaleString()} EGP`}
+                            {
+                              availableConfigs.length <= 3 && availableConfigs.every((c) => c.name.length <= 14) ? (
+                                <div className="flex justify-center w-full overflow-hidden">
+                                  <SegmentedControl
+                                    value={String(selectedConfigIdx)}
+                                    onValueChange={(val) => setSelectedConfigIdx(Number(val))}
+                                    style={
+                                      {
+                                        "--lg-tab-width": `${Math.floor(220 / availableConfigs.length)}px`,
+                                        "--lg-tab-height": "28px",
+                                      } as React.CSSProperties
+                                    }
+                                    items={availableConfigs.map((cfg, idx) => ({
+                                      value: String(idx),
+                                      label: cfg.name,
+                                    }))}
+                                  />
+                                </div>
+                              ) : availableConfigs.length <= 4 ? (
+                                <div className="flex flex-wrap gap-1.5">
+                                  {availableConfigs.map((cfg, idx) => {
+                                    const isSelected = selectedConfigIdx === idx;
+                                    return (
+                                      <button
+                                        key={cfg.id || idx}
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          setSelectedConfigIdx(idx);
+                                        }}
+                                                ? "bg-cyan-500/25 text-white border-cyan-300/80 shadow-[0_0_14px_rgba(0,240,255,0.3)] scale-[1.02]"
+                                                : "bg-white/[0.05] text-slate-300 border-white/15 hover:border-white/30 hover:text-white"
+                                            }`}
+                      title={`${cfg.name} - ${ cfg.salePrice.toLocaleString() } EGP`}
                     >
                       {cfg.name}
                     </button>
@@ -222,7 +239,7 @@ export default function ProductCard({
                 value={selectedConfigIdx}
                 onChange={(e) => setSelectedConfigIdx(Number(e.target.value))}
                 onClick={(e) => e.stopPropagation()}
-                className="w-full glass-input px-2.5 py-1.5 rounded-lg text-xs font-medium text-white border-white/15 focus:border-cyan-400"
+                className="w-full glass-input px-2.5 py-1.5 rounded-xl text-xs font-medium text-white border-white/20 focus:border-cyan-400"
               >
                 {availableConfigs.map((cfg, idx) => (
                   <option key={cfg.id || idx} value={idx} className="bg-slate-900 text-white">
@@ -235,16 +252,16 @@ export default function ProductCard({
         )}
 
         {/* Pricing & Stock Status */}
-        <div className="pt-2 border-t border-white/5 space-y-3">
+        <div className="pt-2.5 border-t border-white/10 space-y-3">
           <div className="flex items-baseline justify-between">
             <div>
               <div className="flex items-baseline gap-2">
                 <span className="text-lg font-black text-white tracking-tight">
                   {currentSalePrice.toLocaleString()}{" "}
-                  <span className="text-xs text-cyan-400 font-semibold">EGP</span>
+                  <span className="text-xs text-cyan-300 font-semibold">EGP</span>
                 </span>
                 {currentDiscountPercent > 0 && (
-                  <span className="text-xs text-slate-500 line-through">
+                  <span className="text-xs text-slate-400 line-through">
                     {currentOriginalPrice.toLocaleString()} EGP
                   </span>
                 )}
@@ -264,58 +281,52 @@ export default function ProductCard({
             </div>
           </div>
 
-          {/* Action Buttons: Direct Add to Cart + Details Link */}
+          {/* Action Buttons: Glisse Liquid Glass Button + Details Link */}
           <div className="pt-1 flex items-center gap-2">
             {isOutOfStock ? (
-              <button
-                type="button"
+              <Button
+                variant="glass"
                 disabled
-                className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-semibold bg-white/5 text-slate-500 border border-white/5 cursor-not-allowed"
+                className="w-full justify-center text-xs font-semibold"
               >
                 Out of Stock
-              </button>
+              </Button>
             ) : (
               <>
-                <button
-                  type="button"
+                <Button
+                  variant="filled"
+                  tint={justAdded ? "#30d158" : "#0088ff"}
+                  icon={
+                    justAdded ? (
+                      <Check className="w-4 h-4 stroke-[3]" />
+                    ) : (
+                      <ShoppingCart className="w-4 h-4" />
+                    )
+                  }
                   onClick={handleAddToCart}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer shadow-md ${
-                    justAdded
-                      ? "bg-emerald-500 text-white shadow-emerald-500/30 border border-emerald-400 scale-[1.02]"
-                      : "btn-primary"
-                  }`}
+                  className="flex-1 justify-center font-bold text-xs shadow-lg shadow-blue-500/20"
                   title={
                     activeConfig
                       ? `Add "${activeConfig.name}" to Cart`
                       : "Add to Cart"
                   }
                 >
-                  {justAdded ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 stroke-[3]" />
-                      <span>Added!</span>
-                    </>
-                  ) : (
-                    <>
-                      <ShoppingCart className="w-3.5 h-3.5 text-cyan-200" />
-                      <span>Add to Cart</span>
-                    </>
-                  )}
-                </button>
+                  {justAdded ? "Added!" : "Add to Cart"}
+                </Button>
 
-                <Link
-                  href={`/products/${slug}`}
-                  className="p-2.5 rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.08] hover:border-cyan-400/50 text-slate-400 hover:text-white transition-all flex items-center justify-center shrink-0"
+                <Button
+                  variant="glass"
+                  icon={<ArrowRight className="w-4 h-4" />}
+                  onClick={() => router.push(`/ products / ${ slug } `)}
+                  aria-label="View full specs and activation instructions"
                   title="View full specs and activation instructions"
-                >
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
+                />
               </>
             )}
           </div>
         </div>
       </div>
-    </div>
+    </Glass>
   );
 }
 

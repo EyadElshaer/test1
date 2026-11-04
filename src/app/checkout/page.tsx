@@ -36,6 +36,7 @@ import {
 import { compressImageForUpload } from "@/lib/imageCompression";
 import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 import { PhoneInput } from "@/components/PhoneInput";
+import { Switch, Glass, Button } from "glisse";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -465,55 +466,54 @@ export default function CheckoutPage() {
                   />
                 </div>
 
-                {/* Auto-Signup Checkbox & Password Field (if guest) */}
+                {/* Auto-Signup Liquid Glass Switch & Password Field (if guest) */}
                 {!user && (
-                  <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-950/40 via-cyan-950/30 to-black/40 border border-blue-500/30 space-y-3">
-                    <label className="flex items-start gap-3 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={autoSignup}
-                        onChange={(e) => setAutoSignup(e.target.checked)}
-                        className="mt-0.5 w-4 h-4 rounded text-cyan-500 focus:ring-cyan-400 bg-slate-900 border-white/20 cursor-pointer"
-                      />
-                      <div className="space-y-0.5">
-                        <span className="text-xs font-bold text-white block">
-                          Create an account for me with these details
-                        </span>
-                        <span className="text-[11px] text-slate-300 block">
-                          Access your digital keys anytime, track past orders, and stay signed in automatically.
-                        </span>
+                      <div className="p-4 rounded-2xl glass-pill space-y-3">
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="space-y-0.5">
+                            <span className="text-xs font-bold text-white block">
+                              Create an account for me with these details
+                            </span>
+                            <span className="text-[11px] text-slate-300 block">
+                              Access your digital keys anytime, track past orders, and stay signed in automatically.
+                            </span>
+                          </div>
+                        <Switch
+                          checked={autoSignup}
+                          onCheckedChange={(checked) => setAutoSignup(checked)}
+                          aria-label="Create an account automatically"
+                        />
                       </div>
-                    </label>
 
-                    {autoSignup && (
-                      <div className="pt-3 border-t border-white/10 space-y-2 animate-in fade-in duration-200">
-                        <label className="text-xs font-semibold text-slate-200 block">
-                          Create Account Password <span className="text-cyan-400">*</span>
-                        </label>
-                        <div className="relative">
-                          <input
-                            type={showAutoSignupPassword ? "text" : "password"}
-                            required={autoSignup}
-                            placeholder="Choose a password (minimum 6 characters)"
-                            value={autoSignupPassword}
-                            onChange={(e) => setAutoSignupPassword(e.target.value)}
-                            className="w-full glass-input pr-10 px-3.5 py-2.5 rounded-xl text-xs font-mono"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowAutoSignupPassword(!showAutoSignupPassword)}
-                            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
-                            aria-label="Toggle password visibility"
-                          >
-                            {showAutoSignupPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                          </button>
+                      {autoSignup && (
+                        <div className="pt-3 border-t border-white/10 space-y-2 animate-in fade-in duration-200">
+                          <label className="text-xs font-semibold text-slate-200 block">
+                            Create Account Password <span className="text-cyan-400">*</span>
+                          </label>
+                          <div className="relative">
+                            <input
+                              type={showAutoSignupPassword ? "text" : "password"}
+                              required={autoSignup}
+                              placeholder="Choose a password (minimum 6 characters)"
+                              value={autoSignupPassword}
+                              onChange={(e) => setAutoSignupPassword(e.target.value)}
+                              className="w-full glass-input pr-10 px-3.5 py-2.5 rounded-xl text-xs font-mono"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowAutoSignupPassword(!showAutoSignupPassword)}
+                              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                              aria-label="Toggle password visibility"
+                            >
+                              {showAutoSignupPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                          </div>
+                          <p className="text-[10px] text-cyan-300 flex items-center gap-1 font-mono">
+                            <span>🔒</span>
+                            <span>You will be kept securely signed in for 90 days with persistent cookies.</span>
+                          </p>
                         </div>
-                        <p className="text-[10px] text-cyan-300 flex items-center gap-1 font-mono">
-                          <span>🔒</span>
-                          <span>You will be kept securely signed in for 90 days with persistent cookies.</span>
-                        </p>
-                      </div>
-                    )}
+                      )}
                   </div>
                 )}
               </div>
@@ -537,11 +537,10 @@ export default function CheckoutPage() {
                       key={method.id}
                       type="button"
                       onClick={() => setSelectedMethodId(method.id)}
-                      className={`p-4 rounded-xl border text-left flex flex-col justify-between transition-all ${
-                        isSelected
+                      className={`p-4 rounded-xl border text-left flex flex-col justify-between transition-all ${isSelected
                           ? "bg-blue-600/20 border-cyan-400 shadow-[0_0_20px_rgba(0,102,255,0.25)] text-white"
                           : "bg-white/[0.02] border-white/10 text-slate-400 hover:text-white hover:bg-white/5"
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center justify-between w-full">
                         <span className="font-bold text-sm text-white">{method.name}</span>

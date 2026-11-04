@@ -3,10 +3,13 @@
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { X, Trash2, Plus, Minus, ArrowRight, Tag, ShoppingBag, ShieldCheck } from "lucide-react";
+import { Glass, Button, Input } from "glisse";
 import { useCart } from "@/context/CartContext";
 
 export default function CartDrawer() {
+  const router = useRouter();
   const {
     items,
     itemCount,
@@ -79,36 +82,35 @@ export default function CartDrawer() {
       {/* Backdrop with smooth opacity transition */}
       <div
         onClick={() => setIsCartOpen(false)}
-        className={`absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity duration-300 ease-out ${
+        className={`absolute inset-0 bg-black/65 backdrop-blur-md transition-opacity duration-300 ease-out ${
           isCartOpen ? "opacity-100" : "opacity-0"
         }`}
       />
 
       {/* Drawer Panel with hardware-accelerated slide-in */}
-      <div className="fixed inset-y-0 right-0 max-w-full flex pl-0 sm:pl-10">
-        <div
-          className={`w-screen max-w-full sm:max-w-md bg-[#0a0f24] border-l border-white/10 text-white flex flex-col shadow-2xl transition-transform duration-300 cubic-bezier(0.16, 1, 0.3, 1) transform-gpu ${
-            isCartOpen ? "translate-x-0" : "translate-x-full"
+      <div className="fixed inset-y-0 right-0 max-w-full flex pl-0 sm:pl-10 p-0 sm:p-3">
+        <Glass
+          className={`w-screen max-w-full sm:max-w-md sm:rounded-[32px] border-l sm:border border-white/20 text-white flex flex-col shadow-[0_25px_70px_rgba(0,0,0,0.75)] transition-transform duration-300 cubic-bezier(0.16, 1, 0.3, 1) transform-gpu overflow-hidden ${
+            isCartOpen ? "translate-x-0" : "translate-x-full sm:translate-x-[110%]"
           }`}
         >
           {/* Header */}
-          <div className="p-4 sm:p-5 border-b border-white/10 flex items-center justify-between">
+          <div className="p-4 sm:p-5 border-b border-white/15 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-blue-500/15 border border-blue-500/30 text-cyan-400">
+              <div className="p-2 rounded-2xl glass-pill text-cyan-300">
                 <ShoppingBag className="w-5 h-5" />
               </div>
               <div>
                 <h3 className="font-bold text-base sm:text-lg text-white">Your Cart</h3>
-                <span className="text-[11px] text-slate-400 block">{itemCount} items selected</span>
+                <span className="text-[11px] text-slate-300 block">{itemCount} items selected</span>
               </div>
             </div>
-            <button
+            <Button
+              variant="glass"
+              icon={<X className="w-4 h-4" />}
               onClick={() => setIsCartOpen(false)}
-              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
               aria-label="Close Cart"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            />
           </div>
 
           {/* Cart Item List */}
@@ -230,36 +232,35 @@ export default function CartDrawer() {
 
           {/* Footer Checkout Summary */}
           {items.length > 0 && (
-            <div className="p-4 sm:p-5 border-t border-white/10 bg-[#070b1a] space-y-4">
+            <div className="p-4 sm:p-5 border-t border-white/15 bg-black/30 backdrop-blur-xl space-y-4">
               {/* Promo Code Form */}
               <form onSubmit={handleApplyPromo} className="space-y-1.5">
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <Tag className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      placeholder="Promo Code"
-                      value={promoInput}
-                      onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
-                      className="w-full glass-input pl-9 pr-3 py-2 rounded-xl text-xs font-mono uppercase"
-                    />
-                  </div>
-                  <button
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="text"
+                    icon={<Tag className="w-4 h-4" />}
+                    placeholder="Promo Code"
+                    value={promoInput}
+                    onValueChange={(val) => setPromoInput(val.toUpperCase())}
+                    className="flex-1 text-xs font-mono uppercase"
+                  />
+                  <Button
                     type="submit"
+                    variant="glass"
                     disabled={isApplying || !promoInput.trim()}
-                    className="px-3.5 py-2 rounded-xl btn-secondary text-xs font-semibold disabled:opacity-50"
+                    className="text-xs font-semibold shrink-0"
                   >
                     {isApplying ? "..." : "Apply"}
-                  </button>
+                  </Button>
                 </div>
 
                 {appliedPromo && (
-                  <div className="flex items-center justify-between text-xs px-2 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-400">
+                  <div className="flex items-center justify-between text-xs px-3 py-1.5 bg-emerald-500/15 border border-emerald-400/30 rounded-xl text-emerald-300">
                     <span>Applied: <strong>{appliedPromo.code}</strong> (-{appliedPromo.discountAmount.toLocaleString()} EGP)</span>
                     <button
                       type="button"
                       onClick={removePromo}
-                      className="text-slate-400 hover:text-red-400 underline text-[11px] ml-2"
+                      className="text-slate-300 hover:text-red-400 underline text-[11px] ml-2"
                     >
                       Remove
                     </button>
@@ -275,7 +276,7 @@ export default function CartDrawer() {
 
               {/* Price Breakdown */}
               <div className="space-y-1.5 text-xs">
-                <div className="flex justify-between text-slate-400">
+                <div className="flex justify-between text-slate-300">
                   <span>Subtotal</span>
                   <span className="font-mono text-white">{subtotal.toLocaleString()} EGP</span>
                 </div>
@@ -285,7 +286,7 @@ export default function CartDrawer() {
                     <span className="font-mono">-{promoDiscount.toLocaleString()} EGP</span>
                   </div>
                 )}
-                <div className="flex justify-between text-base font-bold text-white pt-2 border-t border-white/10">
+                <div className="flex justify-between text-base font-bold text-white pt-2 border-t border-white/15">
                   <span>Total Amount</span>
                   <span className="font-mono text-cyan-300 text-lg">
                     {total.toLocaleString()} EGP
@@ -295,27 +296,31 @@ export default function CartDrawer() {
 
               {/* Action Buttons */}
               <div className="space-y-2 pt-1 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]">
-                <Link
-                  href="/checkout"
-                  onClick={() => setIsCartOpen(false)}
-                  className="w-full py-3.5 rounded-xl font-bold text-xs sm:text-sm text-white btn-primary flex items-center justify-center gap-2 shadow-lg shadow-blue-500/30"
+                <Button
+                  variant="filled"
+                  tint="#0088ff"
+                  onClick={() => {
+                    setIsCartOpen(false);
+                    router.push("/checkout");
+                  }}
+                  className="w-full justify-center h-12 font-bold text-xs sm:text-sm shadow-lg shadow-blue-500/30"
                 >
                   <span>Proceed to Checkout</span>
-                  <ArrowRight className="w-4 h-4" />
-                </Link>
+                  <ArrowRight className="w-4 h-4 ml-1" />
+                </Button>
 
                 <div className="flex items-center justify-between pt-1">
                   <Link
                     href="/cart"
                     onClick={() => setIsCartOpen(false)}
-                    className="text-xs text-slate-400 hover:text-white underline"
+                    className="text-xs text-slate-300 hover:text-white underline"
                   >
                     View Full Cart Page
                   </Link>
                   <button
                     type="button"
                     onClick={clearCart}
-                    className="text-xs text-slate-500 hover:text-red-400 transition-colors"
+                    className="text-xs text-slate-400 hover:text-red-400 transition-colors"
                   >
                     Clear Cart
                   </button>
@@ -323,13 +328,13 @@ export default function CartDrawer() {
               </div>
 
               {/* Trust Tag */}
-              <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400 pt-1">
-                <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
+              <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-300 pt-1">
+                <ShieldCheck className="w-3.5 h-3.5 text-cyan-300" />
                 <span>Instant Digital Fulfillment • Manual Verification</span>
               </div>
             </div>
           )}
-        </div>
+        </Glass>
       </div>
     </div>
   );

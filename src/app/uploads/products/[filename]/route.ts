@@ -11,13 +11,18 @@ export async function GET(
     const { filename } = await params;
     const safeFilename = path.basename(filename);
 
-    // 1. Check database storage
+    // Security check: Private payment screenshots (proof_*) must NOT be served via public uploads endpoint
+    if (safeFilename.startsWith("proof_")) {
+      return new NextResponse("Not Found", { status: 404 });
+    }
+
+    // 1. Check database storage (only public product images, never private screenshots)
     try {
       const dbFile = await prisma.uploadedFile.findUnique({
         where: { filename: safeFilename },
       });
 
-      if (dbFile && dbFile.data) {
+      if (dbFile && dbFile.data && dbFile.category !== "screenshot") {
         return new NextResponse(new Uint8Array(dbFile.data), {
           headers: {
             "Content-Type": dbFile.mimeType || "image/jpeg",

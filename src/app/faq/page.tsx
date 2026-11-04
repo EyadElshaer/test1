@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { HelpCircle, ChevronDown, ChevronUp, Search, MessageSquare } from "lucide-react";
+import { Glass, SearchField, Button } from "glisse";
 
 interface FaqItem {
   id: string;
@@ -64,94 +65,88 @@ export default function FaqPage() {
           Everything you need to know about our digital game keys, Windows licensing, manual payment verification, order tracking, and refund guidelines.
         </p>
 
-        {/* Search Bar */}
-        <div className="max-w-md mx-auto pt-4">
-          <div className="relative">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
+          {/* Glisse Liquid Glass SearchField */}
+          <div className="max-w-md mx-auto pt-4 flex justify-center">
+            <SearchField
               placeholder="Search help topics..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full glass-input pl-10 pr-4 py-3 rounded-2xl text-xs sm:text-sm"
+              onValueChange={(val) => setSearch(val)}
+              className="w-full !max-w-md h-11"
             />
           </div>
         </div>
-      </div>
 
-      {/* Category Filter Pills */}
-      <div className="flex flex-wrap items-center justify-center gap-2">
-        {categories.map((cat) => (
-          <button
+          {/* Category Filter Pills (Glisse Buttons) */}
+          <div className="flex flex-wrap items-center justify-center gap-2.5">
+            {categories.map((cat) => (
+                <Button
             key={cat}
-            onClick={() => setSelectedCategory(cat)}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
-              selectedCategory === cat
-                ? "bg-blue-600 text-white shadow-md shadow-blue-500/20 border border-cyan-400"
-                : "bg-white/5 text-slate-400 hover:text-white hover:bg-white/10"
-            }`}
-          >
-            {cat === "ALL" ? "All Questions" : cat}
-          </button>
-        ))}
-      </div>
-
-      {/* FAQ Accordion List */}
-      <div className="space-y-4">
-        {loading ? (
-          <div className="text-center py-12 text-slate-500 text-xs">Loading FAQs...</div>
-        ) : filteredFaqs.length === 0 ? (
-          <div className="text-center py-12 text-slate-400 text-xs glass-card rounded-2xl p-6">
-            No FAQs found matching your criteria.
-          </div>
-        ) : (
-          filteredFaqs.map((faq) => {
-            const isOpen = Boolean(openItems[faq.id]);
-            return (
-              <div
-                key={faq.id}
-                className="glass-card rounded-2xl border border-white/10 overflow-hidden transition-all duration-200"
+                variant={selectedCategory === cat ? "filled" : "glass"}
+                tint={selectedCategory === cat ? "#0088ff" : undefined}
+                onClick={() => setSelectedCategory(cat)}
+                className="text-xs font-semibold"
               >
-                <button
-                  type="button"
-                  onClick={() => toggleItem(faq.id)}
-                  className="w-full p-5 text-left flex items-center justify-between gap-4 group"
+                {cat === "ALL" ? "All Questions" : cat}
+          </Button>
+        ))}
+        </div>
+
+        {/* FAQ Accordion List */}
+        <div className="space-y-4">
+          {loading ? (
+            <div className="text-center py-12 text-slate-500 text-xs">Loading FAQs...</div>
+          ) : filteredFaqs.length === 0 ? (
+            <div className="text-center py-12 text-slate-400 text-xs glass-card rounded-2xl p-6">
+              No FAQs found matching your criteria.
+            </div>
+          ) : (
+            filteredFaqs.map((faq) => {
+              const isOpen = Boolean(openItems[faq.id]);
+              return (
+                <div
+                  key={faq.id}
+                  className="glass-card rounded-2xl border border-white/10 overflow-hidden transition-all duration-200"
                 >
-                  <span className="font-bold text-sm sm:text-base text-white group-hover:text-cyan-300 transition-colors">
-                    {faq.question}
-                  </span>
-                  <span className="p-1.5 rounded-lg bg-white/5 text-slate-400 group-hover:text-white shrink-0">
-                    {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                  </span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleItem(faq.id)}
+                    className="w-full p-5 text-left flex items-center justify-between gap-4 group"
+                  >
+                    <span className="font-bold text-sm sm:text-base text-white group-hover:text-cyan-300 transition-colors">
+                      {faq.question}
+                    </span>
+                    <span className="p-1.5 rounded-lg bg-white/5 text-slate-400 group-hover:text-white shrink-0">
+                      {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </span>
+                  </button>
 
-                {isOpen && (
-                  <div className="px-5 pb-5 pt-1 text-xs sm:text-sm text-slate-300 leading-relaxed border-t border-white/5 whitespace-pre-line">
-                    {faq.answer}
-                  </div>
-                )}
-              </div>
-            );
-          })
-        )}
-      </div>
+                  {isOpen && (
+                    <div className="px-5 pb-5 pt-1 text-xs sm:text-sm text-slate-300 leading-relaxed border-t border-white/5 whitespace-pre-line">
+                      {faq.answer}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
 
-      {/* Support Box */}
-      <div className="p-8 rounded-3xl glass-panel border border-cyan-500/20 text-center space-y-3">
-        <h3 className="font-bold text-white text-lg">Still have questions?</h3>
-        <p className="text-xs text-slate-400 max-w-md mx-auto">
-          Our friendly support team is available during operating hours to assist you with order verification and activation assistance.
-        </p>
-        <div className="pt-2">
-          <a
-            href="mailto:support@premikeys.com"
-            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl btn-primary text-xs font-bold"
-          >
-            <MessageSquare className="w-3.5 h-3.5" />
-            <span>Contact Support via Email</span>
-          </a>
+        {/* Support Box */}
+        <div className="p-8 rounded-3xl glass-panel border border-cyan-500/20 text-center space-y-3">
+          <h3 className="font-bold text-white text-lg">Still have questions?</h3>
+          <p className="text-xs text-slate-400 max-w-md mx-auto">
+            Our friendly support team is available during operating hours to assist you with order verification and activation assistance.
+          </p>
+          <div className="pt-2">
+            <a
+              href="mailto:support@premikeys.com"
+              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl btn-primary text-xs font-bold"
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>Contact Support via Email</span>
+            </a>
+          </div>
         </div>
       </div>
-    </div>
-  );
+      );
 }
