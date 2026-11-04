@@ -1,403 +1,262 @@
 @import "tailwindcss";
-@import "glisse/styles.css";
 
+:root {
+  --background: #030712;
+  --foreground: #f8fafc;
+  --card-bg: rgba(13, 21, 46, 0.7);
+  --card-border: rgba(56, 189, 248, 0.12);
+  --accent-blue: #0066ff;
+  --accent-cyan: #00f0ff;
+  --accent-red: #ef4444;
+  --accent-purple: #8b5cf6;
+}
 
-  :root,
-  [data-theme="dark"] {
-    --background: #02050f;
-    --foreground: #f8fafc;
-    --card-bg: rgba(18, 25, 48, 0.45);
-    --card-border: rgba(255, 255, 255, 0.16);
-    --accent-blue: #007aff;
-    --accent-cyan: #00e5ff;
-    --accent-red: #ff3b30;
-    --accent-purple: #af52de;
+html {
+  scroll-behavior: smooth;
+  -webkit-tap-highlight-color: transparent;
+  text-rendering: optimizeLegibility;
+  color-scheme: dark;
+}
 
-    /* iOS 26 Liquid Glass Variables (Glisse) */
-    --lg-foreground: rgb(255 255 255 / 0.96);
-    --lg-muted: rgb(235 235 245 / 0.65);
-    --lg-glass: rgb(26 36 64 / 0.48);
-    --lg-glass-active: rgb(48 64 110 / 0.62);
-    --lg-edge: rgb(255 255 255 / 0.16);
-    --lg-drop: rgb(0 0 0 / 0.35);
-    --lg-selection: rgb(255 255 255 / 0.18);
-    --lg-lens: rgb(255 255 255 / 0.08);
-    --lg-lens-drop: rgb(0 200 255 / 0.18);
-    --lg-segment-track: rgb(15 23 42 / 0.45);
-    --lg-segment-thumb: rgb(255 255 255 / 0.22);
-    --lg-segment-label: rgb(255 255 255);
-    --lg-segment-lens: rgb(255 255 255 / 0.08);
-    --lg-surface: rgb(12 18 38 / 0.85);
-    --lg-surface-edge: rgb(255 255 255 / 0.2);
-    --lg-shadow: rgb(0 0 0 / 0.55);
-    --lg-highlight: rgb(56 189 248 / 0.18);
-    --lg-separator: rgb(255 255 255 / 0.14);
-    --lg-destructive: #ff453a;
-    --lg-track: rgb(255 255 255 / 0.22);
-    --lg-rail: rgb(255 255 255 / 0.14);
-    --lg-on: #30d158;
-    --lg-fill: #0088ff;
-    --lg-ring: rgb(0 229 255 / 0.6);
-    --lg-lens-shine: 1.25;
-    --lg-rim-shine: 0.24;
-    --lg-blur: 14px;
-    --lg-glass-bend: 0.52;
-    --lg-glass-dispersion: 0.55;
+body {
+  background-color: #030712;
+  color: #f1f5f9;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-image: 
+    radial-gradient(circle at 15% 10%, rgba(0, 102, 255, 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 85% 20%, rgba(239, 68, 68, 0.05) 0%, transparent 45%),
+    radial-gradient(circle at 50% 80%, rgba(0, 240, 255, 0.05) 0%, transparent 50%);
+}
+
+/* Hardware-accelerated GPU classes with lightweight composition */
+.gpu-layer {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Glassmorphism Classes - Light on GPU, high aesthetic */
+.glass-panel {
+  background: rgba(10, 16, 36, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-card {
+  background: rgba(12, 19, 42, 0.75);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(56, 189, 248, 0.12);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), 
+              border-color 0.25s ease, 
+              box-shadow 0.25s ease;
+  transform: translateZ(0);
+}
+
+.glass-card:hover {
+  border-color: rgba(0, 240, 255, 0.35);
+  box-shadow: 0 10px 25px -10px rgba(0, 102, 255, 0.25), 0 0 15px rgba(0, 240, 255, 0.08);
+  transform: translateY(-2px);
+}
+
+.glass-input {
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #f8fafc;
+  transition: border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-input:focus {
+  border-color: #00f0ff;
+  box-shadow: 0 0 0 2px rgba(0, 240, 255, 0.2);
+  outline: none;
+}
+
+/* Buttons with tactile click feedback */
+.btn-primary {
+  background: linear-gradient(135deg, #0066ff 0%, #00d2ff 100%);
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 4px 14px rgba(0, 102, 255, 0.3);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: translateZ(0);
+}
+
+.btn-primary:hover {
+  box-shadow: 0 6px 20px rgba(0, 240, 255, 0.45);
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.btn-primary:active {
+  transform: translateY(0px) scale(0.98);
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.3);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: translateZ(0);
+}
+
+.btn-danger:hover {
+  box-shadow: 0 6px 18px rgba(239, 68, 68, 0.45);
+  filter: brightness(1.08);
+}
+
+.btn-danger:active {
+  transform: scale(0.98);
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e2e8f0;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: translateZ(0);
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+}
+
+.btn-secondary:active {
+  transform: scale(0.98);
+}
+
+/* Badges */
+.badge-discount {
+  background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
+  color: #ffffff;
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+
+.badge-platform {
+  background: rgba(0, 102, 255, 0.15);
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  color: #38bdf8;
+}
+
+/* Order Status Badges */
+.status-badge-pending {
+  background: rgba(234, 179, 8, 0.15);
+  border: 1px solid rgba(234, 179, 8, 0.4);
+  color: #facc15;
+}
+
+.status-badge-approved {
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  color: #60a5fa;
+}
+
+.status-badge-done {
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  color: #4ade80;
+}
+
+.status-badge-rejected {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #f87171;
+}
+
+/* Skeleton shimmer animation for fast perception */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
   }
-
-  html {
-    scroll-behavior: smooth;
-    -webkit-tap-highlight-color: transparent;
-    text-rendering: optimizeLegibility;
-    color-scheme: dark;
+  100% {
+    background-position: 200% 0;
   }
+}
 
-  body {
-    background-color: #02050f;
-    color: #f8fafc;
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    min-height: 100vh;
-    overflow-x: hidden;
-    background-image:
-    radial-gradient(circle at 12% 14%, rgba(0, 136, 255, 0.22) 0%, transparent 42%),
-    radial-gradient(circle at 86% 18%, rgba(168, 85, 247, 0.18) 0%, transparent 45%),
-    radial-gradient(circle at 50% 52%, rgba(0, 229, 255, 0.13) 0%, transparent 55%),
-    radial-gradient(circle at 20% 85%, rgba(56, 189, 248, 0.16) 0%, transparent 48%),
-    radial-gradient(circle at 82% 82%, rgba(59, 130, 246, 0.18) 0%, transparent 45%);
-    background-attachment: fixed;
+.skeleton-shimmer {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.03) 25%, rgba(255, 255, 255, 0.08) 37%, rgba(255, 255, 255, 0.03) 63%);
+  background-size: 400% 100%;
+  animation: shimmer 1.6s ease infinite;
+}
+
+/* Custom smooth scrollbar */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+::-webkit-scrollbar-track {
+  background: #030712;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #38bdf8;
+}
+
+/* Device efficiency: Disable animations for users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
+}
 
-  /* Ambient Floating Liquid Mesh Wallpaper */
-  @keyframes floatOrbSlow {
+/* Mobile Optimizations: Touch response and iOS input zoom prevention */
+button, a, input, select, textarea {
+  touch-action: manipulation;
+}
 
-    0%,
-    100% {
-      transform: translate3d(0, 0, 0) scale(1);
-    }
-
-    33% {
-      transform: translate3d(30px, -25px, 0) scale(1.06);
-    }
-
-    66% {
-      transform: translate3d(-25px, 20px, 0) scale(0.95);
-    }
-  }
-
-  .liquid-ambient-orb {
-    animation: floatOrbSlow 18s ease-in-out infinite;
-    will-change: transform;
-  }
-
-  /* Hardware-accelerated GPU classes with lightweight composition */
-  .gpu-layer {
-    transform: translateZ(0);
-    backface-visibility: hidden;
-  }
-
-  /* iOS 26 Liquid Glass Panels & Cards */
-  .glass-panel {
-    position: relative;
-    background: linear-gradient(135deg,
-        rgba(255, 255, 255, 0.1) 0%,
-        rgba(255, 255, 255, 0.03) 50%,
-        rgba(0, 210, 255, 0.05) 100%);
-    backdrop-filter: blur(24px) saturate(190%);
-    -webkit-backdrop-filter: blur(24px) saturate(190%);
-    border: 1px solid rgba(255, 255, 255, 0.16);
-    box-shadow:
-      0 20px 50px -12px rgba(0, 0, 0, 0.55),
-      inset 0 1px 1px 0 rgba(255, 255, 255, 0.28),
-      inset 0 -1px 1px 0 rgba(255, 255, 255, 0.06);
-  }
-
-  .glass-card {
-    position: relative;
-    background: linear-gradient(145deg,
-        rgba(255, 255, 255, 0.085) 0%,
-        rgba(15, 23, 45, 0.52) 55%,
-        rgba(0, 170, 255, 0.06) 100%);
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    box-shadow:
-      0 12px 32px -8px rgba(0, 0, 0, 0.45),
-      inset 0 1px 0.5px 0 rgba(255, 255, 255, 0.25),
-      inset 0 0 18px 0 rgba(255, 255, 255, 0.025);
-    transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1),
-      border-color 0.3s ease,
-      box-shadow 0.3s ease,
-      background 0.3s ease;
-    transform: translateZ(0);
-  }
-
-  .glass-card:hover {
-    border-color: rgba(0, 229, 255, 0.42);
-    box-shadow:
-      0 18px 40px -10px rgba(0, 110, 255, 0.32),
-      0 0 24px rgba(0, 229, 255, 0.1),
-      inset 0 1px 1px 0 rgba(255, 255, 255, 0.38);
-    transform: translateY(-3px);
-  }
-
-  .glass-pill {
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.05) 100%);
-    backdrop-filter: blur(18px) saturate(180%);
-    -webkit-backdrop-filter: blur(18px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    box-shadow:
-      0 4px 16px rgba(0, 0, 0, 0.25),
-      inset 0 1px 0.5px rgba(255, 255, 255, 0.32);
-  }
-
-  .glass-input {
-    background: rgba(15, 23, 42, 0.55);
-    backdrop-filter: blur(16px) saturate(170%);
-    -webkit-backdrop-filter: blur(16px) saturate(170%);
-    border: 1px solid rgba(255, 255, 255, 0.16);
-    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35), inset 0 1px 0.5px rgba(255, 255, 255, 0.12);
-    color: #f8fafc;
-    transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-
-  .glass-input:focus {
-    background: rgba(22, 34, 62, 0.72);
-    border-color: rgba(0, 229, 255, 0.7);
-    box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.2), inset 0 1px 0.5px rgba(255, 255, 255, 0.25);
-    outline: none;
-  }
-
-  /* iOS Liquid Glass Buttons with Specular Rim */
-  .btn-primary {
-    background: linear-gradient(135deg, rgba(0, 122, 255, 0.9) 0%, rgba(0, 210, 255, 0.85) 100%);
-    backdrop-filter: blur(14px) saturate(180%);
-    -webkit-backdrop-filter: blur(14px) saturate(180%);
-    color: #ffffff;
-    font-weight: 600;
-    border: 1px solid rgba(255, 255, 255, 0.28);
-    box-shadow:
-      0 8px 24px -4px rgba(0, 122, 255, 0.45),
-      inset 0 1px 1px rgba(255, 255, 255, 0.45),
-      inset 0 -1px 1px rgba(0, 0, 0, 0.2);
-    transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
-    transform: translateZ(0);
-  }
-
-  .btn-primary:hover {
-    box-shadow:
-      0 10px 28px -2px rgba(0, 210, 255, 0.55),
-      inset 0 1px 1.5px rgba(255, 255, 255, 0.65);
-    filter: brightness(1.08);
-    transform: translateY(-1.5px) scale(1.01);
-  }
-
-  .btn-primary:active {
-    transform: translateY(0px) scale(0.97);
-  }
-
-  .btn-danger {
-    background: linear-gradient(135deg, rgba(220, 38, 38, 0.88) 0%, rgba(255, 69, 58, 0.88) 100%);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    color: #ffffff;
-    border: 1px solid rgba(255, 255, 255, 0.25);
-    box-shadow:
-      0 6px 20px rgba(239, 68, 68, 0.38),
-      inset 0 1px 1px rgba(255, 255, 255, 0.35);
-    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-    transform: translateZ(0);
-  }
-
-  .btn-danger:hover {
-    box-shadow: 0 8px 24px rgba(255, 69, 58, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.5);
-    filter: brightness(1.08);
-  }
-
-  .btn-danger:active {
-    transform: scale(0.97);
-  }
-
-  .btn-secondary {
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.04) 100%);
-    backdrop-filter: blur(16px) saturate(180%);
-    -webkit-backdrop-filter: blur(16px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    box-shadow:
-      0 4px 14px rgba(0, 0, 0, 0.25),
-      inset 0 1px 0.5px rgba(255, 255, 255, 0.28);
-    color: #f1f5f9;
-    transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
-    transform: translateZ(0);
-  }
-
-  .btn-secondary:hover {
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.08) 100%);
-    border-color: rgba(255, 255, 255, 0.32);
-    box-shadow:
-      0 6px 20px rgba(0, 210, 255, 0.15),
-      inset 0 1px 1px rgba(255, 255, 255, 0.4);
-    color: #ffffff;
-  }
-
-  .btn-secondary:active {
-    transform: scale(0.97);
-  }
-
-  /* Glisse Customization Overrides for Flexible Widths */
-  .lg-tab-bar-wide {
-    --lg-tab-width: 124px;
-    --lg-tab-height: 36px;
-  }
-
-  .lg-segmented-wide {
-    --lg-tab-width: 132px;
-    --lg-tab-height: 36px;
-  }
-
-  @media (max-width: 640px) {
-    .lg-segmented-wide {
-      --lg-tab-width: 98px;
-      --lg-tab-height: 34px;
-    }
-  }
-
-  /* Badges */
-  .badge-discount {
-    background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
-    color: #ffffff;
-    font-weight: 700;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-  }
-
-  .badge-platform {
-    background: rgba(0, 102, 255, 0.15);
-    border: 1px solid rgba(0, 240, 255, 0.3);
-    color: #38bdf8;
-  }
-
-  /* Order Status Badges */
-  .status-badge-pending {
-    background: rgba(234, 179, 8, 0.15);
-    border: 1px solid rgba(234, 179, 8, 0.4);
-    color: #facc15;
-  }
-
-  .status-badge-approved {
-    background: rgba(59, 130, 246, 0.15);
-    border: 1px solid rgba(59, 130, 246, 0.4);
-    color: #60a5fa;
-  }
-
-  .status-badge-done {
-    background: rgba(34, 197, 94, 0.15);
-    border: 1px solid rgba(34, 197, 94, 0.4);
-    color: #4ade80;
-  }
-
-  .status-badge-rejected {
-    background: rgba(239, 68, 68, 0.15);
-    border: 1px solid rgba(239, 68, 68, 0.4);
-    color: #f87171;
-  }
-
-  /* Skeleton shimmer animation for fast perception */
-  @keyframes shimmer {
-    0% {
-      background-position: -200% 0;
-    }
-
-    100% {
-      background-position: 200% 0;
-    }
-  }
-
-  .skeleton-shimmer {
-    background: linear-gradient(90deg, rgba(255, 255, 255, 0.03) 25%, rgba(255, 255, 255, 0.08) 37%, rgba(255, 255, 255, 0.03) 63%);
-    background-size: 400% 100%;
-    animation: shimmer 1.6s ease infinite;
-  }
-
-  /* Custom smooth scrollbar */
-  ::-webkit-scrollbar {
-    width: 7px;
-    height: 7px;
-  }
-
-  ::-webkit-scrollbar-track {
-    background: #030712;
-  }
-
-  ::-webkit-scrollbar-thumb {
-    background: #1e293b;
-    border-radius: 9999px;
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    background: #38bdf8;
-  }
-
-  /* Device efficiency: Disable animations for users who prefer reduced motion */
-  @media (prefers-reduced-motion: reduce) {
-
-    *,
-    ::before,
-    ::after {
-      animation-duration: 0.01ms !important;
-      animation-iteration-count: 1 !important;
-      transition-duration: 0.01ms !important;
-      scroll-behavior: auto !important;
-    }
-  }
-
-  /* Mobile Optimizations: Touch response and iOS input zoom prevention */
-  button,
-  a,
-  input,
+@media (max-width: 640px) {
+  input:not([type="checkbox"]):not([type="radio"]),
   select,
   textarea {
-    touch-action: manipulation;
+    font-size: 16px !important;
   }
+}
 
-  @media (max-width: 640px) {
+.pb-safe {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom, 1rem));
+}
 
-    input:not([type="checkbox"]):not([type="radio"]),
-    select,
-    textarea {
-      font-size: 16px !important;
-    }
-  }
+.bottom-safe {
+  bottom: env(safe-area-inset-bottom, 0px);
+}
 
-  .pb-safe {
-    padding-bottom: max(1rem, env(safe-area-inset-bottom, 1rem));
-  }
+/* Google One Tap container & iframe transparency fix for mobile and dark mode */
+#credential_picker_container,
+#credential_picker_container > div,
+#credential_picker_container iframe,
+#credential_picker_iframe,
+iframe[src*="accounts.google.com"],
+iframe[title*="Google"],
+iframe[title="Sign in with Google Dialog"] {
+  background: transparent !important;
+  background-color: transparent !important;
+  color-scheme: light dark !important;
+  border: none !important;
+  box-shadow: none !important;
+}
 
-  .bottom-safe {
-    bottom: env(safe-area-inset-bottom, 0px);
-  }
-
-  /* Google One Tap container & iframe transparency fix for mobile and dark mode */
+@supports (-webkit-touch-callout: none) {
   #credential_picker_container,
-  #credential_picker_container>div,
+  #credential_picker_container > div,
   #credential_picker_container iframe,
-  #credential_picker_iframe,
-  iframe[src*="accounts.google.com"],
-  iframe[title*="Google"],
-  iframe[title="Sign in with Google Dialog"] {
+  #credential_picker_iframe {
     background: transparent !important;
     background-color: transparent !important;
     color-scheme: light dark !important;
-    border: none !important;
-    box-shadow: none !important;
   }
+}
 
-  @supports (-webkit-touch-callout: none) {
-
-    #credential_picker_container,
-    #credential_picker_container>div,
-    #credential_picker_container iframe,
-    #credential_picker_iframe {
-      background: transparent !important;
-      background-color: transparent !important;
-      color-scheme: light dark !important;
-    }
-  }

@@ -21,7 +21,6 @@ import {
 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { extractConfigurations, ProductConfiguration } from "@/lib/configurations";
-import { Glass, Button, SegmentedControl } from "glisse";
 
 export default function ProductDetailClient({ product }: { product: any }) {
   const router = useRouter();
@@ -194,10 +193,11 @@ export default function ProductDetailClient({ product }: { product: any }) {
                 <button
                   key={img.id || idx}
                   onClick={() => handleSelectImage(idx)}
-                  className={`relative w-20 h-20 rounded-xl overflow-hidden shrink-0 border-2 transition-all duration-200 active:scale-95 bg-[#070b19] flex items-center justify-center p-1 ${activeImageIndex === idx
+                  className={`relative w-20 h-20 rounded-xl overflow-hidden shrink-0 border-2 transition-all duration-200 active:scale-95 bg-[#070b19] flex items-center justify-center p-1 ${
+                    activeImageIndex === idx
                       ? "border-cyan-400 shadow-[0_0_15px_rgba(0,240,255,0.4)]"
                       : "border-white/10 opacity-70 hover:opacity-100"
-                    }`}
+                  }`}
                   title={img.altText || `View image ${idx + 1}`}
                 >
                   <Image
@@ -281,13 +281,13 @@ export default function ProductDetailClient({ product }: { product: any }) {
 
           {/* Configuration Selector */}
           {hasConfigs && (
-              <Glass className="rounded-3xl p-5 border border-white/15 space-y-3.5 shadow-xl">
-                <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-cyan-300">
-                      Select Configuration / Edition
-                    </span>
-                    {activeConfig && (
-                  <span className="text-xs text-slate-300">
+            <div className="glass-card rounded-2xl p-5 border border-white/10 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-cyan-400">
+                  Select Configuration / Edition
+                </span>
+                {activeConfig && (
+                  <span className="text-xs text-slate-400">
                     Selected: <strong className="text-white">{activeConfig.name}</strong>
                   </span>
                 )}
@@ -300,16 +300,16 @@ export default function ProductDetailClient({ product }: { product: any }) {
                       key={cfg.id || idx}
                       type="button"
                       onClick={() => setSelectedConfigIdx(idx)}
-                      className={`p-3.5 rounded-2xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between ${
+                      className={`p-3 rounded-xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between ${
                         isSelected
-                          ? "bg-cyan-500/20 border-cyan-300/80 shadow-[0_0_24px_rgba(0,229,255,0.25)] scale-[1.01]"
-                          : "bg-white/[0.04] border-white/15 hover:border-white/30 hover:bg-white/[0.08]"
+                          ? "bg-cyan-500/15 border-cyan-400 shadow-[0_0_20px_rgba(0,240,255,0.2)] scale-[1.01]"
+                          : "bg-white/[0.02] border-white/10 hover:border-white/20 hover:bg-white/[0.05]"
                       }`}
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-bold text-xs sm:text-sm text-white">{cfg.name}</span>
                         {cfg.discountPercent > 0 && (
-                          <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-full bg-rose-500/25 text-rose-200 border border-rose-400/40">
+                          <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">
                             -{cfg.discountPercent}%
                           </span>
                         )}
@@ -319,7 +319,7 @@ export default function ProductDetailClient({ product }: { product: any }) {
                           {cfg.salePrice.toLocaleString()} EGP
                         </span>
                         {cfg.discountPercent > 0 && (
-                          <span className="text-xs text-slate-400 line-through">
+                          <span className="text-xs text-slate-500 line-through">
                             {cfg.originalPrice.toLocaleString()} EGP
                           </span>
                         )}
@@ -328,117 +328,144 @@ export default function ProductDetailClient({ product }: { product: any }) {
                   );
                 })}
               </div>
-            </Glass>
+            </div>
           )}
 
           {/* Pricing Card */}
-          <div ref={pricingSectionRef}>
-            <Glass className="rounded-3xl p-5 sm:p-6 border border-white/15 space-y-4 shadow-2xl">
-              <div className="flex items-baseline justify-between">
-                <div>
-                  <div className="text-xs text-slate-300 font-medium">Digital Product Price</div>
-                  <div className="flex items-baseline gap-3 mt-1">
-                    <span className="text-3xl sm:text-4xl font-black text-white tracking-tight">
-                      {activeSalePrice.toLocaleString()} <span className="text-base text-cyan-300 font-bold">EGP</span>
-                    </span>
-                    {activeDiscountPercent > 0 && (
-                      <span className="text-base text-slate-400 line-through">
-                        {activeOriginalPrice.toLocaleString()} EGP
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="text-right">
-                  {isOutOfStock ? (
-                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-red-500/15 text-red-300 border border-red-400/30">
-                      <AlertCircle className="w-3.5 h-3.5" /> Out of Stock
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-400/30">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> In Stock &amp; Ready
+          <div ref={pricingSectionRef} className="glass-card rounded-2xl p-5 sm:p-6 border border-white/10 space-y-4">
+            <div className="flex items-baseline justify-between">
+              <div>
+                <div className="text-xs text-slate-400 font-medium">Digital Product Price</div>
+                <div className="flex items-baseline gap-3 mt-1">
+                  <span className="text-3xl sm:text-4xl font-black text-white tracking-tight">
+                    {activeSalePrice.toLocaleString()} <span className="text-base text-cyan-400 font-bold">EGP</span>
+                  </span>
+                  {activeDiscountPercent > 0 && (
+                    <span className="text-base text-slate-500 line-through">
+                      {activeOriginalPrice.toLocaleString()} EGP
                     </span>
                   )}
                 </div>
               </div>
 
-              {/* Quantity Selector */}
-              {!isOutOfStock && (
-                <div className="flex items-center justify-between pt-3 border-t border-white/15">
-                  <span className="text-xs font-medium text-slate-200">Quantity</span>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="glass"
-                      icon={<Minus className="w-4 h-4" />}
-                      onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                      aria-label="Decrease quantity"
-                    />
-                    <span className="px-3 font-mono font-bold text-sm text-white select-none">
-                      {quantity}
-                    </span>
-                    <Button
-                      variant="glass"
-                      icon={<Plus className="w-4 h-4" />}
-                      onClick={() => setQuantity(quantity + 1)}
-                      aria-label="Increase quantity"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                <Button
-                  variant={justAdded ? "filled" : "glass"}
-                  tint={justAdded ? "#30d158" : undefined}
-                  icon={
-                    justAdded ? (
-                      <Check className="w-4 h-4 stroke-[3]" />
-                    ) : (
-                      <ShoppingCart className="w-4 h-4 text-cyan-300" />
-                    )
-                  }
-                  onClick={handleAddToCart}
-                  disabled={isOutOfStock}
-                  className="w-full justify-center h-12 font-bold text-sm"
-                >
-                  {justAdded ? "Added to Cart!" : "Add to Cart"}
-                </Button>
-
-                <Button
-                  variant="filled"
-                  tint="#0088ff"
-                  icon={<Zap className="w-4 h-4 fill-current" />}
-                  onClick={handleBuyNow}
-                  disabled={isOutOfStock}
-                  className="w-full justify-center h-12 font-bold text-sm shadow-lg shadow-blue-500/30"
-                >
-                  Buy Now
-                </Button>
+              <div className="text-right">
+                {isOutOfStock ? (
+                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-red-500/10 text-red-400 border border-red-500/20">
+                    <AlertCircle className="w-3.5 h-3.5" /> Out of Stock
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> In Stock & Ready
+                  </span>
+                )}
               </div>
-
-              <p className="text-[11px] text-slate-300 text-center pt-1">
-                Manual transfer via InstaPay / Vodafone Cash verified before key dispatch.
-              </p>
-            </Glass>
-          </div>
-
-          {/* Content Tabs (iOS 26 Liquid Glass SegmentedControl) */}
-          <div className="space-y-4 pt-2">
-            <div className="flex justify-start overflow-x-auto pb-1">
-              <SegmentedControl
-                value={activeTab}
-                onValueChange={(val) => setActiveTab(val as "overview" | "activation" | "specs")}
-                style={{ "--lg-tab-width": "135px", "--lg-tab-height": "36px" } as React.CSSProperties}
-                items={[
-                  { value: "overview", label: "Overview" },
-                  { value: "activation", label: "Activation" },
-                  { value: "specs", label: "Specifications" },
-                ]}
-              />
             </div>
 
-            <Glass className="rounded-3xl p-5 border border-white/15 text-xs text-slate-200 leading-relaxed space-y-3">
+            {/* Quantity Selector */}
+            {!isOutOfStock && (
+              <div className="flex items-center justify-between pt-3 border-t border-white/10">
+                <span className="text-xs font-medium text-slate-300">Quantity</span>
+                <div className="flex items-center border border-white/10 rounded-xl bg-black/40 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    className="p-2 text-slate-400 hover:text-white transition-colors active:scale-95"
+                    aria-label="Decrease quantity"
+                  >
+                    <Minus className="w-4 h-4" />
+                  </button>
+                  <span className="px-4 font-mono font-bold text-sm text-white select-none">
+                    {quantity}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setQuantity(quantity + 1)}
+                    className="p-2 text-slate-400 hover:text-white transition-colors active:scale-95"
+                    aria-label="Increase quantity"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+              <button
+                type="button"
+                onClick={handleAddToCart}
+                disabled={isOutOfStock}
+                className={`w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl font-bold text-sm transition-all duration-200 disabled:opacity-40 ${
+                  justAdded
+                    ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 border border-emerald-400"
+                    : "btn-secondary"
+                }`}
+              >
+                {justAdded ? (
+                  <>
+                    <Check className="w-4 h-4 stroke-[3]" />
+                    <span>Added to Cart!</span>
+                  </>
+                ) : (
+                  <>
+                    <ShoppingCart className="w-4 h-4 text-cyan-400" />
+                    <span>Add to Cart</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleBuyNow}
+                disabled={isOutOfStock}
+                className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl font-bold text-sm btn-primary disabled:opacity-40"
+              >
+                <Zap className="w-4 h-4 fill-current" />
+                <span>Buy Now</span>
+              </button>
+            </div>
+
+            <p className="text-[11px] text-slate-400 text-center pt-1">
+              Manual transfer via InstaPay / Vodafone Cash verified before key dispatch.
+            </p>
+          </div>
+
+          {/* Content Tabs (Overview, Activation, Specs) */}
+          <div className="space-y-4 pt-4">
+            <div className="flex border-b border-white/10 text-xs font-bold gap-2">
+              <button
+                onClick={() => setActiveTab("overview")}
+                className={`pb-3 px-4 transition-colors relative ${
+                  activeTab === "overview"
+                    ? "text-cyan-400 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-cyan-400"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                Overview & Details
+              </button>
+              <button
+                onClick={() => setActiveTab("activation")}
+                className={`pb-3 px-4 transition-colors relative ${
+                  activeTab === "activation"
+                    ? "text-cyan-400 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-cyan-400"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                Activation Guide
+              </button>
+              <button
+                onClick={() => setActiveTab("specs")}
+                className={`pb-3 px-4 transition-colors relative ${
+                  activeTab === "specs"
+                    ? "text-cyan-400 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-cyan-400"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                Specifications
+              </button>
+            </div>
+
+            <div className="text-xs text-slate-300 leading-relaxed space-y-3 pt-2">
               {activeTab === "overview" && (
                 <div className="prose prose-invert text-xs max-w-none whitespace-pre-line leading-relaxed">
                   {product.description}
@@ -447,9 +474,9 @@ export default function ProductDetailClient({ product }: { product: any }) {
 
               {activeTab === "activation" && (
                 <div className="space-y-3">
-                  <div className="p-4 rounded-2xl glass-pill text-cyan-100">
+                  <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-cyan-200">
                     <h4 className="font-bold text-sm text-white mb-1">Official Activation Steps</h4>
-                    <p className="text-xs text-slate-200 whitespace-pre-line leading-relaxed">
+                    <p className="text-xs text-slate-300 whitespace-pre-line leading-relaxed">
                       {product.deliveryInstructions ||
                         "Upon order payment verification by our team, your 25-character activation key will appear on your order confirmation and My Orders tracking screen. Redeem directly on the official publisher client or platform settings."}
                     </p>
@@ -459,27 +486,27 @@ export default function ProductDetailClient({ product }: { product: any }) {
 
               {activeTab === "specs" && (
                 <div className="space-y-2">
-                  <div className="grid grid-cols-2 gap-2.5 text-xs">
-                    <div className="p-3 rounded-2xl glass-pill">
-                      <span className="text-slate-300 block text-[10px]">Publisher / Platform</span>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="p-2.5 rounded-lg bg-slate-900 border border-white/5">
+                      <span className="text-slate-400 block text-[10px]">Publisher / Platform</span>
                       <span className="font-semibold text-white">{product.platform || "PC / Multiplatform"}</span>
                     </div>
-                    <div className="p-3 rounded-2xl glass-pill">
-                      <span className="text-slate-300 block text-[10px]">License Type</span>
+                    <div className="p-2.5 rounded-lg bg-slate-900 border border-white/5">
+                      <span className="text-slate-400 block text-[10px]">License Type</span>
                       <span className="font-semibold text-white">{product.productType || "Digital Product"}</span>
                     </div>
-                    <div className="p-3 rounded-2xl glass-pill">
-                      <span className="text-slate-300 block text-[10px]">Region Compatibility</span>
+                    <div className="p-2.5 rounded-lg bg-slate-900 border border-white/5">
+                      <span className="text-slate-400 block text-[10px]">Region Compatibility</span>
                       <span className="font-semibold text-white">{product.compatibility || "Global"}</span>
                     </div>
-                    <div className="p-3 rounded-2xl glass-pill">
-                      <span className="text-slate-300 block text-[10px]">Delivery Method</span>
+                    <div className="p-2.5 rounded-lg bg-slate-900 border border-white/5">
+                      <span className="text-slate-400 block text-[10px]">Delivery Method</span>
                       <span className="font-semibold text-white">Manual Verified Order Tracking</span>
                     </div>
                   </div>
                 </div>
               )}
-            </Glass>
+            </div>
           </div>
         </div>
       </div>

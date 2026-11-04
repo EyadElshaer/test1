@@ -27,7 +27,6 @@ import {
 import { PhoneInput } from "@/components/PhoneInput";
 import { GoogleReCaptcha, GoogleReCaptchaRef } from "@/components/GoogleReCaptcha";
 import { GoogleSignInButton } from "@/components/GoogleSignInButton";
-import { Glass, SegmentedControl, Button } from "glisse";
 
 function AuthForm() {
   const router = useRouter();
@@ -81,7 +80,7 @@ function AuthForm() {
           setRemainingAttempts(data.remainingAttempts);
         }
       })
-      .catch(() => { });
+      .catch(() => {});
   }, []);
 
   // Handle Google OAuth query parameter errors
@@ -98,7 +97,7 @@ function AuthForm() {
       } else {
         setErrorMessage(
           decodeURIComponent(authError).replace(/_/g, " ") ||
-          "Failed to sign in with Google. Please try again."
+            "Failed to sign in with Google. Please try again."
         );
       }
     }
@@ -292,282 +291,298 @@ function AuthForm() {
           </p>
         </div>
 
-              {/* iOS 26 Liquid Glass SegmentedControl Tab Switcher */ }
-              <div className="flex justify-center">
-                <SegmentedControl
-                  value={activeTab}
-                  onValueChange={(val) => {
-                    setActiveTab(val as "login" | "register");
+        {/* Tab Switcher */}
+        <div className="glass-card p-1 rounded-2xl border border-white/10 grid grid-cols-2 gap-1 bg-black/40">
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab("login");
+              setErrorMessage("");
+            }}
+            className={`py-2.5 rounded-xl text-xs font-bold transition-all ${
+              activeTab === "login"
+                ? "bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-md shadow-blue-500/20"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            Sign In
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab("register");
+              setErrorMessage("");
+            }}
+            className={`py-2.5 rounded-xl text-xs font-bold transition-all ${
+              activeTab === "register"
+                ? "bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-md shadow-blue-500/20"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            Create Account
+          </button>
+        </div>
+
+        {/* Auth Card */}
+        <div className="glass-card rounded-3xl p-6 sm:p-8 border border-white/10 bg-[#070d1d]/90 shadow-2xl relative">
+          {/* Lockout Warning Banner */}
+          {isLocked && (
+            <div className="mb-5 p-4 rounded-2xl bg-rose-500/15 border border-rose-500/40 text-rose-300 space-y-2">
+              <div className="flex items-center gap-2.5 font-bold text-xs text-rose-200">
+                <ShieldAlert className="w-5 h-5 text-rose-400 shrink-0" />
+                <span>Security Lockout: IP Restricted</span>
+              </div>
+              <p className="text-[11px] leading-relaxed text-rose-300/90">
+                10 incorrect password attempts detected. To safeguard accounts against unauthorized access, logins from your IP have been temporarily restricted.
+              </p>
+              <div className="flex items-center gap-2 pt-1 font-mono text-xs font-semibold text-rose-200">
+                <Clock className="w-4 h-4 text-rose-400" />
+                <span>Lockout expires in: {formatLockoutTimer(lockoutRemainingSeconds)}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Remaining Attempts Warning */}
+          {!isLocked && remainingAttempts !== null && remainingAttempts <= 5 && remainingAttempts > 0 && activeTab === "login" && (
+            <div className="mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2 font-medium">
+              <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>
+                {remainingAttempts} attempt{remainingAttempts === 1 ? "" : "s"} remaining before your IP is restricted for 15 minutes.
+              </span>
+            </div>
+          )}
+
+          {errorMessage && !isLocked && (
+            <div className="mb-5 p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+
+          {successMessage && (
+            <div className="mb-5 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <span>{successMessage}</span>
+            </div>
+          )}
+
+          {/* Social Authentication: Google */}
+          <div className="mb-5 space-y-4">
+            <GoogleSignInButton
+              redirectUrl={redirectUrl}
+              text={activeTab === "login" ? "Continue with Google" : "Sign up with Google"}
+              disabled={isLocked}
+            />
+
+            {/* Visual Divider */}
+            <div className="relative flex items-center justify-center">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-white/10" />
+              </div>
+              <div className="relative px-3 bg-[#070d1d] text-[10px] uppercase font-bold tracking-wider text-slate-400">
+                <span>Or {activeTab === "login" ? "sign in" : "sign up"} with credentials</span>
+              </div>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Name field (for Register only) */}
+            {activeTab === "register" && (
+              <div>
+                <label className="text-xs font-semibold text-slate-300 block mb-1.5">
+                  Full Name
+                </label>
+                <div className="relative">
+                  <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Ahmed Hassan"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full glass-input pl-10 pr-4 py-2.5 rounded-xl text-xs"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Identifier Type Selector: Phone Number or Email */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-semibold text-slate-300">
+                  {identifierType === "phone" ? "Mobile Phone Number" : "Email Address"}
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIdentifierType(identifierType === "phone" ? "email" : "phone");
                     setErrorMessage("");
                   }}
-                style={{ "--lg-tab-width": "165px", "--lg-tab-height": "38px" } as React.CSSProperties}
-                items={[
-                  { value: "login", label: "Sign In" },
-                  { value: "register", label: "Create Account" },
-                ]}
-          />
+                  className="text-[11px] text-cyan-400 hover:text-cyan-300 transition-colors flex items-center gap-1 font-medium"
+                >
+                  {identifierType === "phone" ? (
+                    <>
+                      <Mail className="w-3 h-3" />
+                      <span>Use Email instead</span>
+                    </>
+                  ) : (
+                    <>
+                      <Phone className="w-3 h-3" />
+                      <span>Use Phone instead</span>
+                    </>
+                  )}
+                </button>
               </div>
 
-              {/* Auth Card */ }
-                <Glass className="rounded-3xl p-6 sm:p-8 border border-white/15 shadow-2xl relative">
-                  {/* Lockout Warning Banner */}
-                  {isLocked && (
-                    <div className="mb-5 p-4 rounded-2xl bg-rose-500/15 border border-rose-500/40 text-rose-300 space-y-2">
-                      <div className="flex items-center gap-2.5 font-bold text-xs text-rose-200">
-                        <ShieldAlert className="w-5 h-5 text-rose-400 shrink-0" />
-                        <span>Security Lockout: IP Restricted</span>
-                      </div>
-                      <p className="text-[11px] leading-relaxed text-rose-300/90">
-                        10 incorrect password attempts detected. To safeguard accounts against unauthorized access, logins from your IP have been temporarily restricted.
-                      </p>
-                      <div className="flex items-center gap-2 pt-1 font-mono text-xs font-semibold text-rose-200">
-                        <Clock className="w-4 h-4 text-rose-400" />
-                        <span>Lockout expires in: {formatLockoutTimer(lockoutRemainingSeconds)}</span>
-                      </div>
-                    </div>
-                  )}
+              {identifierType === "phone" ? (
+                <PhoneInput
+                  id="auth-phone-input"
+                  required
+                  value={phoneInput}
+                  country={selectedCountry}
+                  onCountryChange={(c) => setSelectedCountry(c)}
+                  onChange={(nationalDigits) => {
+                    setPhoneInput(nationalDigits);
+                    setErrorMessage("");
+                  }}
+                  autoDetectIp={true}
+                />
+              ) : (
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="email"
+                    required
+                    placeholder="e.g. ahmed@gmail.com"
+                    value={emailInput}
+                    onChange={(e) => setEmailInput(e.target.value)}
+                    className="w-full glass-input pl-10 pr-4 py-2.5 rounded-xl text-xs font-mono"
+                  />
+                </div>
+              )}
+            </div>
 
-                  {/* Remaining Attempts Warning */}
-                  {!isLocked && remainingAttempts !== null && remainingAttempts <= 5 && remainingAttempts > 0 && activeTab === "login" && (
-                    <div className="mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2 font-medium">
-                      <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0" />
-                      <span>
-                        {remainingAttempts} attempt{remainingAttempts === 1 ? "" : "s"} remaining before your IP is restricted for 15 minutes.
-                      </span>
-                    </div>
-                  )}
+            {/* Password Field */}
+            <div>
+              <label className="text-xs font-semibold text-slate-300 block mb-1.5">Password</label>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  placeholder={
+                    activeTab === "register" ? "At least 6 characters" : "Enter your account password"
+                  }
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full glass-input pl-10 pr-10 py-2.5 rounded-xl text-xs"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                  aria-label="Toggle password visibility"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
 
-                  {errorMessage && !isLocked && (
-                    <div className="mb-5 p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4 shrink-0" />
-                      <span>{errorMessage}</span>
-                    </div>
-                  )}
+            {/* Confirm Password (for Register only) */}
+            {activeTab === "register" && (
+              <div>
+                <label className="text-xs font-semibold text-slate-300 block mb-1.5">
+                  Confirm Password
+                </label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    placeholder="Repeat your password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full glass-input pl-10 pr-4 py-2.5 rounded-xl text-xs"
+                  />
+                </div>
+              </div>
+            )}
 
-                  {successMessage && (
-                    <div className="mb-5 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 shrink-0" />
-                      <span>{successMessage}</span>
-                    </div>
-                  )}
+            {/* Official Google reCAPTCHA Checkbox (Revealed only after failed attempts) */}
+            {activeTab === "login" && requiresCaptcha && (
+              <div className="py-2.5 px-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="flex items-center gap-2 text-xs text-amber-300 font-medium">
+                  <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>Security verification required: Please verify you are human</span>
+                </div>
+                <div className="flex justify-center">
+                  <GoogleReCaptcha
+                    ref={recaptchaRef}
+                    onVerify={(token) => {
+                      setRecaptchaToken(token);
+                      setErrorMessage("");
+                    }}
+                    onExpire={() => setRecaptchaToken("")}
+                  />
+                </div>
+              </div>
+            )}
 
-                  {/* Social Authentication: Google */}
-                  <div className="mb-5 space-y-4">
-                    <GoogleSignInButton
-                      redirectUrl={redirectUrl}
-                      text={activeTab === "login" ? "Continue with Google" : "Sign up with Google"}
-                      disabled={isLocked}
-                    />
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={isLoading || isLocked}
+              className="w-full mt-2 py-3 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-98"
+            >
+              {isLocked ? (
+                <>
+                  <Lock className="w-4 h-4" />
+                  <span>IP Restricted ({formatLockoutTimer(lockoutRemainingSeconds)})</span>
+                </>
+              ) : (
+                <>
+                  <span>
+                    {isLoading
+                      ? "Verifying with Google reCAPTCHA..."
+                      : activeTab === "login"
+                      ? "Sign In to Account"
+                      : "Create My Account"}
+                  </span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </button>
+          </form>
 
-                    {/* Visual Divider */}
-                    <div className="relative flex items-center justify-center">
-                      <div className="absolute inset-0 flex items-center">
-                        <div className="w-full border-t border-white/10" />
-                      </div>
-                      <div className="relative px-3 bg-[#070d1d] text-[10px] uppercase font-bold tracking-wider text-slate-400">
-                        <span>Or {activeTab === "login" ? "sign in" : "sign up"} with credentials</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <form onSubmit={handleSubmit} className="space-y-4">
-                    {/* Name field (for Register only) */}
-                    {activeTab === "register" && (
-                      <div>
-                        <label className="text-xs font-semibold text-slate-300 block mb-1.5">
-                          Full Name
-                        </label>
-                        <div className="relative">
-                          <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                          <input
-                            type="text"
-                            required
-                            placeholder="e.g. Ahmed Hassan"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            className="w-full glass-input pl-10 pr-4 py-2.5 rounded-xl text-xs"
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Identifier Type Selector: Phone Number or Email */}
-                    <div>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <label className="text-xs font-semibold text-slate-300">
-                          {identifierType === "phone" ? "Mobile Phone Number" : "Email Address"}
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIdentifierType(identifierType === "phone" ? "email" : "phone");
-                            setErrorMessage("");
-                          }}
-                          className="text-[11px] text-cyan-400 hover:text-cyan-300 transition-colors flex items-center gap-1 font-medium"
-                        >
-                          {identifierType === "phone" ? (
-                            <>
-                              <Mail className="w-3 h-3" />
-                              <span>Use Email instead</span>
-                            </>
-                          ) : (
-                            <>
-                              <Phone className="w-3 h-3" />
-                              <span>Use Phone instead</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-
-                      {identifierType === "phone" ? (
-                        <PhoneInput
-                          id="auth-phone-input"
-                          required
-                          value={phoneInput}
-                          country={selectedCountry}
-                          onCountryChange={(c) => setSelectedCountry(c)}
-                          onChange={(nationalDigits) => {
-                            setPhoneInput(nationalDigits);
-                            setErrorMessage("");
-                          }}
-                          autoDetectIp={true}
-                        />
-                      ) : (
-                        <div className="relative">
-                          <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                          <input
-                            type="email"
-                            required
-                            placeholder="e.g. ahmed@gmail.com"
-                            value={emailInput}
-                            onChange={(e) => setEmailInput(e.target.value)}
-                            className="w-full glass-input pl-10 pr-4 py-2.5 rounded-xl text-xs font-mono"
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Password Field */}
-                    <div>
-                      <label className="text-xs font-semibold text-slate-300 block mb-1.5">Password</label>
-                      <div className="relative">
-                        <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                        <input
-                          type={showPassword ? "text" : "password"}
-                          required
-                          placeholder={
-                            activeTab === "register" ? "At least 6 characters" : "Enter your account password"
-                          }
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          className="w-full glass-input pl-10 pr-10 py-2.5 rounded-xl text-xs"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
-                          aria-label="Toggle password visibility"
-                        >
-                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Confirm Password (for Register only) */}
-                    {activeTab === "register" && (
-                      <div>
-                        <label className="text-xs font-semibold text-slate-300 block mb-1.5">
-                          Confirm Password
-                        </label>
-                        <div className="relative">
-                          <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                          <input
-                            type={showPassword ? "text" : "password"}
-                            required
-                            placeholder="Repeat your password"
-                            value={confirmPassword}
-                            onChange={(e) => setConfirmPassword(e.target.value)}
-                            className="w-full glass-input pl-10 pr-4 py-2.5 rounded-xl text-xs"
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Official Google reCAPTCHA Checkbox (Revealed only after failed attempts) */}
-                    {activeTab === "login" && requiresCaptcha && (
-                      <div className="py-2.5 px-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                        <div className="flex items-center gap-2 text-xs text-amber-300 font-medium">
-                          <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0" />
-                          <span>Security verification required: Please verify you are human</span>
-                        </div>
-                        <div className="flex justify-center">
-                          <GoogleReCaptcha
-                            ref={recaptchaRef}
-                            onVerify={(token) => {
-                              setRecaptchaToken(token);
-                              setErrorMessage("");
-                            }}
-                            onExpire={() => setRecaptchaToken("")}
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Submit Button */}
-                    <button
-                      type="submit"
-                      disabled={isLoading || isLocked}
-                      className="w-full mt-2 py-3 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-98"
-                    >
-                      {isLocked ? (
-                        <>
-                          <Lock className="w-4 h-4" />
-                          <span>IP Restricted ({formatLockoutTimer(lockoutRemainingSeconds)})</span>
-                        </>
-                      ) : (
-                        <>
-                          <span>
-                            {isLoading
-                              ? "Verifying with Google reCAPTCHA..."
-                              : activeTab === "login"
-                                ? "Sign In to Account"
-                                : "Create My Account"}
-                          </span>
-                          <ArrowRight className="w-4 h-4" />
-                        </>
-                      )}
-                    </button>
-                  </form>
-
-                  {/* Privacy & Google reCAPTCHA reassurance */}
-                  <div className="mt-6 pt-5 border-t border-white/10 space-y-2 text-center">
-                    <div className="flex items-center justify-center gap-2 text-[11px] text-slate-400">
-                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                      <span>Protected by Google reCAPTCHA & PremiKeys Anti-Brute Force</span>
-                    </div>
-                    <p className="text-[10px] text-slate-500 leading-relaxed">
-                      This site is protected by reCAPTCHA and the Google{" "}
-                      <a
-                        href="https://policies.google.com/privacy"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-slate-400 hover:text-cyan-400 underline underline-offset-2"
-                      >
-                        Privacy Policy
-                      </a>{" "}
-                      and{" "}
-                      <a
-                        href="https://policies.google.com/terms"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-slate-400 hover:text-cyan-400 underline underline-offset-2"
-                      >
-                        Terms of Service
-                      </a>{" "}
-                      apply.
-                    </p>
-                  </div>
-        </Glass>
+          {/* Privacy & Google reCAPTCHA reassurance */}
+          <div className="mt-6 pt-5 border-t border-white/10 space-y-2 text-center">
+            <div className="flex items-center justify-center gap-2 text-[11px] text-slate-400">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <span>Protected by Google reCAPTCHA & PremiKeys Anti-Brute Force</span>
+            </div>
+            <p className="text-[10px] text-slate-500 leading-relaxed">
+              This site is protected by reCAPTCHA and the Google{" "}
+              <a
+                href="https://policies.google.com/privacy"
+                target="_blank"
+                rel="noreferrer"
+                className="text-slate-400 hover:text-cyan-400 underline underline-offset-2"
+              >
+                Privacy Policy
+              </a>{" "}
+              and{" "}
+              <a
+                href="https://policies.google.com/terms"
+                target="_blank"
+                rel="noreferrer"
+                className="text-slate-400 hover:text-cyan-400 underline underline-offset-2"
+              >
+                Terms of Service
+              </a>{" "}
+              apply.
+            </p>
+          </div>
+        </div>
 
         {/* Guest Order Lookup Helper */}
         <div className="text-center">

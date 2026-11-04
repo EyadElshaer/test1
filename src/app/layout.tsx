@@ -58,37 +58,20 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-        <html lang="en" className="dark" data-theme="dark">
-          <body className="min-h-screen bg-[#02050f] text-slate-100 flex flex-col antialiased selection:bg-cyan-500 selection:text-black relative">
-            {/* Ambient iOS 26 Liquid Glass Mesh Wallpaper (marked for Glisse optical refraction) */}
-            <div
-              data-glisse-backdrop=""
-              aria-hidden="true"
-              className="fixed inset-0 -z-10 overflow-hidden pointer-events-none select-none"
-            >
-              <div className="liquid-ambient-orb absolute -top-[10%] left-[8%] w-[460px] h-[460px] rounded-full bg-gradient-to-br from-blue-600/25 via-cyan-400/15 to-transparent blur-[110px]" />
-              <div
-                className="liquid-ambient-orb absolute top-[28%] -right-[8%] w-[520px] h-[520px] rounded-full bg-gradient-to-bl from-indigo-600/20 via-purple-500/15 to-cyan-500/10 blur-[120px]"
-                style={{ animationDelay: "-6s" }}
-              />
-              <div
-                className="liquid-ambient-orb absolute -bottom-[12%] left-[25%] w-[560px] h-[420px] rounded-full bg-gradient-to-tr from-cyan-500/20 via-blue-600/15 to-transparent blur-[120px]"
-                style={{ animationDelay: "-12s" }}
-              />
-            </div>
-
-            <AuthProvider>
-              <GoogleOneTap />
-              <CartProvider>
-                <AnnouncementBanner />
-                <Header />
-                <main className="flex-1 w-full relative z-10">{children}</main>
-                <CartDrawer />
-                <CookieNotice />
-                <Footer />
-              </CartProvider>
-            </AuthProvider>
-          </body>
-        </html>
-        );
+    <html lang="en" className="dark">
+      <body className="min-h-screen bg-[#030712] text-slate-100 flex flex-col antialiased selection:bg-cyan-500 selection:text-black">
+        <AuthProvider>
+          <GoogleOneTap />
+          <CartProvider>
+            <AnnouncementBanner />
+            <Header />
+            <main className="flex-1 w-full">{children}</main>
+            <CartDrawer />
+            <CookieNotice />
+            <Footer />
+          </CartProvider>
+        </AuthProvider>
+      </body>
+    </html>
+  );
 }
