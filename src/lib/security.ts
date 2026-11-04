@@ -29,8 +29,17 @@ export const SECURITY_CONFIG = {
   },
 };
 
-// In-memory security records keyed by IP and/or target account
-const securityMap = new Map<string, SecurityRecord>();
+// In-memory security records keyed by IP and/or target account (persisted on globalThis across route workers/HMR)
+const globalForSecurity = globalThis as unknown as {
+  premikeysSecurityMap?: Map<string, SecurityRecord>;
+};
+
+const securityMap =
+  globalForSecurity.premikeysSecurityMap ?? new Map<string, SecurityRecord>();
+
+if (!globalForSecurity.premikeysSecurityMap) {
+  globalForSecurity.premikeysSecurityMap = securityMap;
+}
 
 // Cleanup stale records every 5 minutes
 setInterval(() => {

@@ -109,11 +109,23 @@ export async function POST(req: Request) {
     // 5. Verify Password
     if (!user.passwordHash) {
       await bcrypt.compare(String(password), DUMMY_BCRYPT_HASH);
+      const failCount = 10 - securityStatus.remainingAttempts;
+      await applyTarpitDelay(failCount);
+
+      const failResult = await recordFailedLogin(ip, trimmed, "customer");
+      const status = failResult.isLocked ? 429 : 401;
+
       return NextResponse.json(
         {
-          error: "Invalid credentials. If you registered with Google, please use 'Continue with Google'.",
+          error: failResult.isLocked
+            ? failResult.message
+            : "Invalid credentials. If you registered with Google, please use 'Continue with Google'.",
+          isLocked: failResult.isLocked,
+          requiresCaptcha: failResult.requiresCaptcha,
+          remainingAttempts: failResult.remainingAttempts,
+          retryAfterSeconds: failResult.retryAfterSeconds,
         },
-        { status: 401 }
+        { status }
       );
     }
 

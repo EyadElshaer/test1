@@ -13,6 +13,11 @@ interface GoogleReCaptchaProps {
   className?: string;
 }
 
+// Default Google reCAPTCHA v2 Site Key fallback (Production: premikeys.com)
+const DEFAULT_SITE_KEY = "6LdWVf8tAAAAABypkK7B_ChiPGK9jCvTpoZh1rZv";
+// Official Google reCAPTCHA v2 test Site Key for localhost / 127.0.0.1 when production key does not allow localhost
+const LOCALHOST_TEST_SITE_KEY = "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI";
+
 export const GoogleReCaptcha = forwardRef<GoogleReCaptchaRef, GoogleReCaptchaProps>(
   function GoogleReCaptcha({ onVerify, onExpire, className = "" }, ref) {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -28,20 +33,31 @@ export const GoogleReCaptcha = forwardRef<GoogleReCaptchaRef, GoogleReCaptchaPro
     onExpireRef.current = onExpire;
 
     const envSiteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY?.trim() || "";
-    const siteKey = envSiteKey || fetchedSiteKey;
+    const configuredKey = fetchedSiteKey || envSiteKey || DEFAULT_SITE_KEY;
+    const isLocalhost =
+      typeof window !== "undefined" &&
+      (window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1" ||
+        window.location.hostname === "[::1]");
+    const siteKey =
+      isLocalhost && configuredKey === DEFAULT_SITE_KEY
+        ? LOCALHOST_TEST_SITE_KEY
+        : configuredKey;
 
     useEffect(() => {
-      if (!envSiteKey) {
-        fetch("/api/auth/recaptcha-config")
-          .then((res) => res.json())
-          .then((data) => {
-            if (data?.siteKey) {
-              setFetchedSiteKey(String(data.siteKey).trim());
-            }
-          })
-          .catch(() => {});
-      }
-    }, [envSiteKey]);
+      let active = true;
+      fetch("/api/auth/recaptcha-config")
+        .then((res) => res.json())
+        .then((data) => {
+          if (active && data?.siteKey && String(data.siteKey).trim()) {
+            setFetchedSiteKey(String(data.siteKey).trim());
+          }
+        })
+        .catch(() => {});
+      return () => {
+        active = false;
+      };
+    }, []);
 
     useImperativeHandle(ref, () => ({
       reset: () => {
@@ -78,24 +94,31 @@ export const GoogleReCaptcha = forwardRef<GoogleReCaptchaRef, GoogleReCaptchaPro
     }));
 
     useEffect(() => {
-      if (!siteKey) return;
+      if (!siteKey || typeof window === "undefined") return;
+
+      let isMounted = true;
+      let pollInterval: ReturnType<typeof setInterval> | null = null;
+
       const renderWidget = () => {
-        if (!containerRef.current) return;
+        if (!isMounted || !containerRef.current) return false;
         const grecaptcha = (window as any).grecaptcha;
 
-        if (!grecaptcha || typeof grecaptcha.render !== "function") return;
+        if (!grecaptcha || typeof grecaptcha.render !== "function") return false;
 
-        // Prevent duplicate rendering in the same container
-        if (widgetIdRef.current !== null || containerRef.current.hasChildNodes()) {
-          return;
+        // If container already has the rendered iframe, mark as rendered
+        if (containerRef.current.childElementCount > 0) {
+          if (isMounted) setIsRendered(true);
+          return true;
         }
+
+        // Reset stale widgetIdRef if container is empty (e.g. after remount)
+        widgetIdRef.current = null;
 
         try {
           const id = grecaptcha.render(containerRef.current, {
             sitekey: siteKey,
             theme: "dark",
             callback: (token: string) => {
-              // Call through stable ref
               if (onVerifyRef.current) {
                 onVerifyRef.current(token);
               }
@@ -105,23 +128,48 @@ export const GoogleReCaptcha = forwardRef<GoogleReCaptchaRef, GoogleReCaptchaPro
                 onExpireRef.current();
               }
             },
+            "error-callback": () => {
+              if (onExpireRef.current) {
+                onExpireRef.current();
+              }
+            },
           });
           widgetIdRef.current = id;
-          setIsRendered(true);
+          if (isMounted) setIsRendered(true);
+          return true;
         } catch (err) {
-          // Ignore duplicate mount in dev
+          if (containerRef.current && containerRef.current.childElementCount > 0) {
+            if (isMounted) setIsRendered(true);
+            return true;
+          }
+          return false;
         }
       };
 
-      if (typeof window === "undefined") return;
+      const attemptRender = () => {
+        const grecaptcha = (window as any).grecaptcha;
+        if (grecaptcha && typeof grecaptcha.render === "function") {
+          return renderWidget();
+        }
+        if (grecaptcha && typeof grecaptcha.ready === "function") {
+          try {
+            grecaptcha.ready(() => {
+              renderWidget();
+            });
+          } catch {}
+        }
+        return false;
+      };
 
-      const grecaptcha = (window as any).grecaptcha;
-      if (grecaptcha && grecaptcha.render) {
-        renderWidget();
-      } else {
-        // Set global callback for when the script finishes loading
+      if (!attemptRender()) {
+        const prevOnLoad = (window as any).onGoogleReCaptchaLoad;
         (window as any).onGoogleReCaptchaLoad = () => {
-          renderWidget();
+          if (typeof prevOnLoad === "function") {
+            try {
+              prevOnLoad();
+            } catch {}
+          }
+          attemptRender();
         };
 
         const scriptId = "google-recaptcha-v2-script";
@@ -136,7 +184,22 @@ export const GoogleReCaptcha = forwardRef<GoogleReCaptchaRef, GoogleReCaptchaPro
           script.defer = true;
           document.head.appendChild(script);
         }
+
+        // Poll until grecaptcha.render finishes initializing (handles script already in DOM or StrictMode remounts)
+        pollInterval = setInterval(() => {
+          if (attemptRender() && pollInterval) {
+            clearInterval(pollInterval);
+            pollInterval = null;
+          }
+        }, 150);
       }
+
+      return () => {
+        isMounted = false;
+        if (pollInterval) {
+          clearInterval(pollInterval);
+        }
+      };
     }, [siteKey]);
 
     return (

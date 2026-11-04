@@ -6,8 +6,12 @@ export interface RecaptchaVerifyResult {
   hostname?: string;
 }
 
+export const DEFAULT_SITE_KEY = "6LdWVf8tAAAAABypkK7B_ChiPGK9jCvTpoZh1rZv";
+export const DEFAULT_SECRET_KEY = "6LdWVf8tAAAAADB75JvkoSjXPHahjTg8HvaSnFoj";
+const LOCALHOST_TEST_SECRET_KEY = "6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe";
+
 export async function getRecaptchaConfig(): Promise<{ siteKey: string; enabled: boolean }> {
-  let siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY?.trim() || "";
+  let siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY?.trim() || DEFAULT_SITE_KEY;
   try {
     const dbSetting = await prisma.storeSetting.findUnique({
       where: { key: "recaptcha_site_key" },
@@ -24,7 +28,7 @@ export async function getRecaptchaConfig(): Promise<{ siteKey: string; enabled: 
  * Retrieve Google reCAPTCHA secret key from environment or database Store Settings
  */
 export async function getRecaptchaSecretKey(): Promise<string> {
-  let secretKey = process.env.RECAPTCHA_SECRET_KEY?.trim() || "";
+  let secretKey = process.env.RECAPTCHA_SECRET_KEY?.trim() || DEFAULT_SECRET_KEY;
 
   try {
     const dbSetting = await prisma.storeSetting.findUnique({
@@ -70,7 +74,27 @@ export async function verifyGoogleRecaptcha(
       }),
     });
 
-    const data = await res.json();
+    let data = await res.json();
+
+    // If running in localhost / dev where the localhost test site key was used, verify with Google's official test secret
+    const isLocalEnv =
+      process.env.NODE_ENV !== "production" ||
+      Boolean(process.env.NEXT_PUBLIC_SITE_URL?.includes("localhost")) ||
+      Boolean(process.env.NEXT_PUBLIC_SITE_URL?.includes("127.0.0.1"));
+    if (!data.success && isLocalEnv && secret === DEFAULT_SECRET_KEY) {
+      const fallbackRes = await fetch(verifyUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          secret: LOCALHOST_TEST_SECRET_KEY,
+          response: token.trim(),
+        }),
+      });
+      const fallbackData = await fallbackRes.json();
+      if (fallbackData.success) {
+        data = fallbackData;
+      }
+    }
 
     if (!data.success) {
       const errorCodes = data["error-codes"] ? data["error-codes"].join(", ") : "verification_failed";

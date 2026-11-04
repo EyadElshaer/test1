@@ -2,12 +2,13 @@ import type { NextConfig } from "next";
 
 const cspDirectives = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/ https://accounts.google.com/gsi/client",
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://www.google.com https://www.gstatic.com https://recaptcha.google.com https://www.recaptcha.net https://accounts.google.com",
+  "worker-src 'self' blob:",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://www.gstatic.com https://accounts.google.com",
   "font-src 'self' data: https://fonts.gstatic.com",
-  "img-src 'self' data: blob: https://images.unsplash.com https://lh3.googleusercontent.com https://*.googleusercontent.com",
-  "connect-src 'self' https://www.google.com/recaptcha/ https://accounts.google.com/ https://identitytoolkit.googleapis.com",
-  "frame-src 'self' https://www.google.com/recaptcha/ https://recaptcha.google.com/recaptcha/ https://accounts.google.com/",
+  "img-src 'self' data: blob: https://images.unsplash.com https://lh3.googleusercontent.com https://*.googleusercontent.com https://www.gstatic.com https://www.google.com https://recaptcha.google.com",
+  "connect-src 'self' https://www.google.com https://www.gstatic.com https://recaptcha.google.com https://www.recaptcha.net https://accounts.google.com https://identitytoolkit.googleapis.com",
+  "frame-src 'self' https://www.google.com https://recaptcha.google.com https://www.gstatic.com https://www.recaptcha.net https://accounts.google.com",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self' https://accounts.google.com/",
