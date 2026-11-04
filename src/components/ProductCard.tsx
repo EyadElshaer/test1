@@ -193,41 +193,42 @@ export default function ProductCard({
                             )}
                           </div>
 
-                            {
-                              availableConfigs.length <= 3 && availableConfigs.every((c) => c.name.length <= 14) ? (
-                                <div className="flex justify-center w-full overflow-hidden">
-                                  <SegmentedControl
-                                    value={String(selectedConfigIdx)}
-                                    onValueChange={(val) => setSelectedConfigIdx(Number(val))}
-                                    style={
-                                      {
-                                        "--lg-tab-width": `${Math.floor(220 / availableConfigs.length)}px`,
-                                        "--lg-tab-height": "28px",
-                                      } as React.CSSProperties
-                                    }
-                                    items={availableConfigs.map((cfg, idx) => ({
-                                      value: String(idx),
-                                      label: cfg.name,
-                                    }))}
-                                  />
-                                </div>
-                              ) : availableConfigs.length <= 4 ? (
-                                <div className="flex flex-wrap gap-1.5">
-                                  {availableConfigs.map((cfg, idx) => {
-                                    const isSelected = selectedConfigIdx === idx;
-                                    return (
-                                      <button
-                                        key={cfg.id || idx}
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.preventDefault();
-                                          e.stopPropagation();
-                                          setSelectedConfigIdx(idx);
-                                        }}
-                                                ? "bg-cyan-500/25 text-white border-cyan-300/80 shadow-[0_0_14px_rgba(0,240,255,0.3)] scale-[1.02]"
-                                                : "bg-white/[0.05] text-slate-300 border-white/15 hover:border-white/30 hover:text-white"
-                                            }`}
-                      title={`${cfg.name} - ${ cfg.salePrice.toLocaleString() } EGP`}
+            {availableConfigs.length <= 3 && availableConfigs.every((c) => c.name.length <= 14) ? (
+              <div className="flex justify-center w-full overflow-hidden">
+                <SegmentedControl
+                  value={String(selectedConfigIdx)}
+                  onValueChange={(val) => setSelectedConfigIdx(Number(val))}
+                  style={
+                    {
+                      "--lg-tab-width": `${Math.floor(220 / availableConfigs.length)}px`,
+                      "--lg-tab-height": "28px",
+                    } as React.CSSProperties
+                  }
+                  items={availableConfigs.map((cfg, idx) => ({
+                    value: String(idx),
+                    label: cfg.name,
+                  }))}
+                />
+              </div>
+            ) : availableConfigs.length <= 4 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {availableConfigs.map((cfg, idx) => {
+                  const isSelected = selectedConfigIdx === idx;
+                  return (
+                    <button
+                      key={cfg.id || idx}
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setSelectedConfigIdx(idx);
+                      }}
+                      className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-all duration-200 border cursor-pointer select-none ${
+                        isSelected
+                          ? "bg-cyan-500/25 text-white border-cyan-300/80 shadow-[0_0_14px_rgba(0,240,255,0.3)] scale-[1.02]"
+                          : "bg-white/[0.05] text-slate-300 border-white/15 hover:border-white/30 hover:text-white"
+                      }`}
+                      title={`${cfg.name} - ${cfg.salePrice.toLocaleString()} EGP`}
                     >
                       {cfg.name}
                     </button>
@@ -317,7 +318,7 @@ export default function ProductCard({
                 <Button
                   variant="glass"
                   icon={<ArrowRight className="w-4 h-4" />}
-                  onClick={() => router.push(`/ products / ${ slug } `)}
+                  onClick={() => router.push(`/products/${slug}`)}
                   aria-label="View full specs and activation instructions"
                   title="View full specs and activation instructions"
                 />

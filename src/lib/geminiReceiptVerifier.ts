@@ -89,24 +89,16 @@ async function loadScreenshotBuffer(
     const cleanFilename = path.basename(screenshotUrl.split("?")[0]);
     if (!cleanFilename) return null;
 
-    // 1. Try local filesystem storage first (ultra-fast 0ms, immune to DB connection pool latency)
-    const candidateDirs = [
-      path.join(process.cwd(), "storage", "screenshots"),
-      "C:\\Users\\ayman\\Documents\\test3\\storage\\screenshots",
-      "C:\\Users\\ayman\\Documents\\test1\\storage\\screenshots",
-    ];
-
-    for (const dir of candidateDirs) {
-      const candidatePath = path.join(dir, cleanFilename);
-      if (fs.existsSync(candidatePath)) {
-        const ext = path.extname(cleanFilename).toLowerCase();
-        const mime =
-          ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg";
-        return {
-          buffer: fs.readFileSync(candidatePath),
-          mimeType: mime,
-        };
-      }
+    // 1. Try local filesystem storage first (statically scoped to storage/screenshots for Vercel/Turbopack)
+    const candidatePath = path.join(/*turbopackIgnore: true*/ process.cwd(), "storage", "screenshots", cleanFilename);
+    if (fs.existsSync(/*turbopackIgnore: true*/ candidatePath)) {
+      const ext = path.extname(cleanFilename).toLowerCase();
+      const mime =
+        ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg";
+      return {
+        buffer: fs.readFileSync(/*turbopackIgnore: true*/ candidatePath),
+        mimeType: mime,
+      };
     }
 
     // 2. Fallback to PostgreSQL database storage
