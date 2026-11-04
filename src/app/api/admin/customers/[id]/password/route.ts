@@ -1,24 +1,27 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
-import { getAdminSession, logAdminAudit } from "@/lib/auth";
+import { requireAdmin, logAdminAudit } from "@/lib/auth";
+import { isValidId } from "@/lib/sanitizer";
 
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireAdmin("customers");
+    if (!auth.authorized) return auth.response;
+    const admin = auth.admin;
 
     const { id } = await params;
+    if (!isValidId(id)) {
+      return NextResponse.json({ error: "Invalid customer ID." }, { status: 400 });
+    }
     const { password } = await req.json();
 
-    if (!password || typeof password !== "string" || password.length < 6) {
+    if (!password || typeof password !== "string" || password.length < 8 || password.length > 128) {
       return NextResponse.json(
-        { error: "Password must be at least 6 characters long." },
+        { error: "Password must be between 8 and 128 characters long." },
         { status: 400 }
       );
     }
@@ -31,7 +34,7 @@ export async function POST(
       return NextResponse.json({ error: "Customer account not found." }, { status: 404 });
     }
 
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await bcrypt.hash(password, 12);
 
     await prisma.user.update({
       where: { id },

@@ -13,14 +13,12 @@ interface GoogleReCaptchaProps {
   className?: string;
 }
 
-// User's Google reCAPTCHA v2 Site Key
-const DEFAULT_SITE_KEY = "6LdWVf8tAAAAABypkK7B_ChiPGK9jCvTpoZh1rZv";
-
 export const GoogleReCaptcha = forwardRef<GoogleReCaptchaRef, GoogleReCaptchaProps>(
   function GoogleReCaptcha({ onVerify, onExpire, className = "" }, ref) {
     const containerRef = useRef<HTMLDivElement>(null);
     const widgetIdRef = useRef<number | null>(null);
     const [isRendered, setIsRendered] = useState(false);
+    const [fetchedSiteKey, setFetchedSiteKey] = useState<string>("");
 
     // Keep callback refs up to date to prevent stale closures or unmount bugs
     const onVerifyRef = useRef(onVerify);
@@ -29,7 +27,21 @@ export const GoogleReCaptcha = forwardRef<GoogleReCaptchaRef, GoogleReCaptchaPro
     const onExpireRef = useRef(onExpire);
     onExpireRef.current = onExpire;
 
-    const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY?.trim() || DEFAULT_SITE_KEY;
+    const envSiteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY?.trim() || "";
+    const siteKey = envSiteKey || fetchedSiteKey;
+
+    useEffect(() => {
+      if (!envSiteKey) {
+        fetch("/api/auth/recaptcha-config")
+          .then((res) => res.json())
+          .then((data) => {
+            if (data?.siteKey) {
+              setFetchedSiteKey(String(data.siteKey).trim());
+            }
+          })
+          .catch(() => {});
+      }
+    }, [envSiteKey]);
 
     useImperativeHandle(ref, () => ({
       reset: () => {
@@ -66,6 +78,7 @@ export const GoogleReCaptcha = forwardRef<GoogleReCaptchaRef, GoogleReCaptchaPro
     }));
 
     useEffect(() => {
+      if (!siteKey) return;
       const renderWidget = () => {
         if (!containerRef.current) return;
         const grecaptcha = (window as any).grecaptcha;

@@ -226,8 +226,8 @@ export default function CheckoutPage() {
     }
 
     if (!user && autoSignup) {
-      if (!autoSignupPassword || autoSignupPassword.length < 6) {
-        triggerError("Please enter an account password of at least 6 characters.");
+      if (!autoSignupPassword || autoSignupPassword.length < 8) {
+        triggerError("Please enter an account password of at least 8 characters.");
         return;
       }
     }
@@ -494,7 +494,7 @@ export default function CheckoutPage() {
                           <input
                             type={showAutoSignupPassword ? "text" : "password"}
                             required={autoSignup}
-                            placeholder="Choose a password (minimum 6 characters)"
+                            placeholder="Choose a password (minimum 8 characters)"
                             value={autoSignupPassword}
                             onChange={(e) => setAutoSignupPassword(e.target.value)}
                             className="w-full glass-input pr-10 px-3.5 py-2.5 rounded-xl text-xs font-mono"
@@ -565,7 +565,7 @@ export default function CheckoutPage() {
                       Transfer Instructions: {selectedPaymentMethod.name}
                     </span>
                     {/* Deep link button if configured */}
-                    {selectedPaymentMethod.deepLink && (
+                    {selectedPaymentMethod.deepLink && /^(https?:\/\/|instapay:\/\/)/i.test(selectedPaymentMethod.deepLink) && (
                       <a
                         href={selectedPaymentMethod.deepLink}
                         target="_blank"

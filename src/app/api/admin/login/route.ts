@@ -74,7 +74,14 @@ export async function POST(req: Request) {
       where: { username: cleanUsername },
     });
 
+    // Constant-time dummy bcrypt hash to prevent username timing enumeration
+    const DUMMY_BCRYPT_HASH = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
+
     if (!admin) {
+      await bcrypt.compare(String(password), DUMMY_BCRYPT_HASH);
+      const failCount = 5 - securityStatus.remainingAttempts;
+      await applyTarpitDelay(failCount);
+
       const failResult = await recordFailedLogin(ip, cleanUsername, "admin");
       await logAdminAudit(null, "LOGIN_FAILED", `Failed admin login: user "${cleanUsername}" not found`, ip);
 
@@ -92,7 +99,7 @@ export async function POST(req: Request) {
     }
 
     // 5. Verify Password
-    const isMatch = await bcrypt.compare(password, admin.passwordHash);
+    const isMatch = await bcrypt.compare(String(password), admin.passwordHash);
 
     if (!isMatch) {
       const failCount = 5 - securityStatus.remainingAttempts;
@@ -104,7 +111,7 @@ export async function POST(req: Request) {
       const status = failResult.isLocked ? 429 : 401;
       return NextResponse.json(
         {
-          error: failResult.message,
+          error: failResult.isLocked ? failResult.message : "Invalid username or password.",
           isLocked: failResult.isLocked,
           requiresCaptcha: failResult.requiresCaptcha,
           remainingAttempts: failResult.remainingAttempts,
@@ -117,8 +124,8 @@ export async function POST(req: Request) {
     // 6. Successful Authentication -> Clear security strikes
     recordSuccessfulLogin(ip, cleanUsername, "admin");
 
-    // Create session & set HttpOnly cookie
-    await createAdminSession(admin.id, ip);
+    // Create rotated session & set HttpOnly cookie with client metadata
+    await createAdminSession(admin.id, ip, req.headers);
 
     return NextResponse.json({
       success: true,

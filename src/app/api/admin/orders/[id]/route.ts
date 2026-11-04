@@ -2,20 +2,32 @@ import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import prisma from "@/lib/prisma";
-import { getAdminSession, logAdminAudit } from "@/lib/auth";
+import { requireAdmin, logAdminAudit } from "@/lib/auth";
 import { syncOrderToGoogleSheets } from "@/lib/googleSheets";
+import { isValidId, sanitizeText } from "@/lib/sanitizer";
+
+const VALID_ORDER_STATUSES = new Set([
+  "PENDING",
+  "APPROVED",
+  "REJECTED",
+  "DONE",
+  "REFUND_REQUESTED",
+  "REFUND_APPROVED",
+  "REFUNDED",
+]);
 
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireAdmin("orders");
+    if (!auth.authorized) return auth.response;
 
     const { id } = await params;
+    if (!isValidId(id)) {
+      return NextResponse.json({ error: "Invalid order ID." }, { status: 400 });
+    }
     const order = await prisma.order.findUnique({
       where: { id },
       include: {
@@ -43,12 +55,14 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireAdmin("orders");
+    if (!auth.authorized) return auth.response;
+    const admin = auth.admin;
 
     const { id } = await params;
+    if (!isValidId(id)) {
+      return NextResponse.json({ error: "Invalid order ID." }, { status: 400 });
+    }
     const {
       status,
       paymentStatus,
@@ -57,6 +71,10 @@ export async function PATCH(
       rejectionReason,
       purgeScreenshot,
     } = await req.json();
+
+    if (status && !VALID_ORDER_STATUSES.has(status)) {
+      return NextResponse.json({ error: "Invalid order status value." }, { status: 400 });
+    }
 
     const existingOrder = await prisma.order.findUnique({
       where: { id },
@@ -110,15 +128,21 @@ export async function PATCH(
             : existingOrder.paymentStatus),
         adminCustomerNote:
           adminCustomerNote !== undefined
-            ? adminCustomerNote
+            ? adminCustomerNote === null
+              ? null
+              : sanitizeText(adminCustomerNote, 4000)
             : existingOrder.adminCustomerNote,
         adminInternalNote:
           adminInternalNote !== undefined
-            ? adminInternalNote
+            ? adminInternalNote === null
+              ? null
+              : sanitizeText(adminInternalNote, 4000)
             : existingOrder.adminInternalNote,
         rejectionReason:
           rejectionReason !== undefined
-            ? rejectionReason
+            ? rejectionReason === null
+              ? null
+              : sanitizeText(rejectionReason, 1000)
             : existingOrder.rejectionReason,
       };
 
@@ -184,12 +208,14 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireAdmin("orders");
+    if (!auth.authorized) return auth.response;
+    const admin = auth.admin;
 
     const { id } = await params;
+    if (!isValidId(id)) {
+      return NextResponse.json({ error: "Invalid order ID." }, { status: 400 });
+    }
     const existingOrder = await prisma.order.findUnique({
       where: { id },
     });

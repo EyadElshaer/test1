@@ -2,15 +2,19 @@ import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
-import { getAdminSession } from "@/lib/auth";
+import { requireAdmin, hasAdminPermission } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { isValidImageBuffer } from "@/lib/sanitizer";
 
 export async function POST(req: Request) {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireAdmin();
+    if (!auth.authorized) return auth.response;
+    if (
+      !hasAdminPermission(auth.admin, "products") &&
+      !hasAdminPermission(auth.admin, "categories")
+    ) {
+      return NextResponse.json({ error: "Forbidden: Insufficient permissions." }, { status: 403 });
     }
 
     const formData = await req.formData();
@@ -82,6 +86,6 @@ export async function POST(req: Request) {
     });
   } catch (error: any) {
     console.error("Product image upload failed:", error);
-    return NextResponse.json({ error: error?.message || "Failed to upload product image." }, { status: 500 });
+    return NextResponse.json({ error: "Failed to upload product image." }, { status: 500 });
   }
 }

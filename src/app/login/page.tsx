@@ -31,7 +31,11 @@ import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 function AuthForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectUrl = searchParams.get("redirect") || "/account/orders";
+  const rawRedirect = searchParams.get("redirect") || "/account/orders";
+  const redirectUrl =
+    rawRedirect.startsWith("/") && !rawRedirect.startsWith("//") && !rawRedirect.startsWith("/\\")
+      ? rawRedirect
+      : "/account/orders";
   const initialTab = searchParams.get("tab") === "register" ? "register" : "login";
   const authError = searchParams.get("error");
 
@@ -188,8 +192,8 @@ function AuthForm() {
         setErrorMessage("Please enter your full name.");
         return;
       }
-      if (password.length < 6) {
-        setErrorMessage("Password must be at least 6 characters long.");
+      if (password.length < 8) {
+        setErrorMessage("Password must be at least 8 characters long.");
         return;
       }
       if (password !== confirmPassword) {
@@ -471,7 +475,7 @@ function AuthForm() {
                   type={showPassword ? "text" : "password"}
                   required
                   placeholder={
-                    activeTab === "register" ? "At least 6 characters" : "Enter your account password"
+                    activeTab === "register" ? "At least 8 characters" : "Enter your account password"
                   }
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}

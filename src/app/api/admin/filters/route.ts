@@ -1,12 +1,17 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getAdminSession, logAdminAudit } from "@/lib/auth";
+import { requireAdmin, hasAdminPermission, logAdminAudit } from "@/lib/auth";
+import { sanitizeString } from "@/lib/sanitizer";
 
 export async function GET() {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireAdmin();
+    if (!auth.authorized) return auth.response;
+    if (
+      !hasAdminPermission(auth.admin, "filters") &&
+      !hasAdminPermission(auth.admin, "products")
+    ) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const filterGroups = await prisma.filterGroup.findMany({
@@ -26,19 +31,19 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireAdmin("filters");
+    if (!auth.authorized) return auth.response;
+    const admin = auth.admin;
 
     const { label, attributeKey, filterType, displayOrder, isActive, categoryId, options } =
       await req.json();
 
-    if (!label || !attributeKey) {
+    const cleanLabel = typeof label === "string" ? sanitizeString(label, 100) : "";
+    if (!cleanLabel || !attributeKey) {
       return NextResponse.json({ error: "Label and attributeKey are required." }, { status: 400 });
     }
 
-    const cleanKey = attributeKey.trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
+    const cleanKey = String(attributeKey).trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
 
     const existing = await prisma.filterGroup.findUnique({
       where: { attributeKey: cleanKey },
@@ -53,7 +58,7 @@ export async function POST(req: Request) {
     const group = await prisma.$transaction(async (tx: any) => {
       const created = await tx.filterGroup.create({
         data: {
-          label: label.trim(),
+          label: cleanLabel,
           attributeKey: cleanKey,
           filterType: filterType || "CHECKBOX",
           displayOrder: parseInt(displayOrder) || 0,
@@ -69,8 +74,8 @@ export async function POST(req: Request) {
             await tx.filterOption.create({
               data: {
                 filterGroupId: created.id,
-                label: opt.label.trim(),
-                value: opt.value.trim(),
+                label: sanitizeString(opt.label, 100),
+                value: sanitizeString(opt.value, 100),
                 displayOrder: idx,
               },
             });

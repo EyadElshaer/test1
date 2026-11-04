@@ -157,17 +157,29 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: "Store Settings", href: "/admin/settings", icon: Settings, permissionKey: "settings" },
   ];
 
-  const visibleNavItems = navItems.filter((item) => {
-    if (!adminUser) return true;
+  const hasSectionPermission = (permissionKey: string, itemName?: string) => {
+    if (!adminUser) return false;
     if (adminUser.role === "SUPER_ADMIN") return true;
-    if (item.name === "Overview") return true;
-    if (!adminUser.permissions || adminUser.permissions === "*") return true;
+    if (permissionKey === "overview") return true;
+    if (!adminUser.permissions || !adminUser.permissions.trim()) return false;
+    if (adminUser.permissions.trim() === "*") return true;
     const allowed = adminUser.permissions.split(",").map((s: string) => s.trim().toLowerCase());
     return (
-      allowed.includes(item.permissionKey.toLowerCase()) ||
-      allowed.includes(item.name.toLowerCase())
+      allowed.includes(permissionKey.toLowerCase()) ||
+      (itemName ? allowed.includes(itemName.toLowerCase()) : false)
     );
-  });
+  };
+
+  const visibleNavItems = navItems.filter((item) =>
+    hasSectionPermission(item.permissionKey, item.name)
+  );
+
+  const activeRestrictedItem = navItems.find(
+    (item) => pathname === item.href || pathname.startsWith(item.href + "/")
+  );
+  const isCurrentRouteForbidden =
+    Boolean(activeRestrictedItem) &&
+    !hasSectionPermission(activeRestrictedItem!.permissionKey, activeRestrictedItem!.name);
 
   const isActive = (href: string) => {
     if (href === "/admin/dashboard") return pathname === "/admin/dashboard";
@@ -296,7 +308,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Dynamic Page Content */}
         <main className="flex-1 p-6 sm:p-8 lg:p-10 overflow-y-auto">
-          {children}
+          {isCurrentRouteForbidden ? (
+            <div className="max-w-lg mx-auto mt-16 p-8 rounded-3xl bg-rose-500/10 border border-rose-500/30 text-center space-y-3">
+              <ShieldAlert className="w-10 h-10 text-rose-400 mx-auto" />
+              <h2 className="text-lg font-bold text-white">Access Restricted (403)</h2>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Your staff account does not have permission to access this section. Please contact a Super Administrator if you require access.
+              </p>
+            </div>
+          ) : (
+            children
+          )}
         </main>
       </div>
 

@@ -1,18 +1,22 @@
 import { NextResponse } from "next/server";
-import { getAdminSession } from "@/lib/auth";
-import { testTelegramBot } from "@/lib/telegram";
+import { requireAdmin } from "@/lib/auth";
+import { testTelegramBot, getTelegramConfig } from "@/lib/telegram";
 
 export async function POST(req: Request) {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireAdmin("settings");
+    if (!auth.authorized) return auth.response;
 
     const body = await req.json();
     const { botToken, chatId } = body;
 
-    if (!botToken || typeof botToken !== "string" || !botToken.trim()) {
+    const storedConfig = await getTelegramConfig();
+    const effectiveToken =
+      typeof botToken === "string" && botToken.trim() && !botToken.includes("••••")
+        ? botToken.trim()
+        : storedConfig.botToken;
+
+    if (!effectiveToken) {
       return NextResponse.json(
         { error: "Please enter your Telegram Bot Token." },
         { status: 400 }
@@ -26,7 +30,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const result = await testTelegramBot(botToken.trim(), chatId.trim());
+    const result = await testTelegramBot(effectiveToken, chatId.trim());
 
     if (!result.success) {
       return NextResponse.json(

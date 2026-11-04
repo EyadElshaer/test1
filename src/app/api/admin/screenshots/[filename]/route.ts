@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
-import { getAdminSession } from "@/lib/auth";
+import { requireAdmin, hasAdminPermission } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { sanitizeFilename } from "@/lib/sanitizer";
 
 export async function GET(
   req: Request,
@@ -10,12 +11,25 @@ export async function GET(
 ) {
   try {
     const { filename } = await params;
-    const safeFilename = path.basename(filename);
+    const safeFilename = sanitizeFilename(path.basename(filename));
+    if (!safeFilename || !/^proof_[a-zA-Z0-9_.-]+\.(jpg|jpeg|png|webp)$/i.test(safeFilename)) {
+      return new NextResponse("Invalid screenshot filename.", { status: 400 });
+    }
 
-    // Strictly require active administrator session to access customer payment proof receipts
-    const admin = await getAdminSession();
-    if (!admin) {
-      return new NextResponse("Unauthorized: Administrator session required.", { status: 401 });
+    // Strictly require active administrator session with orders, refunds, or customers permission
+    const auth = await requireAdmin();
+    if (!auth.authorized) {
+      return auth.response;
+    }
+    const admin = auth.admin;
+    if (
+      !hasAdminPermission(admin, "orders") &&
+      !hasAdminPermission(admin, "refunds") &&
+      !hasAdminPermission(admin, "customers")
+    ) {
+      return new NextResponse("Forbidden: Insufficient permissions to view payment proofs.", {
+        status: 403,
+      });
     }
 
     // 1. Try PostgreSQL database first (primary storage for persistent serverless environments)

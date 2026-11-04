@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getAdminSession, logAdminAudit } from "@/lib/auth";
+import { requireAdmin, logAdminAudit } from "@/lib/auth";
+import { sanitizeString, sanitizeText, sanitizeSafeUrl } from "@/lib/sanitizer";
 
 export async function GET() {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireAdmin("payment-methods");
+    if (!auth.authorized) return auth.response;
 
     const paymentMethods = await prisma.paymentMethod.findMany({
       orderBy: { displayOrder: "asc" },
@@ -22,10 +21,9 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireAdmin("payment-methods");
+    if (!auth.authorized) return auth.response;
+    const admin = auth.admin;
 
     const {
       name,
@@ -50,23 +48,30 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Name and payment instructions are required." }, { status: 400 });
     }
 
+    if (deepLink && !sanitizeSafeUrl(deepLink, { allowedProtocols: ["https:", "http:", "instapay:", "tel:"] })) {
+      return NextResponse.json({ error: "Invalid deepLink URL scheme." }, { status: 400 });
+    }
+    if (publicPaymentUrl && !sanitizeSafeUrl(publicPaymentUrl, { allowedProtocols: ["https:", "http:"] })) {
+      return NextResponse.json({ error: "Invalid publicPaymentUrl scheme." }, { status: 400 });
+    }
+
     const cleanCode = code?.trim()
       ? code.trim().toUpperCase().replace(/[^A-Z0-9_]/g, "")
       : name.trim().toUpperCase().replace(/[^A-Z0-9_]/g, "");
 
     const method = await prisma.paymentMethod.create({
       data: {
-        name: name.trim(),
+        name: sanitizeString(name, 100),
         code: cleanCode,
-        description: description?.trim() || null,
-        icon: icon || null,
-        instructions: instructions.trim(),
-        recipientName: recipientName?.trim() || null,
-        accountDetails: accountDetails?.trim() || null,
-        currency: currency || "EGP",
-        transferReferenceHint: transferReferenceHint?.trim() || null,
-        deepLink: deepLink?.trim() || null,
-        publicPaymentUrl: publicPaymentUrl?.trim() || null,
+        description: description ? sanitizeString(description, 500) : null,
+        icon: icon ? sanitizeString(icon, 100) : null,
+        instructions: sanitizeText(instructions, 3000),
+        recipientName: recipientName ? sanitizeString(recipientName, 120) : null,
+        accountDetails: accountDetails ? sanitizeString(accountDetails, 200) : null,
+        currency: currency ? sanitizeString(currency, 10) : "EGP",
+        transferReferenceHint: transferReferenceHint ? sanitizeString(transferReferenceHint, 200) : null,
+        deepLink: deepLink ? sanitizeSafeUrl(deepLink, { allowedProtocols: ["https:", "http:", "instapay:", "tel:"] }) : null,
+        publicPaymentUrl: publicPaymentUrl ? sanitizeSafeUrl(publicPaymentUrl, { allowedProtocols: ["https:", "http:"] }) : null,
         minAmount: minAmount ? Number(minAmount) : null,
         maxAmount: maxAmount ? Number(maxAmount) : null,
         requireScreenshot: requireScreenshot !== undefined ? Boolean(requireScreenshot) : true,

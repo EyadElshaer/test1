@@ -1,18 +1,17 @@
 import { NextResponse } from "next/server";
-import { getAdminSession } from "@/lib/auth";
+import { requireAdmin } from "@/lib/auth";
 import {
   getTelegramConfig,
   setTelegramWebhook,
   getTelegramWebhookInfo,
   pollTelegramUpdates,
 } from "@/lib/telegram";
+import { sanitizeSafeUrl } from "@/lib/sanitizer";
 
 export async function GET() {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireAdmin("settings");
+    if (!auth.authorized) return auth.response;
 
     const config = await getTelegramConfig();
     if (!config.botToken) {
@@ -33,16 +32,15 @@ export async function GET() {
       siteUrl: config.siteUrl,
     });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error("Telegram sync GET error:", err);
+    return NextResponse.json({ error: "Failed to sync Telegram status." }, { status: 500 });
   }
 }
 
 export async function POST(req: Request) {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireAdmin("settings");
+    if (!auth.authorized) return auth.response;
 
     const body = await req.json().catch(() => ({}));
     const config = await getTelegramConfig();
@@ -54,8 +52,15 @@ export async function POST(req: Request) {
     const action = body.action || "set_webhook";
 
     if (action === "set_webhook") {
-      const targetUrl = (body.webhookUrl || `${config.siteUrl}/api/telegram/webhook`).trim();
-      const res = await setTelegramWebhook(config.botToken, targetUrl);
+      const rawUrl = (body.webhookUrl || `${config.siteUrl}/api/telegram/webhook`).trim();
+      const safeUrl = sanitizeSafeUrl(rawUrl, { allowedProtocols: ["https:"] });
+      if (!safeUrl || !safeUrl.endsWith("/api/telegram/webhook")) {
+        return NextResponse.json(
+          { error: "Webhook URL must be a valid https:// URL ending with /api/telegram/webhook" },
+          { status: 400 }
+        );
+      }
+      const res = await setTelegramWebhook(config.botToken, safeUrl);
       return NextResponse.json(res);
     }
 
@@ -66,6 +71,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error("Telegram sync POST error:", err);
+    return NextResponse.json({ error: "Failed to execute Telegram sync action." }, { status: 500 });
   }
 }

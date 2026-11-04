@@ -1,16 +1,18 @@
 import { NextResponse } from "next/server";
-import { getAdminSession } from "@/lib/auth";
+import { requireAdmin } from "@/lib/auth";
 import { getGeminiApiKey } from "@/lib/geminiReceiptVerifier";
 
 export async function POST(req: Request) {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized: Admin session required." }, { status: 401 });
-    }
+    const auth = await requireAdmin("settings");
+    if (!auth.authorized) return auth.response;
 
     const body = await req.json().catch(() => ({}));
-    const keyToTest = body.apiKey?.trim() || (await getGeminiApiKey()).apiKey;
+    const rawCandidate = typeof body.apiKey === "string" ? body.apiKey.trim() : "";
+    const keyToTest =
+      rawCandidate && !rawCandidate.includes("••••")
+        ? rawCandidate
+        : (await getGeminiApiKey()).apiKey;
 
     if (!keyToTest) {
       return NextResponse.json(

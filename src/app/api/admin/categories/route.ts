@@ -1,12 +1,18 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getAdminSession, logAdminAudit } from "@/lib/auth";
+import { requireAdmin, hasAdminPermission, logAdminAudit } from "@/lib/auth";
+import { sanitizeString } from "@/lib/sanitizer";
 
 export async function GET() {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireAdmin();
+    if (!auth.authorized) return auth.response;
+    if (
+      !hasAdminPermission(auth.admin, "categories") &&
+      !hasAdminPermission(auth.admin, "products") &&
+      !hasAdminPermission(auth.admin, "filters")
+    ) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const categories = await prisma.category.findMany({
@@ -25,28 +31,28 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireAdmin("categories");
+    if (!auth.authorized) return auth.response;
+    const admin = auth.admin;
 
     const { name, slug: customSlug, description, image, displayOrder, isActive, isFeatured } =
       await req.json();
 
-    if (!name || typeof name !== "string") {
+    const cleanName = typeof name === "string" ? sanitizeString(name, 100) : "";
+    if (!cleanName) {
       return NextResponse.json({ error: "Category name is required." }, { status: 400 });
     }
 
     const slug = customSlug?.trim()
       ? customSlug.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-")
-      : name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-");
+      : cleanName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
     const category = await prisma.category.create({
       data: {
-        name: name.trim(),
+        name: cleanName,
         slug,
-        description: description?.trim() || null,
-        image: image || null,
+        description: description ? sanitizeString(description, 500) : null,
+        image: image ? sanitizeString(image, 500) : null,
         displayOrder: parseInt(displayOrder) || 0,
         isActive: isActive !== undefined ? Boolean(isActive) : true,
         isFeatured: Boolean(isFeatured),

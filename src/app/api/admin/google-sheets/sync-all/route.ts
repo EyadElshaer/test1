@@ -1,12 +1,17 @@
 import { NextResponse } from "next/server";
-import { getAdminSession, logAdminAudit } from "@/lib/auth";
+import { requireAdmin, hasAdminPermission, logAdminAudit } from "@/lib/auth";
 import { syncAllOrdersToGoogleSheets } from "@/lib/googleSheets";
 
 export async function POST() {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireAdmin();
+    if (!auth.authorized) return auth.response;
+    const admin = auth.admin;
+    if (
+      !hasAdminPermission(admin, "settings") &&
+      !hasAdminPermission(admin, "orders")
+    ) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const result = await syncAllOrdersToGoogleSheets();

@@ -24,19 +24,7 @@ export function getGoogleClientSecret(): string {
 }
 
 export function getSiteBaseUrl(req?: Request): string {
-  // 1. If request is provided, inspect the incoming host header (dynamically works for premikeys.vercel.app, premikeys.com, etc.)
-  if (req) {
-    const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
-    if (host) {
-      const isLocal = host.startsWith("localhost") || host.startsWith("127.0.0.1");
-      const proto = isLocal
-        ? req.headers.get("x-forwarded-proto") || "http"
-        : "https";
-      return `${proto}://${host}`.replace(/\/+$/, "");
-    }
-  }
-
-  // 2. Check Vercel deployment environment variables
+  // 1. Prioritize explicitly configured production site URL to prevent Host Header Poisoning
   if (process.env.NEXT_PUBLIC_SITE_URL && !process.env.NEXT_PUBLIC_SITE_URL.includes("localhost")) {
     return process.env.NEXT_PUBLIC_SITE_URL.trim().replace(/\/+$/, "");
   }
@@ -47,6 +35,17 @@ export function getSiteBaseUrl(req?: Request): string {
 
   if (process.env.VERCEL_URL) {
     return `https://${process.env.VERCEL_URL.replace(/\/+$/, "")}`;
+  }
+
+  // 2. In local development or trusted host, validate host strictly against safe hostname pattern
+  if (req) {
+    const rawHost = (req.headers.get("host") || "").trim().toLowerCase();
+    if (/^(localhost|127\.0\.0\.1)(:\d{1,5})?$/.test(rawHost)) {
+      return `http://${rawHost}`;
+    }
+    if (/^[a-z0-9.-]+\.(vercel\.app|premikeys\.com)$/.test(rawHost)) {
+      return `https://${rawHost}`;
+    }
   }
 
   if (process.env.NEXT_PUBLIC_SITE_URL) {
@@ -282,21 +281,19 @@ export async function syncGoogleUser(
     });
   }
 
-  // 2. Automatically link any guest orders previously placed with this email or phone
+  // 2. Link guest orders ONLY by Google-verified email address (never by unverified phone)
   try {
-    const orderConditions: any[] = [{ customerEmail: cleanEmail }];
-    if (user.phone) {
-      orderConditions.push({ customerPhone: user.phone });
+    if (profile.email_verified === true || profile.email_verified === "true") {
+      await prisma.order.updateMany({
+        where: {
+          userId: null,
+          customerEmail: cleanEmail,
+        },
+        data: {
+          userId: user.id,
+        },
+      });
     }
-    await prisma.order.updateMany({
-      where: {
-        userId: null,
-        OR: orderConditions,
-      },
-      data: {
-        userId: user.id,
-      },
-    });
   } catch (linkErr) {
     console.warn("Could not backlink guest orders to Google user:", linkErr);
   }

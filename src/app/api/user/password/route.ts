@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
-import { getUserSession } from "@/lib/userAuth";
+import { getUserSession, invalidateAllUserSessions, createUserSession } from "@/lib/userAuth";
 import { getClientIp } from "@/lib/security";
 import { checkRateLimit } from "@/lib/rateLimit";
 
@@ -26,9 +26,9 @@ export async function POST(req: Request) {
 
     const { currentPassword, newPassword } = await req.json();
 
-    if (!newPassword || typeof newPassword !== "string" || newPassword.length < 6) {
+    if (!newPassword || typeof newPassword !== "string" || newPassword.length < 8 || newPassword.length > 128) {
       return NextResponse.json(
-        { error: "New password must be at least 6 characters long." },
+        { error: "New password must be between 8 and 128 characters long." },
         { status: 400 }
       );
     }
@@ -47,7 +47,7 @@ export async function POST(req: Request) {
 
     // If the user already has a password set, verify their current password
     if (user.passwordHash) {
-      if (!currentPassword) {
+      if (!currentPassword || typeof currentPassword !== "string") {
         return NextResponse.json(
           { error: "Please enter your current password to confirm this change." },
           { status: 400 }
@@ -63,7 +63,7 @@ export async function POST(req: Request) {
       }
     }
 
-    const newHash = await bcrypt.hash(newPassword, 10);
+    const newHash = await bcrypt.hash(newPassword, 12);
 
     await prisma.user.update({
       where: { id: user.id },
@@ -71,6 +71,10 @@ export async function POST(req: Request) {
         passwordHash: newHash,
       },
     });
+
+    // Invalidate all existing sessions for this user and issue a fresh rotated session
+    await invalidateAllUserSessions(user.id, false);
+    await createUserSession(user.id, req.headers);
 
     return NextResponse.json({
       success: true,

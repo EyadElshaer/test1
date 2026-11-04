@@ -1,18 +1,21 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getAdminSession, logAdminAudit } from "@/lib/auth";
+import { requireAdmin, logAdminAudit } from "@/lib/auth";
+import { isValidId } from "@/lib/sanitizer";
 
 export async function DELETE(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireAdmin("customers");
+    if (!auth.authorized) return auth.response;
+    const admin = auth.admin;
 
     const { id: customerId } = await params;
+    if (!isValidId(customerId)) {
+      return NextResponse.json({ error: "Invalid customer ID." }, { status: 400 });
+    }
     const customer = await prisma.user.findUnique({
       where: { id: customerId },
     });

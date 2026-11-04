@@ -95,6 +95,29 @@ export async function POST(req: Request) {
       );
     }
 
+    if (paymentScreenshotUrl) {
+      if (
+        typeof paymentScreenshotUrl !== "string" ||
+        !/^\/api\/admin\/screenshots\/proof_[a-zA-Z0-9_.-]+\.(jpg|jpeg|png|webp|gif)$/i.test(paymentScreenshotUrl)
+      ) {
+        return NextResponse.json({ error: "Invalid payment screenshot URL format." }, { status: 400 });
+      }
+
+      // Prevent reusing a previously uploaded receipt screenshot across multiple orders
+      if (!paymentScreenshotUrl.includes("proof_mock_")) {
+        const duplicateReceiptOrder = await prisma.order.findFirst({
+          where: { paymentScreenshotUrl },
+          select: { id: true },
+        });
+        if (duplicateReceiptOrder) {
+          return NextResponse.json(
+            { error: "This payment screenshot has already been used for another order. Please upload a fresh receipt." },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
     // 4. Fetch Products from DB & Recompute Totals on Server
     const productIds = items.map((i: any) => i.productId);
     const dbProducts = await prisma.product.findMany({
@@ -137,11 +160,17 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: `Product not found: ${item.productId}` }, { status: 400 });
       }
 
-      if (dbProd.availability === "OUT_OF_STOCK") {
+      if (dbProd.availability === "OUT_OF_STOCK" || (typeof dbProd.stockQuantity === "number" && dbProd.stockQuantity <= 0)) {
         return NextResponse.json({ error: `"${dbProd.title}" is currently out of stock.` }, { status: 400 });
       }
 
-      const qty = Math.max(1, parseInt(item.quantity) || 1);
+      const qty = Math.max(1, Math.min(50, parseInt(item.quantity) || 1));
+      if (typeof dbProd.stockQuantity === "number" && qty > dbProd.stockQuantity) {
+        return NextResponse.json(
+          { error: `Only ${dbProd.stockQuantity} unit(s) of "${dbProd.title}" are currently available.` },
+          { status: 400 }
+        );
+      }
 
       // Check for matching configuration
       const prodConfigs = extractConfigurations(dbProd);
@@ -192,7 +221,23 @@ export async function POST(req: Request) {
         const validUses = !promo.maxUses || promo.currentUses < promo.maxUses;
         const validSubtotal = !promo.minSubtotal || serverSubtotal >= promo.minSubtotal;
 
-        if (validDates && validUses && validSubtotal) {
+        let validPerCustomer = true;
+        if (promo.maxUsesPerCustomer && promo.maxUsesPerCustomer > 0) {
+          const customerUses = await prisma.promoCodeUsage.count({
+            where: {
+              promoCodeId: promo.id,
+              OR: [
+                { customerPhone: normalizedPhone },
+                { customerEmail: cleanCustomerEmail },
+              ],
+            },
+          });
+          if (customerUses >= promo.maxUsesPerCustomer) {
+            validPerCustomer = false;
+          }
+        }
+
+        if (validDates && validUses && validSubtotal && validPerCustomer) {
           // Check item eligibility & minProductPrice
           let qualifyingSubtotal = 0;
           let eligiblePIds: string[] = [];
@@ -236,7 +281,7 @@ export async function POST(req: Request) {
     const activeSessionUser = await getUserSession();
     if (activeSessionUser) {
       orderUserId = activeSessionUser.id;
-    } else if (autoSignup && password && password.length >= 6) {
+    } else if (autoSignup && password && typeof password === "string" && password.length >= 8 && password.length <= 128) {
       const cleanEmail = customerEmail.trim().toLowerCase();
       try {
         let user = await prisma.user.findFirst({
@@ -246,18 +291,16 @@ export async function POST(req: Request) {
         });
 
         if (user) {
-          // If account exists, link order to it, but NEVER overwrite passwords without prior auth
-          orderUserId = user.id;
+          // Security: Only link the order and sign in if the caller proves ownership of the existing account
           if (user.passwordHash) {
             const isMatch = await bcrypt.compare(password, user.passwordHash);
             if (isMatch) {
+              orderUserId = user.id;
               await createUserSession(user.id, req.headers);
             }
           }
-          // Note: If user was registered via Google (!user.passwordHash), we do NOT set a password
-          // or log in automatically from an unauthenticated checkout form to prevent account hijacking.
         } else {
-          const passwordHash = await bcrypt.hash(password, 10);
+          const passwordHash = await bcrypt.hash(password, 12);
           user = await prisma.user.create({
             data: {
               name: cleanCustomerName,
@@ -378,6 +421,19 @@ export async function POST(req: Request) {
           items: true,
         },
       });
+
+      // Decrement product stock quantities atomically
+      for (const itemSnap of orderItemsSnapshot) {
+        await tx.product.updateMany({
+          where: {
+            id: itemSnap.productId,
+            stockQuantity: { gte: itemSnap.quantity },
+          },
+          data: {
+            stockQuantity: { decrement: itemSnap.quantity },
+          },
+        });
+      }
 
       // Update promo code usage count
       if (appliedPromoRecord) {

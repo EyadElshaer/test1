@@ -1,25 +1,44 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
-import { getAdminSession, logAdminAudit } from "@/lib/auth";
+import {
+  requireAdmin,
+  hasAdminPermission,
+  invalidateAllAdminSessions,
+  logAdminAudit,
+} from "@/lib/auth";
+import { isValidId, sanitizeString } from "@/lib/sanitizer";
+
+const VALID_PERMISSIONS = new Set([
+  "orders",
+  "refunds",
+  "customers",
+  "products",
+  "categories",
+  "filters",
+  "payment-methods",
+  "promo-codes",
+  "faq",
+  "settings",
+  "security",
+  "staff",
+]);
 
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const currentAdmin = await getAdminSession();
-    if (!currentAdmin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
+    const auth = await requireAdmin("staff");
+    if (!auth.authorized) return auth.response;
+    const currentAdmin = auth.admin;
     const isSuperAdmin = currentAdmin.role === "SUPER_ADMIN";
-    const allowedPerms = (currentAdmin as any).permissions?.split(",").map((p: string) => p.trim()) || [];
-    if (!isSuperAdmin && !allowedPerms.includes("staff")) {
-      return NextResponse.json({ error: "Forbidden: You do not have staff management permission." }, { status: 403 });
-    }
 
     const { id } = await params;
+    if (!isValidId(id)) {
+      return NextResponse.json({ error: "Invalid staff ID." }, { status: 400 });
+    }
+
     const { password, role, permissions, email } = await req.json();
 
     const targetAdmin = await prisma.admin.findUnique({
@@ -38,10 +57,35 @@ export async function PATCH(
       );
     }
 
-    const updateData: any = {};
-    if (password && typeof password === "string" && password.length >= 6) {
-      updateData.passwordHash = await bcrypt.hash(password, 10);
+    // Non-superadmins cannot modify another admin who holds permissions the currentAdmin lacks
+    if (!isSuperAdmin && targetAdmin.permissions) {
+      const targetPerms = targetAdmin.permissions
+        .split(",")
+        .map((p) => p.trim().toLowerCase())
+        .filter(Boolean);
+      for (const tp of targetPerms) {
+        if (!hasAdminPermission(currentAdmin, tp)) {
+          return NextResponse.json(
+            { error: "Forbidden: You cannot modify an admin with higher permissions than your own." },
+            { status: 403 }
+          );
+        }
+      }
     }
+
+    const updateData: any = {};
+    let passwordChanged = false;
+    if (password !== undefined && password !== "") {
+      if (typeof password !== "string" || password.length < 8 || password.length > 128) {
+        return NextResponse.json(
+          { error: "Password must be between 8 and 128 characters long." },
+          { status: 400 }
+        );
+      }
+      updateData.passwordHash = await bcrypt.hash(password, 12);
+      passwordChanged = true;
+    }
+
     if (role && (role === "SUPER_ADMIN" || role === "ADMIN")) {
       // Privilege Escalation Prevention: Only a SUPER_ADMIN can assign the SUPER_ADMIN role
       if (role === "SUPER_ADMIN" && !isSuperAdmin) {
@@ -50,13 +94,50 @@ export async function PATCH(
           { status: 403 }
         );
       }
+      // Prevent demoting the last SUPER_ADMIN
+      if (targetAdmin.role === "SUPER_ADMIN" && role === "ADMIN") {
+        const superAdminCount = await prisma.admin.count({
+          where: { role: "SUPER_ADMIN" },
+        });
+        if (superAdminCount <= 1) {
+          return NextResponse.json(
+            { error: "Cannot demote the last remaining SUPER_ADMIN account." },
+            { status: 400 }
+          );
+        }
+      }
       updateData.role = role;
     }
+
     if (permissions !== undefined) {
-      updateData.permissions = typeof permissions === "string" ? permissions.trim() : Array.isArray(permissions) ? permissions.join(",") : "";
+      const rawPermList =
+        typeof permissions === "string"
+          ? permissions.split(",")
+          : Array.isArray(permissions)
+          ? permissions
+          : [];
+      const normalizedPerms = rawPermList
+        .map((p: unknown) => (typeof p === "string" ? p.trim().toLowerCase() : ""))
+        .filter((p: string) => VALID_PERMISSIONS.has(p));
+
+      if (!isSuperAdmin) {
+        for (const perm of normalizedPerms) {
+          if (!hasAdminPermission(currentAdmin, perm)) {
+            return NextResponse.json(
+              {
+                error: `Forbidden: You cannot grant the "${perm}" permission because your account does not possess it.`,
+              },
+              { status: 403 }
+            );
+          }
+        }
+      }
+      updateData.permissions = normalizedPerms.join(",");
     }
+
     if (email !== undefined) {
-      updateData.email = email ? email.trim().toLowerCase() : null;
+      updateData.email =
+        email && typeof email === "string" ? sanitizeString(email, 120).toLowerCase() : null;
     }
 
     const updated = await prisma.admin.update({
@@ -71,6 +152,10 @@ export async function PATCH(
         updatedAt: true,
       },
     });
+
+    if (passwordChanged) {
+      await invalidateAllAdminSessions(id, currentAdmin.id === id);
+    }
 
     await logAdminAudit(
       currentAdmin.id,
@@ -90,18 +175,15 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const currentAdmin = await getAdminSession();
-    if (!currentAdmin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
+    const auth = await requireAdmin("staff");
+    if (!auth.authorized) return auth.response;
+    const currentAdmin = auth.admin;
     const isSuperAdmin = currentAdmin.role === "SUPER_ADMIN";
-    const allowedPerms = (currentAdmin as any).permissions?.split(",").map((p: string) => p.trim()) || [];
-    if (!isSuperAdmin && !allowedPerms.includes("staff")) {
-      return NextResponse.json({ error: "Forbidden: You do not have staff management permission." }, { status: 403 });
-    }
 
     const { id } = await params;
+    if (!isValidId(id)) {
+      return NextResponse.json({ error: "Invalid staff ID." }, { status: 400 });
+    }
 
     if (currentAdmin.id === id) {
       return NextResponse.json({ error: "Cannot delete your own active admin account." }, { status: 400 });
@@ -121,6 +203,21 @@ export async function DELETE(
         { error: "Forbidden: Only a SUPER_ADMIN can delete another SUPER_ADMIN account." },
         { status: 403 }
       );
+    }
+
+    if (!isSuperAdmin && targetAdmin.permissions) {
+      const targetPerms = targetAdmin.permissions
+        .split(",")
+        .map((p) => p.trim().toLowerCase())
+        .filter(Boolean);
+      for (const tp of targetPerms) {
+        if (!hasAdminPermission(currentAdmin, tp)) {
+          return NextResponse.json(
+            { error: "Forbidden: You cannot delete an admin with permissions you do not possess." },
+            { status: 403 }
+          );
+        }
+      }
     }
 
     // Guard: Prevent deleting the last SUPER_ADMIN in the system

@@ -1,13 +1,11 @@
 import { NextResponse } from "next/server";
-import { getAdminSession } from "@/lib/auth";
+import { requireAdmin } from "@/lib/auth";
 import { testGoogleSheetsWebhook } from "@/lib/googleSheets";
 
 export async function POST(req: Request) {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireAdmin("settings");
+    if (!auth.authorized) return auth.response;
 
     const body = await req.json();
     const { webhookUrl } = body;

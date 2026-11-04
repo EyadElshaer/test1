@@ -20,6 +20,10 @@ export async function GET(
     }
 
     const safeFilename = path.basename(filename);
+    if (!/^proof_[a-zA-Z0-9_.-]+\.(jpg|jpeg|png|webp|gif)$/i.test(safeFilename)) {
+      return new NextResponse("Invalid filename format.", { status: 400 });
+    }
+
     const order = await prisma.order.findUnique({
       where: { orderNumber },
     });
@@ -28,17 +32,11 @@ export async function GET(
       return new NextResponse("Not found or unauthorized.", { status: 404 });
     }
 
-    // Strictly verify ownership: Admin session or authenticated customer account
+    // Strictly verify ownership: Admin session or authenticated customer account that owns the order
     const admin = await getAdminSession();
     const sessionUser = await getUserSession();
 
-    const isOwnerUser = Boolean(
-      sessionUser &&
-      (order.userId === sessionUser.id ||
-        (order.userId === null &&
-          ((sessionUser.email && order.customerEmail.toLowerCase() === sessionUser.email.toLowerCase()) ||
-            (sessionUser.phone && order.customerPhone.replace(/\D/g, "") === sessionUser.phone.replace(/\D/g, "")))))
-    );
+    const isOwnerUser = Boolean(sessionUser && order.userId && order.userId === sessionUser.id);
 
     if (!admin && !isOwnerUser) {
       return new NextResponse("Unauthorized: You do not have permission to view this receipt.", { status: 403 });

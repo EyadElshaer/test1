@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getAdminSession, logAdminAudit } from "@/lib/auth";
+import { requireAdmin, logAdminAudit } from "@/lib/auth";
+import { sanitizeString } from "@/lib/sanitizer";
 
 export async function GET() {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireAdmin("promo-codes");
+    if (!auth.authorized) return auth.response;
 
     const promoCodes = await prisma.promoCode.findMany({
       orderBy: { createdAt: "desc" },
@@ -25,10 +24,9 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireAdmin("promo-codes");
+    if (!auth.authorized) return auth.response;
+    const admin = auth.admin;
 
     const {
       code,
@@ -51,7 +49,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Code and a positive discount value are required." }, { status: 400 });
     }
 
-    const cleanCode = code.trim().toUpperCase();
+    const cleanCode = String(code).trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "");
     const existing = await prisma.promoCode.findUnique({
       where: { code: cleanCode },
     });
@@ -60,10 +58,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: `Promo code '${cleanCode}' already exists.` }, { status: 400 });
     }
 
+    const numVal = Number(discountValue);
+    if (discountType !== "FIXED" && numVal > 100) {
+      return NextResponse.json({ error: "Percentage discount cannot exceed 100%." }, { status: 400 });
+    }
+
     const promo = await prisma.promoCode.create({
       data: {
         code: cleanCode,
-        description: description?.trim() || null,
+        description: description ? sanitizeString(description, 300) : null,
         discountType: discountType === "FIXED" ? "FIXED" : "PERCENTAGE",
         discountValue: Number(discountValue),
         startDate: startDate ? new Date(startDate) : null,

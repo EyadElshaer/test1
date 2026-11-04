@@ -235,6 +235,7 @@ async function runTests() {
         orderNumber: createdOrderNumber,
         reason: "Defective or unredeemed key",
         explanation: "Key was unable to activate in Steam client.",
+        verificationContact: "mohamed.test@example.com",
       }),
     });
     const refundData = await refundRes.json();
@@ -251,6 +252,7 @@ async function runTests() {
         orderNumber: createdOrderNumber,
         reason: "Defective key",
         explanation: "Duplicate attempt",
+        verificationContact: "mohamed.test@example.com",
       }),
     });
     const duplicateData = await duplicateRefundRes.json();
@@ -362,7 +364,8 @@ async function runTests() {
     assert(
       verifiedLookupData.order?.status === "APPROVED" &&
         verifiedLookupData.order?.adminCustomerNote?.includes("STEAM-ABC12"),
-      `Customer My Orders reflects status APPROVED and displays released key code`
+      `Customer My Orders reflects status APPROVED and displays released key code`,
+      `status=${verifiedLookupData.order?.status}, note=${verifiedLookupData.order?.adminCustomerNote}`
     );
   } catch (err: any) {
     assert(false, "Admin auth & order workflow test", err.message);

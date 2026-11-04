@@ -1,9 +1,17 @@
 import crypto from "crypto";
 
-const CAPTCHA_SECRET =
-  process.env.JWT_SECRET ||
-  process.env.SESSION_SECRET ||
-  "premikeys_ultra_secure_captcha_signature_salt_99812";
+const RUNTIME_CAPTCHA_SECRET = crypto.randomBytes(32).toString("hex");
+
+function getCaptchaSecret(): string {
+  const secret = process.env.JWT_SECRET?.trim() || process.env.SESSION_SECRET?.trim();
+  if (secret && secret.length >= 16) {
+    return secret;
+  }
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("CRITICAL: JWT_SECRET environment variable must be configured in production.");
+  }
+  return RUNTIME_CAPTCHA_SECRET;
+}
 
 // Characters excluding ambiguous ones (no 0/O, 1/I/l, 8/B confusion)
 const CHAR_SET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -44,7 +52,7 @@ export function generateCaptcha(): CaptchaChallenge {
   // Sign the answer
   const signatureData = `${code.toLowerCase()}:${expiresAt}:${salt}`;
   const hmac = crypto
-    .createHmac("sha256", CAPTCHA_SECRET)
+    .createHmac("sha256", getCaptchaSecret())
     .update(signatureData)
     .digest("hex");
 
@@ -167,7 +175,7 @@ export function verifyCaptcha(
     // Recompute signature for user's answer
     const cleanAnswer = answer.trim().toLowerCase();
     const expectedSig = crypto
-      .createHmac("sha256", CAPTCHA_SECRET)
+      .createHmac("sha256", getCaptchaSecret())
       .update(`${cleanAnswer}:${payload.exp}:${payload.salt}`)
       .digest("hex");
 

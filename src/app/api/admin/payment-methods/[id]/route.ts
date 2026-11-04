@@ -1,33 +1,43 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getAdminSession, logAdminAudit } from "@/lib/auth";
+import { requireAdmin, logAdminAudit } from "@/lib/auth";
+import { isValidId, sanitizeString, sanitizeText, sanitizeSafeUrl } from "@/lib/sanitizer";
 
 export async function PUT(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireAdmin("payment-methods");
+    if (!auth.authorized) return auth.response;
+    const admin = auth.admin;
 
     const { id } = await params;
+    if (!isValidId(id)) {
+      return NextResponse.json({ error: "Invalid payment method ID." }, { status: 400 });
+    }
     const body = await req.json();
+
+    if (body.deepLink && !sanitizeSafeUrl(body.deepLink, { allowedProtocols: ["https:", "http:", "instapay:", "tel:"] })) {
+      return NextResponse.json({ error: "Invalid deepLink URL scheme." }, { status: 400 });
+    }
+    if (body.publicPaymentUrl && !sanitizeSafeUrl(body.publicPaymentUrl, { allowedProtocols: ["https:", "http:"] })) {
+      return NextResponse.json({ error: "Invalid publicPaymentUrl scheme." }, { status: 400 });
+    }
 
     const updated = await prisma.paymentMethod.update({
       where: { id },
       data: {
-        name: body.name.trim(),
-        description: body.description?.trim() || null,
-        icon: body.icon || null,
-        instructions: body.instructions.trim(),
-        recipientName: body.recipientName?.trim() || null,
-        accountDetails: body.accountDetails?.trim() || null,
-        currency: body.currency || "EGP",
-        transferReferenceHint: body.transferReferenceHint?.trim() || null,
-        deepLink: body.deepLink?.trim() || null,
-        publicPaymentUrl: body.publicPaymentUrl?.trim() || null,
+        name: sanitizeString(body.name, 100),
+        description: body.description ? sanitizeString(body.description, 500) : null,
+        icon: body.icon ? sanitizeString(body.icon, 100) : null,
+        instructions: sanitizeText(body.instructions, 3000),
+        recipientName: body.recipientName ? sanitizeString(body.recipientName, 120) : null,
+        accountDetails: body.accountDetails ? sanitizeString(body.accountDetails, 200) : null,
+        currency: body.currency ? sanitizeString(body.currency, 10) : "EGP",
+        transferReferenceHint: body.transferReferenceHint ? sanitizeString(body.transferReferenceHint, 200) : null,
+        deepLink: body.deepLink ? sanitizeSafeUrl(body.deepLink, { allowedProtocols: ["https:", "http:", "instapay:", "tel:"] }) : null,
+        publicPaymentUrl: body.publicPaymentUrl ? sanitizeSafeUrl(body.publicPaymentUrl, { allowedProtocols: ["https:", "http:"] }) : null,
         minAmount: body.minAmount ? Number(body.minAmount) : null,
         maxAmount: body.maxAmount ? Number(body.maxAmount) : null,
         requireScreenshot: Boolean(body.requireScreenshot),
@@ -50,12 +60,14 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireAdmin("payment-methods");
+    if (!auth.authorized) return auth.response;
+    const admin = auth.admin;
 
     const { id } = await params;
+    if (!isValidId(id)) {
+      return NextResponse.json({ error: "Invalid payment method ID." }, { status: 400 });
+    }
     const deleted = await prisma.paymentMethod.delete({ where: { id } });
     await logAdminAudit(admin.id, "PAYMENT_METHOD_DELETED", `Payment method deleted: ${deleted.name}`);
 

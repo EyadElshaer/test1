@@ -1,26 +1,29 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getAdminSession, logAdminAudit } from "@/lib/auth";
+import { requireAdmin, logAdminAudit } from "@/lib/auth";
+import { isValidId, sanitizeString, sanitizeText } from "@/lib/sanitizer";
 
 export async function PUT(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireAdmin("faq");
+    if (!auth.authorized) return auth.response;
+    const admin = auth.admin;
 
     const { id } = await params;
+    if (!isValidId(id)) {
+      return NextResponse.json({ error: "Invalid FAQ ID." }, { status: 400 });
+    }
     const { category, question, answer, displayOrder, isPublished } = await req.json();
 
     const updated = await prisma.faqItem.update({
       where: { id },
       data: {
-        category: category || "General",
-        question: question.trim(),
-        answer: answer.trim(),
+        category: category ? sanitizeString(category, 100) : "General",
+        question: sanitizeString(question, 500),
+        answer: sanitizeText(answer, 5000),
         displayOrder: parseInt(displayOrder) || 0,
         isPublished: Boolean(isPublished),
       },
@@ -40,12 +43,14 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireAdmin("faq");
+    if (!auth.authorized) return auth.response;
+    const admin = auth.admin;
 
     const { id } = await params;
+    if (!isValidId(id)) {
+      return NextResponse.json({ error: "Invalid FAQ ID." }, { status: 400 });
+    }
     await prisma.faqItem.delete({ where: { id } });
     await logAdminAudit(admin.id, "FAQ_DELETED", `FAQ deleted: ${id}`);
 

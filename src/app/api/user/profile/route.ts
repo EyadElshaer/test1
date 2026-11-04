@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getUserSession, isEmail, normalizePhone } from "@/lib/userAuth";
 import { getClientIp } from "@/lib/security";
 import { checkRateLimit } from "@/lib/rateLimit";
+import { sanitizeString } from "@/lib/sanitizer";
 import {
   findCountryByCode,
   detectCountryFromPhone,
@@ -33,10 +34,11 @@ export async function PATCH(req: Request) {
     const updateData: { name?: string; email?: string | null; phone?: string | null } = {};
 
     if (name !== undefined) {
-      if (!name || typeof name !== "string" || name.trim().length < 2) {
+      const cleanName = sanitizeString(name, 70);
+      if (!cleanName || cleanName.length < 2) {
         return NextResponse.json({ error: "Name must be at least 2 characters long." }, { status: 400 });
       }
-      updateData.name = name.trim();
+      updateData.name = cleanName;
     }
 
     if (email !== undefined) {
@@ -124,43 +126,9 @@ export async function PATCH(req: Request) {
       },
     });
 
-    // Securely backlink past unassigned guest orders strictly when both identifiers match if both are present
-    try {
-      if (updatedUser.email && updatedUser.phone) {
-        await prisma.order.updateMany({
-          where: {
-            userId: null,
-            customerEmail: updatedUser.email,
-            customerPhone: updatedUser.phone,
-          },
-          data: {
-            userId: updatedUser.id,
-          },
-        });
-      } else if (updatedUser.email) {
-        await prisma.order.updateMany({
-          where: {
-            userId: null,
-            customerEmail: updatedUser.email,
-          },
-          data: {
-            userId: updatedUser.id,
-          },
-        });
-      } else if (updatedUser.phone) {
-        await prisma.order.updateMany({
-          where: {
-            userId: null,
-            customerPhone: updatedUser.phone,
-          },
-          data: {
-            userId: updatedUser.id,
-          },
-        });
-      }
-    } catch (linkErr) {
-      console.warn("Backlink error during profile update:", linkErr);
-    }
+    // Security: Do NOT automatically claim unassigned guest orders (userId: null) when a user
+    // updates their profile email or phone without cryptographic/OTP verification of the new contact,
+    // preventing cross-account guest order and license key hijacking.
 
     return NextResponse.json({
       success: true,

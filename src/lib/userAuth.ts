@@ -4,8 +4,9 @@ import prisma from "@/lib/prisma";
 import { extractClientMeta } from "@/lib/clientMeta";
 
 export const USER_COOKIE_NAME = "premikeys_user_session";
-// 90 days persistent session so the user stays signed in
+// 90 days persistent session absolute expiry, 30 days inactivity timeout
 export const USER_SESSION_DAYS = 90;
+export const USER_IDLE_TIMEOUT_MS = 30 * 24 * 60 * 60 * 1000;
 
 export function normalizePhone(rawPhone: string): string {
   if (!rawPhone) return "";
@@ -24,6 +25,24 @@ export function isEmail(val: string): boolean {
 }
 
 export async function createUserSession(userId: string, reqHeaders?: Headers) {
+  const cookieStore = await cookies();
+
+  // Session rotation: if the client already has a session token, invalidate it before issuing a new one
+  const existingToken = cookieStore.get(USER_COOKIE_NAME)?.value;
+  if (existingToken) {
+    await prisma.userSession.deleteMany({ where: { token: existingToken } }).catch(() => {});
+  }
+
+  // Prune expired sessions for this user
+  await prisma.userSession
+    .deleteMany({
+      where: {
+        userId,
+        expiresAt: { lt: new Date() },
+      },
+    })
+    .catch(() => {});
+
   const token = crypto.randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + USER_SESSION_DAYS * 24 * 60 * 60 * 1000);
   const meta = await extractClientMeta(reqHeaders);
@@ -44,7 +63,6 @@ export async function createUserSession(userId: string, reqHeaders?: Headers) {
     },
   });
 
-  const cookieStore = await cookies();
   cookieStore.set(USER_COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
@@ -54,6 +72,25 @@ export async function createUserSession(userId: string, reqHeaders?: Headers) {
   });
 
   return token;
+}
+
+export async function invalidateAllUserSessions(userId: string, keepCurrentCookie = false) {
+  try {
+    const cookieStore = await cookies();
+    const currentToken = cookieStore.get(USER_COOKIE_NAME)?.value;
+    if (keepCurrentCookie && currentToken) {
+      await prisma.userSession.deleteMany({
+        where: {
+          userId,
+          token: { not: currentToken },
+        },
+      });
+    } else {
+      await prisma.userSession.deleteMany({ where: { userId } });
+    }
+  } catch (error) {
+    console.error("Failed to invalidate user sessions:", error);
+  }
 }
 
 export async function getUserSession() {
@@ -84,6 +121,14 @@ export async function getUserSession() {
     if (!session) return null;
 
     if (session.expiresAt < new Date()) {
+      await prisma.userSession.delete({ where: { token } }).catch(() => {});
+      return null;
+    }
+
+    if (
+      session.lastActiveAt &&
+      Date.now() - new Date(session.lastActiveAt).getTime() > USER_IDLE_TIMEOUT_MS
+    ) {
       await prisma.userSession.delete({ where: { token } }).catch(() => {});
       return null;
     }

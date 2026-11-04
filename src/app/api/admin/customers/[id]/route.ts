@@ -1,19 +1,22 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
-import { getAdminSession, logAdminAudit } from "@/lib/auth";
+import { requireAdmin, logAdminAudit } from "@/lib/auth";
+import { isValidId, sanitizeString } from "@/lib/sanitizer";
 
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireAdmin("customers");
+    if (!auth.authorized) return auth.response;
+    const admin = auth.admin;
 
     const { id } = await params;
+    if (!isValidId(id)) {
+      return NextResponse.json({ error: "Invalid customer ID." }, { status: 400 });
+    }
     const { password, name, email, phone } = await req.json();
 
     const existingUser = await prisma.user.findUnique({
@@ -29,13 +32,13 @@ export async function PATCH(
 
     // Password change
     if (password !== undefined && password !== null && password !== "") {
-      if (typeof password !== "string" || password.length < 6) {
+      if (typeof password !== "string" || password.length < 8 || password.length > 128) {
         return NextResponse.json(
-          { error: "Password must be at least 6 characters long." },
+          { error: "Password must be between 8 and 128 characters long." },
           { status: 400 }
         );
       }
-      const passwordHash = await bcrypt.hash(password, 10);
+      const passwordHash = await bcrypt.hash(password, 12);
       updateData.passwordHash = passwordHash;
       auditChanges.push("Password reset");
 
@@ -46,8 +49,11 @@ export async function PATCH(
     }
 
     if (name && typeof name === "string" && name.trim()) {
-      updateData.name = name.trim();
-      auditChanges.push(`Name changed to "${name.trim()}"`);
+      const cleanName = sanitizeString(name, 80);
+      if (cleanName) {
+        updateData.name = cleanName;
+        auditChanges.push(`Name changed to "${cleanName}"`);
+      }
     }
 
     if (email !== undefined) {
@@ -117,12 +123,14 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireAdmin("customers");
+    if (!auth.authorized) return auth.response;
+    const admin = auth.admin;
 
     const { id } = await params;
+    if (!isValidId(id)) {
+      return NextResponse.json({ error: "Invalid customer ID." }, { status: 400 });
+    }
     const existingUser = await prisma.user.findUnique({
       where: { id },
     });

@@ -9,13 +9,11 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const orConditions: any[] = [{ userId: user.id }];
-    if (user.email) orConditions.push({ userId: null, customerEmail: user.email.toLowerCase() });
-    if (user.phone) orConditions.push({ userId: null, customerPhone: user.phone });
-
+    // Security: Strictly return orders explicitly bound to this authenticated user's account ID.
+    // Guest orders (userId: null) must not be exposed merely because an unverified email/phone matches.
     const orders = await prisma.order.findMany({
       where: {
-        OR: orConditions,
+        userId: user.id,
       },
       orderBy: { createdAt: "desc" },
       include: {

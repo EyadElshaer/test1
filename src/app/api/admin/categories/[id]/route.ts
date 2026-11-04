@@ -1,28 +1,33 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getAdminSession, logAdminAudit } from "@/lib/auth";
+import { requireAdmin, logAdminAudit } from "@/lib/auth";
+import { isValidId, sanitizeString } from "@/lib/sanitizer";
 
 export async function PUT(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireAdmin("categories");
+    if (!auth.authorized) return auth.response;
+    const admin = auth.admin;
 
     const { id } = await params;
+    if (!isValidId(id)) {
+      return NextResponse.json({ error: "Invalid category ID." }, { status: 400 });
+    }
     const { name, slug, description, image, displayOrder, isActive, isFeatured } =
       await req.json();
 
     const category = await prisma.category.update({
       where: { id },
       data: {
-        name: name.trim(),
-        slug: slug?.trim() || undefined,
-        description: description?.trim() || null,
-        image: image || null,
+        name: sanitizeString(name, 100),
+        slug: slug?.trim()
+          ? slug.trim().toLowerCase().replace(/[^a-z0-9-]+/g, "-")
+          : undefined,
+        description: description ? sanitizeString(description, 500) : null,
+        image: image ? sanitizeString(image, 500) : null,
         displayOrder: parseInt(displayOrder) || 0,
         isActive: Boolean(isActive),
         isFeatured: Boolean(isFeatured),
@@ -43,12 +48,14 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireAdmin("categories");
+    if (!auth.authorized) return auth.response;
+    const admin = auth.admin;
 
     const { id } = await params;
+    if (!isValidId(id)) {
+      return NextResponse.json({ error: "Invalid category ID." }, { status: 400 });
+    }
 
     // Check if category is still referenced by products
     const productCount = await prisma.product.count({

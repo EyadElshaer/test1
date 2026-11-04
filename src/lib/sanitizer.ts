@@ -118,3 +118,66 @@ export function isValidImageBuffer(buffer: Buffer): { valid: boolean; detectedMi
 
   return { valid: false };
 }
+
+/**
+ * Validates that an ID matches CUID or standard alphanumeric identifier format.
+ */
+export function isValidId(id: unknown): id is string {
+  if (typeof id !== "string") return false;
+  return /^[a-zA-Z0-9_-]{1,64}$/.test(id.trim());
+}
+
+/**
+ * Validates and sanitizes a URL to prevent javascript:, data:, vbscript: XSS or SSRF schemes.
+ * Returns null if the URL is invalid or uses a disallowed scheme.
+ */
+export function sanitizeSafeUrl(
+  input: unknown,
+  options?: { allowRelative?: boolean; allowedProtocols?: string[] }
+): string | null {
+  if (typeof input !== "string") return null;
+  const trimmed = input.trim().replace(/[\u0000-\u001F\u007F]/g, "");
+  if (!trimmed) return null;
+
+  const allowRelative = options?.allowRelative ?? false;
+  const allowedProtocols = options?.allowedProtocols ?? ["https:", "http:"];
+
+  if (allowRelative && trimmed.startsWith("/")) {
+    if (trimmed.startsWith("//") || trimmed.startsWith("/\\")) {
+      return null;
+    }
+    return trimmed;
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    if (!allowedProtocols.includes(parsed.protocol.toLowerCase())) {
+      return null;
+    }
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Strictly validates an internal redirect path to prevent Open Redirect vulnerabilities.
+ */
+export function sanitizeRedirectPath(
+  input: unknown,
+  defaultPath: string = "/account/orders"
+): string {
+  if (typeof input !== "string") return defaultPath;
+  const trimmed = input.trim().replace(/[\u0000-\u001F\u007F]/g, "");
+  if (
+    !trimmed ||
+    !trimmed.startsWith("/") ||
+    trimmed.startsWith("//") ||
+    trimmed.startsWith("/\\") ||
+    trimmed.includes("://")
+  ) {
+    return defaultPath;
+  }
+  return trimmed;
+}
+

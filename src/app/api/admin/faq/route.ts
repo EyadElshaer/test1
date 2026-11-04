@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getAdminSession, logAdminAudit } from "@/lib/auth";
+import { requireAdmin, logAdminAudit } from "@/lib/auth";
+import { sanitizeString, sanitizeText } from "@/lib/sanitizer";
 
 export async function GET() {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireAdmin("faq");
+    if (!auth.authorized) return auth.response;
 
     const faqs = await prisma.faqItem.findMany({
       orderBy: [{ displayOrder: "asc" }, { createdAt: "desc" }],
@@ -22,22 +21,24 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireAdmin("faq");
+    if (!auth.authorized) return auth.response;
+    const admin = auth.admin;
 
     const { category, question, answer, displayOrder, isPublished } = await req.json();
 
-    if (!question || !answer) {
+    const cleanQuestion = typeof question === "string" ? sanitizeString(question, 500) : "";
+    const cleanAnswer = typeof answer === "string" ? sanitizeText(answer, 5000) : "";
+
+    if (!cleanQuestion || !cleanAnswer) {
       return NextResponse.json({ error: "Question and answer are required." }, { status: 400 });
     }
 
     const faq = await prisma.faqItem.create({
       data: {
-        category: category || "General",
-        question: question.trim(),
-        answer: answer.trim(),
+        category: category ? sanitizeString(category, 100) : "General",
+        question: cleanQuestion,
+        answer: cleanAnswer,
         displayOrder: parseInt(displayOrder) || 0,
         isPublished: isPublished !== undefined ? Boolean(isPublished) : true,
       },

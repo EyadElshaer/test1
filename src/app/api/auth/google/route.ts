@@ -8,6 +8,9 @@ import {
   syncGoogleUser,
 } from "@/lib/googleAuth";
 import { createUserSession, getUserSession } from "@/lib/userAuth";
+import { sanitizeRedirectPath } from "@/lib/sanitizer";
+import { getClientIp } from "@/lib/security";
+import { checkRateLimit } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +20,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const redirectTarget = searchParams.get("redirect") || "/account/orders";
+    const redirectTarget = sanitizeRedirectPath(searchParams.get("redirect"), "/account/orders");
     const action = searchParams.get("action"); // "link" or standard login
 
     // 1. Check if Google OAuth credentials are set in environment
@@ -67,6 +70,15 @@ export async function GET(req: Request) {
  */
 export async function POST(req: Request) {
   try {
+    const ip = getClientIp(req);
+    const rate = checkRateLimit(`google_onetap_${ip}`, 15, 10 * 60 * 1000);
+    if (!rate.allowed) {
+      return NextResponse.json(
+        { error: "Too many authentication requests. Please try again shortly." },
+        { status: 429 }
+      );
+    }
+
     const body = await req.json();
     const { credential } = body;
 

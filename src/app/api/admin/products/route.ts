@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getAdminSession, logAdminAudit } from "@/lib/auth";
+import { requireAdmin, logAdminAudit } from "@/lib/auth";
 import { extractConfigurations } from "@/lib/configurations";
+import { sanitizeString, sanitizeText } from "@/lib/sanitizer";
 
 export async function GET(req: Request) {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireAdmin("products");
+    if (!auth.authorized) return auth.response;
 
     const { searchParams } = new URL(req.url);
     const search = searchParams.get("search")?.trim() || "";
@@ -61,10 +60,9 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireAdmin("products");
+    if (!auth.authorized) return auth.response;
+    const admin = auth.admin;
 
     const body = await req.json();
     const {
@@ -128,20 +126,22 @@ export async function POST(req: Request) {
     const newProduct = await prisma.$transaction(async (tx: any) => {
       const product = await tx.product.create({
         data: {
-          title: title.trim(),
+          title: sanitizeString(title, 200),
           slug: uniqueSlug,
-          shortDescription: shortDescription?.trim() || null,
-          description: description.trim(),
+          shortDescription: shortDescription ? sanitizeString(shortDescription, 500) : null,
+          description: sanitizeText(description, 10000),
           originalPrice: orig,
           salePrice: sale,
           discountPercent,
           categoryId,
-          platform: platform?.trim() || null,
-          productType: productType?.trim() || null,
-          compatibility: compatibility?.trim() || null,
-          deliveryInstructions: deliveryInstructions?.trim() || null,
+          platform: platform ? sanitizeString(platform, 100) : null,
+          productType: productType ? sanitizeString(productType, 100) : null,
+          compatibility: compatibility ? sanitizeString(compatibility, 200) : null,
+          deliveryInstructions: deliveryInstructions
+            ? sanitizeText(deliveryInstructions, 5000)
+            : null,
           availability: availability || "IN_STOCK",
-          stockQuantity: parseInt(stockQuantity) || 999,
+          stockQuantity: Math.max(0, parseInt(stockQuantity) || 999),
           isFeatured: Boolean(isFeatured),
           isPublished: isPublished !== undefined ? Boolean(isPublished) : true,
           isArchived: false,

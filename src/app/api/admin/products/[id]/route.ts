@@ -1,19 +1,21 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getAdminSession, logAdminAudit } from "@/lib/auth";
+import { requireAdmin, logAdminAudit } from "@/lib/auth";
 import { extractConfigurations } from "@/lib/configurations";
+import { isValidId, sanitizeString, sanitizeText } from "@/lib/sanitizer";
 
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireAdmin("products");
+    if (!auth.authorized) return auth.response;
 
     const { id } = await params;
+    if (!isValidId(id)) {
+      return NextResponse.json({ error: "Invalid product ID." }, { status: 400 });
+    }
     const product = await prisma.product.findUnique({
       where: { id },
       include: {
@@ -45,12 +47,14 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireAdmin("products");
+    if (!auth.authorized) return auth.response;
+    const admin = auth.admin;
 
     const { id } = await params;
+    if (!isValidId(id)) {
+      return NextResponse.json({ error: "Invalid product ID." }, { status: 400 });
+    }
     const body = await req.json();
     const {
       title,
@@ -99,20 +103,24 @@ export async function PUT(
       const prod = await tx.product.update({
         where: { id },
         data: {
-          title: title.trim(),
-          slug: slug?.trim() || undefined,
-          shortDescription: shortDescription?.trim() || null,
-          description: description.trim(),
+          title: sanitizeString(title, 200),
+          slug: slug?.trim()
+            ? slug.trim().toLowerCase().replace(/[^a-z0-9-]+/g, "-")
+            : undefined,
+          shortDescription: shortDescription ? sanitizeString(shortDescription, 500) : null,
+          description: sanitizeText(description, 10000),
           originalPrice: orig,
           salePrice: sale,
           discountPercent,
           categoryId,
-          platform: platform?.trim() || null,
-          productType: productType?.trim() || null,
-          compatibility: compatibility?.trim() || null,
-          deliveryInstructions: deliveryInstructions?.trim() || null,
+          platform: platform ? sanitizeString(platform, 100) : null,
+          productType: productType ? sanitizeString(productType, 100) : null,
+          compatibility: compatibility ? sanitizeString(compatibility, 200) : null,
+          deliveryInstructions: deliveryInstructions
+            ? sanitizeText(deliveryInstructions, 5000)
+            : null,
           availability: availability || "IN_STOCK",
-          stockQuantity: parseInt(stockQuantity) || 999,
+          stockQuantity: Math.max(0, parseInt(stockQuantity) || 999),
           isFeatured: Boolean(isFeatured),
           isPublished: Boolean(isPublished),
           isArchived: isArchived !== undefined ? Boolean(isArchived) : false,
@@ -188,12 +196,14 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireAdmin("products");
+    if (!auth.authorized) return auth.response;
+    const admin = auth.admin;
 
     const { id } = await params;
+    if (!isValidId(id)) {
+      return NextResponse.json({ error: "Invalid product ID." }, { status: 400 });
+    }
     const existing = await prisma.product.findUnique({
       where: { id },
       include: { orderItems: true },

@@ -6,12 +6,8 @@ export interface RecaptchaVerifyResult {
   hostname?: string;
 }
 
-// User's Google reCAPTCHA v2 production keys
-export const DEFAULT_SITE_KEY = "6LdWVf8tAAAAABypkK7B_ChiPGK9jCvTpoZh1rZv";
-export const DEFAULT_SECRET_KEY = "6LdWVf8tAAAAADB75JvkoSjXPHahjTg8HvaSnFoj";
-
 export async function getRecaptchaConfig(): Promise<{ siteKey: string; enabled: boolean }> {
-  let siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY?.trim() || DEFAULT_SITE_KEY;
+  let siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY?.trim() || "";
   try {
     const dbSetting = await prisma.storeSetting.findUnique({
       where: { key: "recaptcha_site_key" },
@@ -21,7 +17,7 @@ export async function getRecaptchaConfig(): Promise<{ siteKey: string; enabled: 
     }
   } catch (e) {}
 
-  return { siteKey, enabled: true };
+  return { siteKey, enabled: Boolean(siteKey) };
 }
 
 /**
@@ -41,7 +37,7 @@ export async function getRecaptchaSecretKey(): Promise<string> {
     // Continue with env
   }
 
-  return secretKey || DEFAULT_SECRET_KEY;
+  return secretKey;
 }
 
 /**
@@ -50,14 +46,18 @@ export async function getRecaptchaSecretKey(): Promise<string> {
 export async function verifyGoogleRecaptcha(
   token: string | null | undefined
 ): Promise<RecaptchaVerifyResult> {
+  const secret = await getRecaptchaSecretKey();
+  if (!secret) {
+    // If reCAPTCHA secret is not configured in environment or database, skip external check
+    return { success: true };
+  }
+
   if (!token || typeof token !== "string" || !token.trim()) {
     return {
       success: false,
       error: "Please complete the Google reCAPTCHA 'I'm not a robot' checkbox.",
     };
   }
-
-  const secret = await getRecaptchaSecretKey();
 
   try {
     const verifyUrl = "https://www.google.com/recaptcha/api/siteverify";

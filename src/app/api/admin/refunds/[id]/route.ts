@@ -1,19 +1,28 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getAdminSession, logAdminAudit } from "@/lib/auth";
+import { requireAdmin, logAdminAudit } from "@/lib/auth";
+import { isValidId, sanitizeText } from "@/lib/sanitizer";
+
+const VALID_REFUND_STATUSES = new Set(["PENDING", "APPROVED", "REJECTED", "DONE"]);
 
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireAdmin("refunds");
+    if (!auth.authorized) return auth.response;
+    const admin = auth.admin;
 
     const { id } = await params;
+    if (!isValidId(id)) {
+      return NextResponse.json({ error: "Invalid refund ID." }, { status: 400 });
+    }
     const { status, adminCustomerNote, adminInternalNote } = await req.json();
+
+    if (status && !VALID_REFUND_STATUSES.has(status)) {
+      return NextResponse.json({ error: "Invalid refund status value." }, { status: 400 });
+    }
 
     const existing = await prisma.refundRequest.findUnique({
       where: { id },
@@ -33,8 +42,18 @@ export async function PATCH(
         where: { id },
         data: {
           status: newStatus,
-          adminCustomerNote: adminCustomerNote !== undefined ? adminCustomerNote : existing.adminCustomerNote,
-          adminInternalNote: adminInternalNote !== undefined ? adminInternalNote : existing.adminInternalNote,
+          adminCustomerNote:
+            adminCustomerNote !== undefined
+              ? adminCustomerNote === null
+                ? null
+                : sanitizeText(adminCustomerNote, 2000)
+              : existing.adminCustomerNote,
+          adminInternalNote:
+            adminInternalNote !== undefined
+              ? adminInternalNote === null
+                ? null
+                : sanitizeText(adminInternalNote, 2000)
+              : existing.adminInternalNote,
         },
         include: {
           order: true,
@@ -98,12 +117,14 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireAdmin("refunds");
+    if (!auth.authorized) return auth.response;
+    const admin = auth.admin;
 
     const { id } = await params;
+    if (!isValidId(id)) {
+      return NextResponse.json({ error: "Invalid refund ID." }, { status: 400 });
+    }
     const existing = await prisma.refundRequest.findUnique({
       where: { id },
       include: { order: true },

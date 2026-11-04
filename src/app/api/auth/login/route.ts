@@ -80,7 +80,14 @@ export async function POST(req: Request) {
       });
     }
 
+    // Constant-time dummy bcrypt hash to prevent account enumeration via timing side-channel
+    const DUMMY_BCRYPT_HASH = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
+
     if (!user) {
+      await bcrypt.compare(String(password), DUMMY_BCRYPT_HASH);
+      const failCount = 10 - securityStatus.remainingAttempts;
+      await applyTarpitDelay(failCount);
+
       // Record failed attempt to stop blind credential stuffing
       const failResult = await recordFailedLogin(ip, trimmed, "customer");
       const status = failResult.isLocked ? 429 : 401;
@@ -89,7 +96,7 @@ export async function POST(req: Request) {
         {
           error: failResult.isLocked
             ? failResult.message
-            : "No account found with this email or phone number.",
+            : "Invalid credentials. Please check your email/phone and password.",
           isLocked: failResult.isLocked,
           requiresCaptcha: failResult.requiresCaptcha,
           remainingAttempts: failResult.remainingAttempts,
@@ -101,15 +108,16 @@ export async function POST(req: Request) {
 
     // 5. Verify Password
     if (!user.passwordHash) {
+      await bcrypt.compare(String(password), DUMMY_BCRYPT_HASH);
       return NextResponse.json(
         {
-          error: "This account was registered with Google. Please use 'Continue with Google' to sign in.",
+          error: "Invalid credentials. If you registered with Google, please use 'Continue with Google'.",
         },
-        { status: 400 }
+        { status: 401 }
       );
     }
 
-    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+    const isPasswordValid = await bcrypt.compare(String(password), user.passwordHash);
 
     if (!isPasswordValid) {
       // Tarpit delay against brute-force dictionary attacks
@@ -122,7 +130,9 @@ export async function POST(req: Request) {
 
       return NextResponse.json(
         {
-          error: failResult.message,
+          error: failResult.isLocked
+            ? failResult.message
+            : "Invalid credentials. Please check your email/phone and password.",
           isLocked: failResult.isLocked,
           requiresCaptcha: failResult.requiresCaptcha,
           remainingAttempts: failResult.remainingAttempts,
@@ -135,28 +145,7 @@ export async function POST(req: Request) {
     // 6. Login Success -> Reset failure records immediately
     recordSuccessfulLogin(ip, trimmed, "customer");
 
-    // 7. Backlink past guest orders if any
-    const orConditions: any[] = [];
-    if (user.email) orConditions.push({ customerEmail: user.email });
-    if (user.phone) orConditions.push({ customerPhone: user.phone });
-
-    if (orConditions.length > 0) {
-      try {
-        await prisma.order.updateMany({
-          where: {
-            userId: null,
-            OR: orConditions,
-          },
-          data: {
-            userId: user.id,
-          },
-        });
-      } catch (linkErr) {
-        console.warn("Could not backlink previous orders to logged-in user:", linkErr);
-      }
-    }
-
-    // 8. Create user session cookie
+    // 7. Create rotated user session cookie
     await createUserSession(user.id, req.headers);
 
     return NextResponse.json({
@@ -175,7 +164,7 @@ export async function POST(req: Request) {
   } catch (error: any) {
     console.error("Login error:", error);
     return NextResponse.json(
-      { error: error?.message || "Failed to log in. Please try again." },
+      { error: "Failed to log in. Please try again." },
       { status: 500 }
     );
   }

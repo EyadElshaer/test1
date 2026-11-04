@@ -37,14 +37,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Order not found." }, { status: 404 });
     }
 
-    // Ownership Verification: Active account session or matching phone/email
+    // Ownership Verification: Active account session owning the order, or matching phone/email contact
     const sessionUser = await getUserSession();
-    const isOwnerSession = Boolean(
-      sessionUser &&
-      (order.userId === sessionUser.id ||
-        (sessionUser.email && order.customerEmail.toLowerCase() === sessionUser.email.toLowerCase()) ||
-        (sessionUser.phone && order.customerPhone.replace(/\D/g, "") === sessionUser.phone.replace(/\D/g, "")))
-    );
+    const isOwnerSession = Boolean(sessionUser && order.userId && order.userId === sessionUser.id);
 
     const contactStr = (verificationContact || "").toString().trim().toLowerCase();
     const cleanPhoneDigits = contactStr.replace(/\D/g, "");

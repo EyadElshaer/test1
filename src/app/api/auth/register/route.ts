@@ -36,9 +36,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Please enter your full name (minimum 2 characters)." }, { status: 400 });
     }
 
-    if (!password || typeof password !== "string" || password.length < 6) {
+    if (!password || typeof password !== "string" || password.length < 8) {
       return NextResponse.json(
-        { error: "Password must be at least 6 characters long." },
+        { error: "Password must be at least 8 characters long." },
         { status: 400 }
       );
     }
@@ -118,8 +118,8 @@ export async function POST(req: Request) {
       }
     }
 
-    // Hash password securely with bcrypt
-    const passwordHash = await bcrypt.hash(password, 10);
+    // Hash password securely with bcrypt (work factor 12)
+    const passwordHash = await bcrypt.hash(password, 12);
 
     // Create the user
     const newUser = await prisma.user.create({
@@ -141,26 +141,8 @@ export async function POST(req: Request) {
       },
     });
 
-    // Automatically link any past guest orders placed with this email or phone
-    const orConditions: any[] = [];
-    if (parsedEmail) orConditions.push({ customerEmail: parsedEmail });
-    if (parsedPhone) orConditions.push({ customerPhone: parsedPhone });
-
-    if (orConditions.length > 0) {
-      try {
-        await prisma.order.updateMany({
-          where: {
-            userId: null,
-            OR: orConditions,
-          },
-          data: {
-            userId: newUser.id,
-          },
-        });
-      } catch (linkErr) {
-        console.warn("Could not backlink previous orders to new user:", linkErr);
-      }
-    }
+    // Security: Do NOT automatically claim unassigned guest orders on unverified local registration,
+    // as email/phone ownership has not been cryptographically verified via OTP or OAuth.
 
     // Create persistent session cookie (stays logged in) with device/location meta
     await createUserSession(newUser.id, req.headers);
@@ -173,7 +155,7 @@ export async function POST(req: Request) {
   } catch (error: any) {
     console.error("Registration error:", error);
     return NextResponse.json(
-      { error: error?.message || "Failed to create account. Please try again." },
+      { error: "Failed to create account. Please try again." },
       { status: 500 }
     );
   }

@@ -1,15 +1,13 @@
 import { NextResponse } from "next/server";
-import { getAdminSession, logAdminAudit } from "@/lib/auth";
+import { requireAdmin, logAdminAudit } from "@/lib/auth";
 import { getActiveLockouts, unblockIp } from "@/lib/security";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireAdmin("security");
+    if (!auth.authorized) return auth.response;
 
     const lockouts = getActiveLockouts();
 
@@ -32,10 +30,9 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireAdmin("security");
+    if (!auth.authorized) return auth.response;
+    const admin = auth.admin;
 
     const body = await req.json();
     const { action, ip } = body;

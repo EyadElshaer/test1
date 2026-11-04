@@ -1,14 +1,28 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
-import { getAdminSession, logAdminAudit } from "@/lib/auth";
+import { requireAdmin, hasAdminPermission, logAdminAudit } from "@/lib/auth";
+import { sanitizeString } from "@/lib/sanitizer";
+
+const VALID_PERMISSIONS = new Set([
+  "orders",
+  "refunds",
+  "customers",
+  "products",
+  "categories",
+  "filters",
+  "payment-methods",
+  "promo-codes",
+  "faq",
+  "settings",
+  "security",
+  "staff",
+]);
 
 export async function GET() {
   try {
-    const admin = await getAdminSession();
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireAdmin("staff");
+    if (!auth.authorized) return auth.response;
 
     const staffMembers = await prisma.admin.findMany({
       select: {
@@ -32,38 +46,30 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const currentAdmin = await getAdminSession();
-    if (!currentAdmin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireAdmin("staff");
+    if (!auth.authorized) return auth.response;
+    const currentAdmin = auth.admin;
 
-    // Only SUPER_ADMIN or admins with staff permission can create staff
     const isSuperAdmin = currentAdmin.role === "SUPER_ADMIN";
-    const allowedPerms = (currentAdmin as any).permissions?.split(",").map((p: string) => p.trim()) || [];
-    if (!isSuperAdmin && !allowedPerms.includes("staff")) {
-      return NextResponse.json(
-        { error: "Forbidden: You do not have permission to create staff accounts." },
-        { status: 403 }
-      );
-    }
 
     const { username, password, email, role, permissions } = await req.json();
 
-    if (!username || typeof username !== "string" || username.trim().length < 3) {
+    const rawUsername = typeof username === "string" ? sanitizeString(username, 50) : "";
+    if (!rawUsername || rawUsername.length < 3 || !/^[a-zA-Z0-9_.-]+$/.test(rawUsername)) {
       return NextResponse.json(
-        { error: "Username must be at least 3 characters long." },
+        { error: "Username must be at least 3 alphanumeric characters long." },
         { status: 400 }
       );
     }
 
-    if (!password || typeof password !== "string" || password.length < 6) {
+    if (!password || typeof password !== "string" || password.length < 8 || password.length > 128) {
       return NextResponse.json(
-        { error: "Password must be at least 6 characters long." },
+        { error: "Password must be between 8 and 128 characters long." },
         { status: 400 }
       );
     }
 
-    const cleanUsername = username.trim().toLowerCase();
+    const cleanUsername = rawUsername.toLowerCase();
 
     // Check if username already taken
     const existing = await prisma.admin.findUnique({
@@ -77,19 +83,51 @@ export async function POST(req: Request) {
       );
     }
 
-    const passwordHash = await bcrypt.hash(password, 10);
-    const cleanPermissions = typeof permissions === "string" ? permissions.trim() : Array.isArray(permissions) ? permissions.join(",") : "";
+    // Parse and validate requested permissions
+    const rawPermList =
+      typeof permissions === "string"
+        ? permissions.split(",")
+        : Array.isArray(permissions)
+          ? permissions
+          : [];
+    const normalizedPerms = rawPermList
+      .map((p: unknown) => (typeof p === "string" ? p.trim().toLowerCase() : ""))
+      .filter((p: string) => VALID_PERMISSIONS.has(p));
+
+    // Horizontal/Vertical Privilege Escalation Prevention:
+    // A non-SUPER_ADMIN staff manager cannot grant permissions they do not possess themselves
+    if (!isSuperAdmin) {
+      for (const perm of normalizedPerms) {
+        if (!hasAdminPermission(currentAdmin, perm)) {
+          return NextResponse.json(
+            {
+              error: `Forbidden: You cannot grant the "${perm}" permission because your account does not possess it.`,
+            },
+            { status: 403 }
+          );
+        }
+      }
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    const cleanPermissions = normalizedPerms.join(",");
 
     // Privilege Escalation Prevention: Only a SUPER_ADMIN can create another SUPER_ADMIN
+    if (role === "SUPER_ADMIN" && !isSuperAdmin) {
+      return NextResponse.json(
+        { error: "Forbidden: Only a SUPER_ADMIN can create another SUPER_ADMIN account." },
+        { status: 403 }
+      );
+    }
     const assignedRole = isSuperAdmin && role === "SUPER_ADMIN" ? "SUPER_ADMIN" : "ADMIN";
 
     const newAdmin = await prisma.admin.create({
       data: {
         username: cleanUsername,
         passwordHash,
-        email: email ? email.trim().toLowerCase() : null,
+        email: email && typeof email === "string" ? sanitizeString(email, 120).toLowerCase() : null,
         role: assignedRole,
-        permissions: cleanPermissions || null,
+        permissions: assignedRole === "SUPER_ADMIN" ? "*" : cleanPermissions,
         mustChangePassword: false,
       },
       select: {
@@ -105,7 +143,7 @@ export async function POST(req: Request) {
     await logAdminAudit(
       currentAdmin.id,
       "STAFF_CREATED",
-      `Admin account "${newAdmin.username}" (role: ${newAdmin.role}, permissions: ${newAdmin.permissions || "ALL"}) created by ${currentAdmin.username}.`
+      `Admin account "${newAdmin.username}" (role: ${newAdmin.role}, permissions: ${newAdmin.permissions || "NONE"}) created by ${currentAdmin.username}.`
     );
 
     return NextResponse.json({ success: true, admin: newAdmin });
