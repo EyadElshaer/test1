@@ -177,6 +177,19 @@ export function GoogleOneTap() {
       return;
     }
 
+    // Google GIS One Tap strictly rejects raw IP origins (e.g. 127.0.0.1 or LAN IPs) with Error 400: origin_mismatch
+    if (
+      typeof window !== "undefined" &&
+      /^(127\.0\.0\.1|0\.0\.0\.0|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|\[::1\])$/.test(
+        window.location.hostname
+      )
+    ) {
+      console.info(
+        "[Google One Tap] Skipped on raw IP hostname; open http://localhost:3000 or your registered domain to use Google One Tap."
+      );
+      return;
+    }
+
     if (isPromptingRef.current || promptedOnceRef.current) {
       return;
     }
