@@ -1,11 +1,25 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { extractConfigurations } from "@/lib/configurations";
+import { getClientIp } from "@/lib/security";
+import { checkRateLimit } from "@/lib/rateLimit";
 
 export async function GET(req: Request) {
   try {
+    const ip = getClientIp(req);
+    const rateCheck = checkRateLimit(`products_search_${ip}`, 120, 60 * 1000);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: "Too many search requests. Please slow down." },
+        {
+          status: 429,
+          headers: { "Retry-After": String(rateCheck.retryAfterSec || 60) },
+        }
+      );
+    }
+
     const { searchParams } = new URL(req.url);
-    const search = searchParams.get("search")?.trim() || "";
+    const search = (searchParams.get("search")?.trim() || "").slice(0, 120);
     const category = searchParams.get("category") || "ALL";
     const sort = searchParams.get("sort") || "featured";
     const minPrice = searchParams.get("minPrice") ? Number(searchParams.get("minPrice")) : null;

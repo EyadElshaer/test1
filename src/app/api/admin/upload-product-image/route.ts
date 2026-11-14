@@ -5,6 +5,8 @@ import crypto from "crypto";
 import { requireAdmin, hasAdminPermission } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { isValidImageBuffer } from "@/lib/sanitizer";
+import { getClientIp } from "@/lib/security";
+import { checkRateLimit } from "@/lib/rateLimit";
 
 export async function POST(req: Request) {
   try {
@@ -15,6 +17,15 @@ export async function POST(req: Request) {
       !hasAdminPermission(auth.admin, "categories")
     ) {
       return NextResponse.json({ error: "Forbidden: Insufficient permissions." }, { status: 403 });
+    }
+
+    const ip = getClientIp(req);
+    const rateCheck = checkRateLimit(`admin_img_upload_${auth.admin.id}_${ip}`, 30, 10 * 60 * 1000);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: `Upload rate limit reached. Please wait ${rateCheck.retryAfterSec} seconds.` },
+        { status: 429 }
+      );
     }
 
     const formData = await req.formData();

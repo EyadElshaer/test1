@@ -1,0 +1,56 @@
+name: Security & Quality Gate CI
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+    branches: ["main", "master"]
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  security-audit:
+    name: Secret Scan, Dependency Audit, Static Analysis & SBOM
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository (with full history for secret scanning)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks Secret Scanner
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js 22 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies deterministically
+        run: npm ci
+
+      - name: Run npm dependency vulnerability audit (Fail on moderate/high/critical)
+        run: npm audit --audit-level=moderate
+
+      - name: Validate Prisma Database Schema
+        run: npx prisma validate
+
+      - name: Run ESLint Static Analysis
+        run: npm run lint
+
+      - name: Generate CycloneDX 1.5 Software Bill of Materials (SBOM)
+        run: npm run sbom
+
+      - name: Upload SBOM Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyclonedx-sbom
+          path: sbom.cdx.json
+          retention-days: 30
+

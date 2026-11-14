@@ -1,11 +1,22 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { testTelegramBot, getTelegramConfig } from "@/lib/telegram";
+import { getClientIp } from "@/lib/security";
+import { checkRateLimit } from "@/lib/rateLimit";
 
 export async function POST(req: Request) {
   try {
     const auth = await requireAdmin("settings");
     if (!auth.authorized) return auth.response;
+
+    const ip = getClientIp(req);
+    const rateCheck = checkRateLimit(`test_telegram_${auth.admin.id}_${ip}`, 5, 5 * 60 * 1000);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: `Too many Telegram test requests. Please wait ${rateCheck.retryAfterSec} seconds.` },
+        { status: 429 }
+      );
+    }
 
     const body = await req.json();
     const { botToken, chatId } = body;

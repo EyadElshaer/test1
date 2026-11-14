@@ -96,7 +96,13 @@ export async function POST(req: Request) {
         );
       }
 
-      if (stored.code !== code.trim()) {
+      const expectedBuf = Buffer.from(stored.code, "utf8");
+      const candidateBuf = Buffer.from(code.trim(), "utf8");
+      const isCodeValid =
+        expectedBuf.length === candidateBuf.length &&
+        crypto.timingSafeEqual(expectedBuf, candidateBuf);
+
+      if (!isCodeValid) {
         const remaining = 3 - stored.attempts;
         return NextResponse.json(
           { error: `Incorrect verification code. ${remaining} attempt${remaining === 1 ? "" : "s"} remaining.` },

@@ -273,6 +273,20 @@ export async function POST(req: Request) {
 
     const finalTotal = Math.max(0, serverSubtotal - promoDiscountAmount);
 
+    // 5.5 Validate Payment Method Min/Max Amount Constraints
+    if (typeof paymentMethod.minAmount === "number" && paymentMethod.minAmount > 0 && finalTotal < paymentMethod.minAmount) {
+      return NextResponse.json(
+        { error: `Minimum order total for ${paymentMethod.name} is ${paymentMethod.minAmount} ${paymentMethod.currency || "EGP"}.` },
+        { status: 400 }
+      );
+    }
+    if (typeof paymentMethod.maxAmount === "number" && paymentMethod.maxAmount > 0 && finalTotal > paymentMethod.maxAmount) {
+      return NextResponse.json(
+        { error: `Maximum order total for ${paymentMethod.name} is ${paymentMethod.maxAmount} ${paymentMethod.currency || "EGP"}.` },
+        { status: 400 }
+      );
+    }
+
     // 6. Generate Unique Order Number (#DN...)
     const orderNumber = await generateUniqueOrderNumber();
 
@@ -371,9 +385,91 @@ export async function POST(req: Request) {
       }
     }
 
-    // 7. Atomic Database Transaction
+    // 7. Atomic Database Transaction (prevents race conditions on stock, promo codes, and receipt replay)
     const newOrder = await prisma.$transaction(async (tx: any) => {
-      // Create order
+      // 7a. Re-verify duplicate screenshot inside transaction to prevent concurrent receipt replay
+      if (paymentScreenshotUrl && !paymentScreenshotUrl.includes("proof_mock_")) {
+        const dupInTx = await tx.order.findFirst({
+          where: { paymentScreenshotUrl },
+          select: { id: true },
+        });
+        if (dupInTx) {
+          throw new Error("BUSINESS_ERROR:This payment screenshot has already been used for another order. Please upload a fresh receipt.");
+        }
+      }
+
+      // 7b. Decrement product stock quantities atomically and verify availability
+      for (const itemSnap of orderItemsSnapshot) {
+        const stockUpdate = await tx.product.updateMany({
+          where: {
+            id: itemSnap.productId,
+            isPublished: true,
+            isArchived: false,
+            NOT: { availability: "OUT_OF_STOCK" },
+            stockQuantity: { gte: itemSnap.quantity },
+          },
+          data: {
+            stockQuantity: { decrement: itemSnap.quantity },
+          },
+        });
+
+        if (stockUpdate.count === 0) {
+          throw new Error(
+            `BUSINESS_ERROR:Insufficient stock for "${itemSnap.productTitle}". Another customer may have just purchased the last available unit.`
+          );
+        }
+      }
+
+      // 7c. Atomically validate and increment promo code usage inside transaction
+      let effectivePromoRecord = appliedPromoRecord;
+      let effectiveDiscountAmount = promoDiscountAmount;
+
+      if (effectivePromoRecord) {
+        let canRedeemInTx = true;
+
+        if (effectivePromoRecord.maxUsesPerCustomer && effectivePromoRecord.maxUsesPerCustomer > 0) {
+          const customerUsesInTx = await tx.promoCodeUsage.count({
+            where: {
+              promoCodeId: effectivePromoRecord.id,
+              OR: [
+                { customerPhone: normalizedPhone },
+                { customerEmail: cleanCustomerEmail },
+              ],
+            },
+          });
+          if (customerUsesInTx >= effectivePromoRecord.maxUsesPerCustomer) {
+            canRedeemInTx = false;
+          }
+        }
+
+        if (canRedeemInTx) {
+          const promoWhere: any = {
+            id: effectivePromoRecord.id,
+            isActive: true,
+          };
+          if (effectivePromoRecord.maxUses && effectivePromoRecord.maxUses > 0) {
+            promoWhere.currentUses = { lt: effectivePromoRecord.maxUses };
+          }
+
+          const promoUpdate = await tx.promoCode.updateMany({
+            where: promoWhere,
+            data: { currentUses: { increment: 1 } },
+          });
+
+          if (promoUpdate.count === 0) {
+            canRedeemInTx = false;
+          }
+        }
+
+        if (!canRedeemInTx) {
+          effectivePromoRecord = null;
+          effectiveDiscountAmount = 0;
+        }
+      }
+
+      const effectiveFinalTotal = Math.max(0, serverSubtotal - effectiveDiscountAmount);
+
+      // 7d. Create order record
       const order = await tx.order.create({
         data: {
           orderNumber,
@@ -389,10 +485,10 @@ export async function POST(req: Request) {
           paymentReference: cleanPaymentRef,
           paymentScreenshotUrl: paymentScreenshotUrl || null,
           subtotal: serverSubtotal,
-          discountAmount: promoDiscountAmount,
-          promoCodeId: appliedPromoRecord?.id || null,
-          promoCodeCode: appliedPromoRecord?.code || null,
-          totalAmount: finalTotal,
+          discountAmount: effectiveDiscountAmount,
+          promoCodeId: effectivePromoRecord?.id || null,
+          promoCodeCode: effectivePromoRecord?.code || null,
+          totalAmount: effectiveFinalTotal,
           currency: paymentMethod.currency || "EGP",
           customerNotes: cleanCustomerNotes,
           items: {
@@ -422,38 +518,20 @@ export async function POST(req: Request) {
         },
       });
 
-      // Decrement product stock quantities atomically
-      for (const itemSnap of orderItemsSnapshot) {
-        await tx.product.updateMany({
-          where: {
-            id: itemSnap.productId,
-            stockQuantity: { gte: itemSnap.quantity },
-          },
-          data: {
-            stockQuantity: { decrement: itemSnap.quantity },
-          },
-        });
-      }
-
-      // Update promo code usage count
-      if (appliedPromoRecord) {
-        await tx.promoCode.update({
-          where: { id: appliedPromoRecord.id },
-          data: { currentUses: { increment: 1 } },
-        });
-
+      // 7e. Record promo code usage linked to the created order
+      if (effectivePromoRecord) {
         await tx.promoCodeUsage.create({
           data: {
-            promoCodeId: appliedPromoRecord.id,
+            promoCodeId: effectivePromoRecord.id,
             orderId: order.id,
             customerPhone: normalizedPhone,
-            customerEmail: customerEmail.trim().toLowerCase(),
-            discountAmount: promoDiscountAmount,
+            customerEmail: cleanCustomerEmail,
+            discountAmount: effectiveDiscountAmount,
           },
         });
       }
 
-      // Clear cart for logged-in user upon order completion
+      // 7f. Clear cart for logged-in user upon order completion
       if (orderUserId) {
         await (tx.user as any).update({
           where: { id: orderUserId },
@@ -508,7 +586,13 @@ export async function POST(req: Request) {
       currency: newOrder.currency,
       paymentMethodName: newOrder.paymentMethodName,
     });
-  } catch (error) {
+  } catch (error: any) {
+    if (typeof error?.message === "string" && error.message.startsWith("BUSINESS_ERROR:")) {
+      return NextResponse.json(
+        { error: error.message.replace("BUSINESS_ERROR:", "") },
+        { status: 400 }
+      );
+    }
     console.error("Order creation failed:", error);
     return NextResponse.json({ error: "Failed to create order. Please try again." }, { status: 500 });
   }

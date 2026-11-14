@@ -6,12 +6,12 @@ export interface RecaptchaVerifyResult {
   hostname?: string;
 }
 
-export const DEFAULT_SITE_KEY = "6LdWVf8tAAAAABypkK7B_ChiPGK9jCvTpoZh1rZv";
-export const DEFAULT_SECRET_KEY = "6LdWVf8tAAAAADB75JvkoSjXPHahjTg8HvaSnFoj";
+// Google's official public test keys for localhost / automated testing only (non-secret, documented by Google)
+const LOCALHOST_TEST_SITE_KEY = "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI";
 const LOCALHOST_TEST_SECRET_KEY = "6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe";
 
 export async function getRecaptchaConfig(): Promise<{ siteKey: string; enabled: boolean }> {
-  let siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY?.trim() || DEFAULT_SITE_KEY;
+  let siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY?.trim() || "";
   try {
     const dbSetting = await prisma.storeSetting.findUnique({
       where: { key: "recaptcha_site_key" },
@@ -21,14 +21,19 @@ export async function getRecaptchaConfig(): Promise<{ siteKey: string; enabled: 
     }
   } catch (e) {}
 
+  if (!siteKey && process.env.NODE_ENV !== "production") {
+    siteKey = LOCALHOST_TEST_SITE_KEY;
+  }
+
   return { siteKey, enabled: Boolean(siteKey) };
 }
 
 /**
- * Retrieve Google reCAPTCHA secret key from environment or database Store Settings
+ * Retrieve Google reCAPTCHA secret key strictly from server environment or database Store Settings.
+ * Never hardcode production private keys in source code.
  */
 export async function getRecaptchaSecretKey(): Promise<string> {
-  let secretKey = process.env.RECAPTCHA_SECRET_KEY?.trim() || DEFAULT_SECRET_KEY;
+  let secretKey = process.env.RECAPTCHA_SECRET_KEY?.trim() || "";
 
   try {
     const dbSetting = await prisma.storeSetting.findUnique({
@@ -81,7 +86,7 @@ export async function verifyGoogleRecaptcha(
       process.env.NODE_ENV !== "production" ||
       Boolean(process.env.NEXT_PUBLIC_SITE_URL?.includes("localhost")) ||
       Boolean(process.env.NEXT_PUBLIC_SITE_URL?.includes("127.0.0.1"));
-    if (!data.success && isLocalEnv && secret === DEFAULT_SECRET_KEY) {
+    if (!data.success && isLocalEnv) {
       const fallbackRes = await fetch(verifyUrl, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },

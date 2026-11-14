@@ -11,7 +11,10 @@
     "seed": "tsx prisma/seed.ts",
     "build:worker": "opennextjs-cloudflare build",
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
-    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview"
+    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "sbom": "tsx scripts/generate-sbom.ts",
+    "test:security": "tsx test/security-audit-pentest.ts",
+    "test:e2e": "tsx test/e2e-workflow.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
@@ -38,6 +41,8 @@
     "wrangler": "^4.162.0"
   },
   "overrides": {
-    "deepmerge-ts": "^8.0.0"
+    "deepmerge-ts": "^8.0.0",
+    "minimatch": "^11.0.1",
+    "glob": "^14.0.2"
   }
 }

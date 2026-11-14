@@ -13,9 +13,7 @@ interface GoogleReCaptchaProps {
   className?: string;
 }
 
-// Default Google reCAPTCHA v2 Site Key fallback (Production: premikeys.com)
-const DEFAULT_SITE_KEY = "6LdWVf8tAAAAABypkK7B_ChiPGK9jCvTpoZh1rZv";
-// Official Google reCAPTCHA v2 test Site Key for localhost / 127.0.0.1 when production key does not allow localhost
+// Official Google reCAPTCHA v2 test Site Key for localhost / 127.0.0.1 when no production key is configured
 const LOCALHOST_TEST_SITE_KEY = "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI";
 
 export const GoogleReCaptcha = forwardRef<GoogleReCaptchaRef, GoogleReCaptchaProps>(
@@ -33,16 +31,13 @@ export const GoogleReCaptcha = forwardRef<GoogleReCaptchaRef, GoogleReCaptchaPro
     onExpireRef.current = onExpire;
 
     const envSiteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY?.trim() || "";
-    const configuredKey = fetchedSiteKey || envSiteKey || DEFAULT_SITE_KEY;
+    const configuredKey = fetchedSiteKey || envSiteKey;
     const isLocalhost =
       typeof window !== "undefined" &&
       (window.location.hostname === "localhost" ||
         window.location.hostname === "127.0.0.1" ||
         window.location.hostname === "[::1]");
-    const siteKey =
-      isLocalhost && configuredKey === DEFAULT_SITE_KEY
-        ? LOCALHOST_TEST_SITE_KEY
-        : configuredKey;
+    const siteKey = configuredKey || (isLocalhost ? LOCALHOST_TEST_SITE_KEY : "");
 
     useEffect(() => {
       let active = true;

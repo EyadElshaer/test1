@@ -1,11 +1,22 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { getGeminiApiKey } from "@/lib/geminiReceiptVerifier";
+import { getClientIp } from "@/lib/security";
+import { checkRateLimit } from "@/lib/rateLimit";
 
 export async function POST(req: Request) {
   try {
     const auth = await requireAdmin("settings");
     if (!auth.authorized) return auth.response;
+
+    const ip = getClientIp(req);
+    const rateCheck = checkRateLimit(`test_gemini_${auth.admin.id}_${ip}`, 5, 5 * 60 * 1000);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: `Too many Gemini API test requests. Please wait ${rateCheck.retryAfterSec} seconds.` },
+        { status: 429 }
+      );
+    }
 
     const body = await req.json().catch(() => ({}));
     const rawCandidate = typeof body.apiKey === "string" ? body.apiKey.trim() : "";
