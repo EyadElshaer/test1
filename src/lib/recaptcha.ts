@@ -7,7 +7,6 @@ export interface RecaptchaVerifyResult {
   hostname?: string;
 }
 
-export const DEFAULT_SITE_KEY = "6LdWVf8tAAAAABypkK7B_ChiPGK9jCvTpoZh1rZv";
 // Google's official public test keys for localhost / automated testing only (non-secret, documented by Google)
 const LOCALHOST_TEST_SITE_KEY = "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI";
 const LOCALHOST_TEST_SECRET_KEY = "6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe";
@@ -20,6 +19,7 @@ function getFallbackSigningSecret(): string {
     process.env.SESSION_SECRET?.trim() ||
     process.env.JWT_SECRET?.trim() ||
     process.env.RECAPTCHA_SECRET_KEY?.trim() ||
+    process.env.DATABASE_URL?.trim() ||
     RUNTIME_FALLBACK_SECRET
   );
 }
@@ -73,7 +73,7 @@ function verifyFallbackRecaptchaToken(token: string): boolean {
 }
 
 export async function getRecaptchaConfig(): Promise<{ siteKey: string; enabled: boolean }> {
-  let siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY?.trim() || DEFAULT_SITE_KEY;
+  let siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY?.trim() || "";
   try {
     const dbSetting = await prisma.storeSetting.findUnique({
       where: { key: "recaptcha_site_key" },
@@ -83,7 +83,7 @@ export async function getRecaptchaConfig(): Promise<{ siteKey: string; enabled: 
     }
   } catch (e) { }
 
-  return { siteKey, enabled: Boolean(siteKey) };
+  return { siteKey, enabled: true };
 }
 
 /**
@@ -152,39 +152,39 @@ export async function verifyGoogleRecaptcha(
 
     let data = await res.json();
 
-      // If the localhost/test site key was used on the client, verify with Google's official test secret
-      if (!data.success && secret !== LOCALHOST_TEST_SECRET_KEY) {
-        const fallbackRes = await fetch(verifyUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({
-            secret: LOCALHOST_TEST_SECRET_KEY,
-            response: token.trim(),
-          }),
-        });
-        const fallbackData = await fallbackRes.json();
-        if (fallbackData.success) {
-          data = fallbackData;
-        }
+    // If the localhost/test site key was used on the client, verify with Google's official test secret
+    if (!data.success && secret !== LOCALHOST_TEST_SECRET_KEY) {
+      const fallbackRes = await fetch(verifyUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          secret: LOCALHOST_TEST_SECRET_KEY,
+          response: token.trim(),
+        }),
+      });
+      const fallbackData = await fallbackRes.json();
+      if (fallbackData.success) {
+        data = fallbackData;
       }
+    }
 
-      if (!data.success) {
-        const errorCodes = data["error-codes"] ? data["error-codes"].join(", ") : "verification_failed";
-        return {
-          success: false,
-          error: `reCAPTCHA verification failed (${errorCodes}). Please check the box again.`,
-        };
-      }
-
-      return {
-        success: true,
-        hostname: data.hostname,
-      };
-    } catch (err: any) {
-      console.error("Google reCAPTCHA verification exception:", err);
+    if (!data.success) {
+      const errorCodes = data["error-codes"] ? data["error-codes"].join(", ") : "verification_failed";
       return {
         success: false,
-        error: "Unable to contact Google reCAPTCHA verification service.",
+        error: `reCAPTCHA verification failed (${errorCodes}). Please check the box again.`,
       };
     }
+
+    return {
+      success: true,
+      hostname: data.hostname,
+    };
+  } catch (err: any) {
+    console.error("Google reCAPTCHA verification exception:", err);
+    return {
+      success: false,
+      error: "Unable to contact Google reCAPTCHA verification service.",
+    };
   }
+}
